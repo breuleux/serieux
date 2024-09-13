@@ -9,10 +9,12 @@ from .model import (
     Field,
     ListModel,
     MappingModel,
+    Model,
     Partial,
     StructuredModel,
+    UnionModel,
 )
-from .proxy import TrackingProxy, get_annotations, proxy
+from .proxy import Proxy, TrackingProxy, deprox, get_annotations, proxy
 
 UnionAlias = type(Union[int, str])
 
@@ -37,16 +39,32 @@ def decompose(cls, default_args=[]):
 
 
 class DataConverter(OvldBase):
+    def __init__(self):
+        self._model_cache = {}
+
     #########
     # model #
     #########
 
-    def model(self, typ: object):
-        return NotImplemented
+    @ovld(priority=100)
+    def model(self, typ: type[object]):
+        if typ not in self._model_cache:
+            model = call_next(typ)
+            self._model_cache[typ] = model
+            if isinstance(model, Model):
+                model.fill(self.model)
+        return self._model_cache[typ]
+
+    def model(self, typ: type[Union]):
+        return UnionModel(original_type=typ, options=typ.__args__)
+
+    def model(self, typ: type[object] | Model):
+        return typ
 
     def model(self, typ: type[dict]):
         dt, [kt, vt] = decompose(typ, [str, object])
         return MappingModel(
+            original_type=typ,
             builder=dt,
             extractor=dict,
             key_type=kt,
@@ -56,15 +74,18 @@ class DataConverter(OvldBase):
     def model(self, typ: type[list]):
         lt, [et] = decompose(typ, [object])
         return ListModel(
+            original_type=typ,
             builder=lt,
             extractor=list,
             element_type=et,
         )
 
     def model(self, typ: type[Dataclass]):
+        flds = fields(getattr(typ, "__origin__", typ))
         return StructuredModel(
+            original_type=typ,
             builder=typ,
-            fields={f.name: Field(type=f.type) for f in fields(typ)},
+            fields={f.name: Field(type=f.type) for f in flds},
         )
 
     #############
@@ -78,15 +99,13 @@ class DataConverter(OvldBase):
     # deserialize_partial #
     #######################
 
-    def deserialize_partial(self, to: type[object], frm: object):
+    @ovld(priority=100)
+    def deserialize_partial(self, to: object, frm: object):
         try:
             if not isinstance(frm, TrackingProxy):
                 frm = TrackingProxy.make(frm)
             model = self.model(to)
-            if model is NotImplemented:
-                rval = call_next(to, frm)
-            else:
-                rval = recurse(model, frm)
+            rval = call_next(model, frm)
             return proxy(rval, get_annotations(frm))
         except ValidationError as exc:
             return exc
@@ -102,7 +121,7 @@ class DataConverter(OvldBase):
             recurse(typ.key_type, k): recurse(typ.element_type, v)
             for k, v in frm.items()
         }
-        return Partial(typ.builder)(**des)
+        return Partial(typ.builder)(des)
 
     def deserialize_partial(self, typ: ListModel, frm: list):
         return Partial(typ.builder)([recurse(typ.element_type, x) for x in frm])
@@ -126,7 +145,7 @@ class DataConverter(OvldBase):
     @ovld(priority=10)
     def build(self, obj: object):
         try:
-            return call_next(obj)
+            return call_next(deprox(obj) if isinstance(obj, Proxy) else obj)
         except Exception as exc:
             return (None, [ValidationError(exc, get_annotations(obj))])
 
