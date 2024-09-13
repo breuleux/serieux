@@ -1,6 +1,6 @@
-from dataclasses import dataclass, fields
+from dataclasses import fields
 from enum import Enum
-from typing import Callable, Union
+from typing import Union
 
 from ovld import Dataclass, OvldBase, call_next, ovld, recurse
 
@@ -10,6 +10,7 @@ from .model import (
     ListModel,
     MappingModel,
     Model,
+    Multiple,
     Partial,
     StructuredModel,
     UnionModel,
@@ -17,18 +18,6 @@ from .model import (
 from .proxy import Proxy, TrackingProxy, deprox, get_annotations, proxy
 
 UnionAlias = type(Union[int, str])
-
-
-@dataclass
-class Partial:
-    builder: Callable
-    args: tuple = None
-    kwargs: dict = None
-
-    def __call__(self, *args, **kwargs):
-        assert not self.args
-        assert not self.kwargs
-        return type(self)(self.builder, args, kwargs)
 
 
 def decompose(cls, default_args=[]):
@@ -110,21 +99,39 @@ class DataConverter(OvldBase):
         except ValidationError as exc:
             return exc
         except Exception as exc:
-            return ValidationError(exc, get_annotations(frm))
+            new_exc = ValidationError(exc, get_annotations(frm))
+            new_exc.__traceback__ = exc.__traceback__
+            return new_exc
 
-    def deserialize_partial(self, typ: StructuredModel, frm: dict):
-        des = {k: recurse(typ.fields[k].type, v) for k, v in frm.items()}
-        return Partial(typ.builder)(**des)
+    def deserialize_partial(self, to: StructuredModel, frm: dict):
+        des = {k: recurse(to.fields[k].type, v) for k, v in frm.items()}
+        return Partial(to.builder)(**des)
 
-    def deserialize_partial(self, typ: MappingModel, frm: dict):
+    def deserialize_partial(self, to: MappingModel, frm: dict):
         des = {
-            recurse(typ.key_type, k): recurse(typ.element_type, v)
+            recurse(to.key_type, k): recurse(to.element_type, v)
             for k, v in frm.items()
         }
-        return Partial(typ.builder)(des)
+        return Partial(to.builder)(des)
 
-    def deserialize_partial(self, typ: ListModel, frm: list):
-        return Partial(typ.builder)([recurse(typ.element_type, x) for x in frm])
+    def deserialize_partial(self, to: ListModel, frm: list):
+        return Partial(to.builder)([recurse(to.element_type, x) for x in frm])
+
+    def deserialize_partial(self, to: object, frm: Multiple):
+        parts = [recurse(to, part) for part in frm.parts]
+        if not all(isinstance(p, Partial) for p in parts):
+            raise TypeError(
+                "Cannot merge multiple sources because they have different types."
+            )
+        p1, *rest = parts
+        for p in rest:
+            if p.builder != p1.model:
+                raise TypeError(
+                    "Cannot merge multiple sources because they have different types."
+                )
+            p1.args += p.args
+            p1.kwargs.update(p.kwargs)
+        return p1
 
     def deserialize_partial(self, to: type[int], frm: int):
         return to(frm)

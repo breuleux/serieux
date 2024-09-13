@@ -1,10 +1,14 @@
 import traceback
 from contextlib import contextmanager
+from pathlib import Path
 
 from serieux import ValidationExceptionGroup, deserialize
+from serieux.model import Multiple
 from serieux.proxy import Accessor
 
 from .common import Point
+
+here = Path(__file__).parent
 
 
 @contextmanager
@@ -59,3 +63,7 @@ def test_primitive_int():
 
 def test_dict():
     assert deserialize(dict[str, int], {"a": 1, "b": 2}) == {"a": 1, "b": 2}
+
+
+def test_deserialize_point_two_sources():
+    assert deserialize(Point, Multiple([{"x": 1}, {"y": 2}])) == Point(1, 2)

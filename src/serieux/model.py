@@ -5,6 +5,10 @@ from typing import Any, Callable, Union, _GenericAlias, _UnionGenericAlias
 
 from ovld import call_next, ovld, recurse
 
+################
+# canonicalize #
+################
+
 
 @ovld
 def canonicalize(t: object):  # noqa: F811
@@ -48,6 +52,11 @@ def canonicalize(t: type, ctx: dict, typesub):  # noqa: F811
         return Union[tuple(recurse(t2, ctx, typesub) for t2 in t.__args__)]
     else:
         return t
+
+
+###############
+# Model types #
+###############
 
 
 @dataclass
@@ -113,8 +122,23 @@ class UnionModel(Model):
         ]
 
 
+####################
+# Other structures #
+####################
+
+
 @dataclass
 class Partial:
-    model: Model
-    args: list
-    kwargs: dict
+    builder: Callable
+    args: tuple = None
+    kwargs: dict = None
+
+    def __call__(self, *args, **kwargs):
+        assert not self.args
+        assert not self.kwargs
+        return type(self)(self.builder, args, kwargs)
+
+
+@dataclass
+class Multiple:
+    parts: list
