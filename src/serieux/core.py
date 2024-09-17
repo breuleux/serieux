@@ -15,7 +15,14 @@ from .model import (
     StructuredModel,
     UnionModel,
 )
-from .proxy import Proxy, TrackingProxy, deprox, get_annotations, proxy
+from .proxy import (
+    Proxy,
+    TrackingProxy,
+    deprox,
+    get_annotations,
+    proxy,
+)
+from .utils import typename
 
 UnionAlias = type(Union[int, str])
 
@@ -28,7 +35,8 @@ def decompose(cls, default_args=[]):
 
 
 class DataConverter(OvldBase):
-    def __init__(self):
+    def __init__(self, raise_immediately=False):
+        self.raise_immediately = raise_immediately
         self._model_cache = {}
 
     #########
@@ -96,15 +104,36 @@ class DataConverter(OvldBase):
             model = self.model(to)
             rval = call_next(model, frm)
             return proxy(rval, get_annotations(frm))
-        except ValidationError as exc:
-            return exc
+        except (ValidationError, ValidationExceptionGroup) as exc:
+            if isinstance(exc, ValidationError) and not exc.ctx:
+                exc.ctx = get_annotations(frm)
+            if self.raise_immediately:
+                raise exc
+            else:
+                return exc
         except Exception as exc:
-            new_exc = ValidationError(exc, get_annotations(frm))
+            new_exc = ValidationError(exc=exc, ctx=get_annotations(frm))
             new_exc.__traceback__ = exc.__traceback__
-            return new_exc
+            if self.raise_immediately:
+                raise new_exc
+            else:
+                return new_exc
 
     def deserialize_partial(self, to: StructuredModel, frm: dict):
-        des = {k: recurse(to.fields[k].type, v) for k, v in frm.items()}
+        extra_fields = [
+            ValidationError(
+                f"Unknown field `{k}` found in the arguments for `{typename(to.original_type)}`",
+                ctx=get_annotations(k),
+            )
+            for k in frm
+            if k not in to.fields
+        ]
+        if extra_fields:
+            raise ValidationExceptionGroup(
+                "Extra fields were given", extra_fields
+            )
+
+        des = {deprox(k): recurse(to.fields[k].type, v) for k, v in frm.items()}
         return Partial(to.builder)(**des)
 
     def deserialize_partial(self, to: MappingModel, frm: dict):
@@ -125,7 +154,7 @@ class DataConverter(OvldBase):
             )
         p1, *rest = parts
         for p in rest:
-            if p.builder != p1.model:
+            if p.builder != p1.builder:
                 raise TypeError(
                     "Cannot merge multiple sources because they have different types."
                 )
@@ -145,6 +174,12 @@ class DataConverter(OvldBase):
     def deserialize_partial(self, to: type[Enum], frm: str):
         return to(frm)
 
+    @ovld(priority=-1)
+    def deserialize_partial(self, to: object, frm: object):
+        raise ValidationError(
+            f"Trying to deserialize to type `{typename(to)}`, but the serialized data is of an incompatible type `{typename(type(frm))}`."
+        )
+
     #########
     # build #
     #########
@@ -154,7 +189,7 @@ class DataConverter(OvldBase):
         try:
             return call_next(deprox(obj) if isinstance(obj, Proxy) else obj)
         except Exception as exc:
-            return (None, [ValidationError(exc, get_annotations(obj))])
+            return (None, [ValidationError(exc=exc, ctx=get_annotations(obj))])
 
     def build(self, part: Partial):
         args, aexcs = recurse(part.args)
@@ -166,6 +201,9 @@ class DataConverter(OvldBase):
 
     def build(self, exc: ValidationError):
         return (None, [exc])
+
+    def build(self, exc: ValidationExceptionGroup):
+        return (None, exc.exceptions)
 
     def build(self, li: list | tuple):
         excs = []

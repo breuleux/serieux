@@ -82,8 +82,8 @@ class StructuredModel(Model):
             f.name = k
 
     def fill(self, model):
-        for field in self.fields.values():
-            field.type = model(canonicalize(field.type, self.original_type))
+        for fld in self.fields.values():
+            fld.type = model(canonicalize(fld.type, self.original_type))
 
 
 @dataclass

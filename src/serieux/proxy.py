@@ -1,12 +1,24 @@
 import inspect
 from dataclasses import dataclass, field, replace
+from types import FunctionType, MethodType
 
+from ovld import subclasscheck
 from wrapt import ObjectProxy
 
+BuiltinType = type("x".startswith)
 proxy_cache = {}
 
 
 class Proxy(ObjectProxy):
+    _self_cls = object
+
+    @classmethod
+    def __is_subtype__(cls, other):
+        return subclasscheck(cls._self_cls, other)
+
+    @classmethod
+    def __is_supertype__(cls, other):
+        return subclasscheck(other, cls._self_cls)
 
     @classmethod
     def make(cls, obj, ann):
@@ -19,7 +31,7 @@ class Proxy(ObjectProxy):
             (cls,),
             {
                 "_self_basis": cls,
-                "__proxy_for__": typ,
+                "_self_cls": typ,
                 **members,
             },
         )
@@ -54,6 +66,18 @@ class ProxyAnnotation:
     pass
 
 
+@dataclass
+class Source(ProxyAnnotation):
+    origin: str
+    source: str
+    start: int
+    end: int
+    linecols: tuple
+
+    def get_snippet(self):
+        return self.source[self.start : self.end]
+
+
 class AccessorPart:
     pass
 
@@ -63,7 +87,10 @@ class Item(AccessorPart):
     item: object
 
     def __str__(self):
-        return f"[{self.item!r}]"
+        if isinstance(self.item, str):
+            return f".{self.item}"
+        else:
+            return f"[{self.item!r}]"
 
 
 @dataclass
@@ -103,6 +130,8 @@ class TrackingProxy(Proxy):
         return basis[type(obj)](obj, ann)
 
     def _wrap(self, x, path_part):
+        if isinstance(x, (FunctionType, MethodType, BuiltinType)):
+            return x
         pathed = self._self_ann[Accessor]
         path = [*pathed.path, path_part]
         return type(self).make(x, {Accessor: replace(pathed, path=path)})
@@ -149,6 +178,10 @@ class _tp_dict:
     def get(self, key, default=None):
         return self._wrap(self.__wrapped__.get(key, default), Item(key))
 
+    def __iter__(self):
+        for x in self.__wrapped__:
+            yield self._wrap(x, Item(x))
+
 
 def _extract(x, ann):
     if isinstance(x, Proxy):
@@ -162,3 +195,14 @@ def proxy(x, ann, typ=None):
     (typ2, x, ann) = _extract(x, ann)
     typ = typ or typ2 or Proxy
     return typ.make(x, ann)
+
+
+def deprox(x):
+    return x.__wrapped__ if isinstance(x, ObjectProxy) else x
+
+
+def reprox(result, original):
+    if isinstance(original, Proxy):
+        return proxy(result, original._self_ann)
+    else:
+        return result
