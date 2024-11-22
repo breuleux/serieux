@@ -1,57 +1,57 @@
 import importlib
 from dataclasses import dataclass, field
-from types import UnionType
-from typing import Any, Callable, Union, _GenericAlias, _UnionGenericAlias
+from types import GenericAlias, UnionType
+from typing import (
+    Callable,
+    ForwardRef,
+    TypeVar,
+    Union,
+    _GenericAlias,
+    get_args,
+    get_origin,
+)
 
-from ovld import call_next, ovld, recurse
-
-################
-# canonicalize #
-################
+#################
+# evaluate_hint #
+#################
 
 
-@ovld
-def canonicalize(t: object):  # noqa: F811
-    return recurse(t, __builtins__, {})
+def evaluate_hint(typ, ctx=None, lcl=None, typesub=None):
+    if isinstance(typ, str):
+        if ctx is not None and not isinstance(ctx, dict):
+            if isinstance(ctx, (GenericAlias, _GenericAlias)):
+                origin = get_origin(ctx)
+                if hasattr(origin, "__type_params__"):
+                    subs = {
+                        p: arg
+                        for p, arg in zip(origin.__type_params__, get_args(ctx))
+                    }
+                    typesub = {**subs, **(typesub or {})}
+                ctx = origin
+            if hasattr(ctx, "__type_params__"):
+                lcl = {p.__name__: p for p in ctx.__type_params__}
+            ctx = importlib.import_module(ctx.__module__).__dict__
+        return evaluate_hint(eval(typ, ctx, lcl), ctx, lcl, typesub)
 
+    elif isinstance(typ, (UnionType, GenericAlias, _GenericAlias)):
+        origin = get_origin(typ)
+        args = get_args(typ)
+        if origin is UnionType:
+            origin = Union
+        new_args = [evaluate_hint(arg, ctx, lcl, typesub) for arg in args]
+        return origin[tuple(new_args)]
 
-@ovld
-def canonicalize(t: Any, ctx: object, typesub=None):  # noqa: F811
-    if isinstance(ctx, _GenericAlias):
-        origin = ctx.__origin__
-        params = getattr(origin, "__type_params__", ())
-        args = ctx.__args__
-        return recurse(
-            t, origin, {tv.__name__: value for tv, value in zip(params, args)}
-        )
+    elif isinstance(typ, TypeVar):
+        return typesub.get(typ, typ) if typesub else typ
+
+    elif isinstance(typ, ForwardRef):
+        return typ._evaluate(ctx, lcl, recursive_guard=frozenset())
+
+    elif isinstance(typ, type):
+        return typ
+
     else:
-        if hasattr(ctx, "__module__"):
-            glb = importlib.import_module(ctx.__module__).__dict__
-            typesub = typesub or {
-                p.__name__: p for p in getattr(ctx, "__type_params__", ())
-            }
-        else:
-            glb = typesub = {}
-        return recurse(t, glb, typesub)
-
-
-@ovld
-def canonicalize(t: UnionType, ctx: dict, typesub):  # noqa: F811
-    return Union[tuple(recurse(t2, ctx, typesub) for t2 in t.__args__)]
-
-
-@ovld
-def canonicalize(t: str, ctx: dict, typesub):  # noqa: F811
-    evaluated = eval(t, ctx, typesub)
-    return call_next(evaluated, ctx, typesub)
-
-
-@ovld
-def canonicalize(t: type, ctx: dict, typesub):  # noqa: F811
-    if isinstance(t, _UnionGenericAlias):
-        return Union[tuple(recurse(t2, ctx, typesub) for t2 in t.__args__)]
-    else:
-        return t
+        raise TypeError("Cannot evaluate hint:", typ, type(typ))
 
 
 ###############
@@ -83,7 +83,7 @@ class StructuredModel(Model):
 
     def fill(self, model):
         for fld in self.fields.values():
-            fld.type = model(canonicalize(fld.type, self.original_type))
+            fld.type = model(evaluate_hint(fld.type, self.original_type))
 
 
 @dataclass
@@ -94,7 +94,7 @@ class ListModel(Model):
 
     def fill(self, model):
         self.element_type = model(
-            canonicalize(self.element_type, self.original_type)
+            evaluate_hint(self.element_type, self.original_type)
         )
 
 
@@ -106,9 +106,9 @@ class MappingModel(Model):
     extractor: Callable
 
     def fill(self, model):
-        self.key_type = model(canonicalize(self.key_type, self.original_type))
+        self.key_type = model(evaluate_hint(self.key_type, self.original_type))
         self.element_type = model(
-            canonicalize(self.element_type, self.original_type)
+            evaluate_hint(self.element_type, self.original_type)
         )
 
 
@@ -118,7 +118,8 @@ class UnionModel(Model):
 
     def fill(self, model):
         self.options = [
-            model(canonicalize(opt, self.original_type)) for opt in self.options
+            model(evaluate_hint(opt, self.original_type))
+            for opt in self.options
         ]
 
 

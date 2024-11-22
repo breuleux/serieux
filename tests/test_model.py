@@ -1,6 +1,6 @@
-# from __future__ import annotations
 from dataclasses import fields
 from numbers import Number
+from typing import TypeVar, Union
 
 from serieux import model
 from serieux.model import (
@@ -9,25 +9,47 @@ from serieux.model import (
     MappingModel,
     StructuredModel,
     UnionModel,
-    canonicalize,
+)
+from serieux.model import (
+    evaluate_hint as eh,
 )
 
-from .common import Point
+from .common import Point, one_test_per_assert
+
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
 
 
-def test_canonicalize_tree():
+@one_test_per_assert
+def test_evaluate_hint():
+    assert eh("str") is str
+    assert eh(list["Point"], Point) == list[Point]
+    assert eh(Union[int, "str"]) == int | str
+    assert eh("int | str") == int | str
+
+
+@one_test_per_assert
+def test_evaluate_hint_generics():
+    assert eh(dict[T1, T2]) == dict[T1, T2]
+    assert eh(dict[T1, T2], typesub={T1: int}) == dict[int, T2]
+    assert eh(dict[T1, T2], typesub={T2: int}) == dict[T1, int]
+    assert eh(dict[T1, T2], typesub={T1: int, T2: str}) == dict[int, str]
+    assert eh(dict[T2, T1], typesub={T1: int, T2: str}) == dict[str, int]
+
+
+def test_evaluate_hint_tree():
     from .definitions import Tree
 
     for field in fields(Tree):
-        assert canonicalize(field.type, Tree) == Number | Tree
+        assert eh(field.type, Tree) == Number | Tree
 
 
-def test_canonicalize_tree_parametric():
+def test_evaluate_hint_tree_parametric():
     from .definitions_py312 import Tree
 
     for field in fields(Tree):
-        assert canonicalize(field.type, Tree[float]) == float | Tree[float]
-        assert canonicalize(field.type, Tree[str]) == str | Tree[str]
+        assert eh(field.type, Tree[float]) == Union[float, Tree[float]]
+        assert eh(field.type, Tree[str]) == Union[str, Tree[str]]
 
 
 def test_model_dict():
@@ -72,8 +94,7 @@ def test_model_dataclass():
 
 
 def test_model_union():
-    model.map.display_resolution(canonicalize(int | str))
-    assert model(canonicalize(int | str)) == UnionModel(
+    assert model(eh(int | str)) == UnionModel(
         original_type=int | str, options=[int, str]
     )
 
@@ -83,6 +104,7 @@ def test_model_tree():
 
     m = model(Tree)
     assert m in m.fields["left"].type.options
+    assert m in m.fields["right"].type.options
 
 
 def test_model_tree_parametric():
@@ -90,3 +112,4 @@ def test_model_tree_parametric():
 
     m = model(Tree[float])
     assert m in m.fields["left"].type.options
+    assert m in m.fields["right"].type.options

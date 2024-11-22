@@ -44,7 +44,7 @@ class DataConverter(OvldBase):
     #########
 
     @ovld(priority=100)
-    def model(self, typ: type[object]):
+    def model(self, typ: type[object] | type[UnionAlias]):
         if typ not in self._model_cache:
             model = call_next(typ)
             self._model_cache[typ] = model
@@ -52,10 +52,13 @@ class DataConverter(OvldBase):
                 model.fill(self.model)
         return self._model_cache[typ]
 
-    def model(self, typ: type[Union]):
+    def model(self, typ: type[UnionAlias]):
         return UnionModel(original_type=typ, options=typ.__args__)
 
-    def model(self, typ: type[object] | Model):
+    def model(self, typ: type[object]):
+        return typ
+
+    def model(self, typ: Model):
         return typ
 
     def model(self, typ: type[dict]):
