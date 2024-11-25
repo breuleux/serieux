@@ -1,0 +1,10 @@
+languages: ["English", "French"]
+capital: "Ottawa"
+population: 39_000_000
+citizens:
+- name: Olivier
+  birthyear: 1985
+  hometown: Montreal
+- name: Abraham
+  birthyear: 2018
+  hometown: Shawinigan

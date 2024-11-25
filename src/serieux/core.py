@@ -229,6 +229,9 @@ class DataConverter(OvldBase):
     def deserialize_partial(self, to: type[Enum], frm: str):
         return to(frm)
 
+    def deserialize_partial(self, to: type[NoneType], frm: NoneType):
+        return None
+
     @ovld(priority=-1)
     def deserialize_partial(self, to: object, frm: object):
         raise ValidationError(

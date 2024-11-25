@@ -42,6 +42,6 @@ class ValidationError(Exception):
         if location:
             (l1, c1), (l2, c2) = location.linecols
             lc = f"{l1}:{c1}-{l2}:{c2}" if l1 != l2 else f"{l1}:{c1}-{c2}"
-            return f"{location.origin}:{lc} -- {type(self.exc).__qualname__}: {self.exc}"
+            return f"{location.origin}:{lc} -- {self.message}"
         else:
-            return f"At path {acc_string}: {type(self.exc).__qualname__}: {self.exc}"
+            return f"At path {acc_string}: {self.message}"
