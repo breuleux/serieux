@@ -11,6 +11,8 @@ from typing import (
     get_origin,
 )
 
+from ovld import ovld
+
 #################
 # evaluate_hint #
 #################
@@ -70,6 +72,9 @@ class Field:
 class Model:
     original_type: type = field(default=None, kw_only=True)
 
+    def recognizes(self, value):
+        return isinstance(value, get_origin(self.original_type))
+
 
 @dataclass
 class StructuredModel(Model):
@@ -121,6 +126,21 @@ class UnionModel(Model):
             model(evaluate_hint(opt, self.original_type))
             for opt in self.options
         ]
+
+
+##############
+# recognizes #
+##############
+
+
+@ovld
+def recognizes(model: Model, value):
+    return model.recognizes(value)
+
+
+@ovld
+def recognizes(t: type, value):
+    return isinstance(value, t)
 
 
 ####################

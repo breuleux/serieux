@@ -1,5 +1,6 @@
 from dataclasses import fields
 from enum import Enum
+from types import NoneType
 from typing import Union
 
 from ovld import Dataclass, OvldBase, call_next, ovld, recurse
@@ -14,6 +15,7 @@ from .model import (
     Partial,
     StructuredModel,
     UnionModel,
+    recognizes,
 )
 from .proxy import (
     Proxy,
@@ -92,8 +94,58 @@ class DataConverter(OvldBase):
     # serialize #
     #############
 
-    def serialize(self, typ, value):
-        pass
+    def serialize(self, x: object):
+        return self.serialize(type(x), x)
+
+    def serialize(self, typ: type[object], value: object):
+        model = self.model(typ)
+        if isinstance(model, Model):
+            return self.serialize(model, value)
+        else:
+            return self.serialize.next(typ, value)
+
+    def serialize(self, typ: StructuredModel, value: object):
+        return {
+            f.name: self.serialize(f.type, f.extract(value))
+            for f in typ.fields.values()
+        }
+
+    def serialize(self, typ: MappingModel, value: object):
+        return {
+            self.serialize(typ.key_type, k): self.serialize(typ.element_type, v)
+            for k, v in typ.extractor(value).items()
+        }
+
+    def serialize(self, typ: ListModel, value: object):
+        return [
+            self.serialize(typ.element_type, x) for x in typ.extractor(value)
+        ]
+
+    def serialize(self, typ: UnionModel, value: object):
+        for opt in typ.options:
+            if recognizes(opt, value):
+                return self.serialize(opt, value)
+        raise TypeError(
+            f"Cannot serialize {value} under type {typ.original_type}"
+        )
+
+    def serialize(self, typ: type[bool], value: bool):
+        return bool(value)
+
+    def serialize(self, typ: type[int], value: int):
+        return int(value)
+
+    def serialize(self, typ: type[float], value: float):
+        return float(value)
+
+    def serialize(self, typ: type[str], value: str):
+        return str(value)
+
+    def serialize(self, typ: type[Enum], value: Enum):
+        return value.value
+
+    def serialize(self, typ: type[NoneType], value: NoneType):
+        return None
 
     #######################
     # deserialize_partial #
