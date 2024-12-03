@@ -3,7 +3,13 @@ from enum import Enum
 from types import NoneType
 from typing import Union
 
-from ovld import Dataclass, OvldBase, call_next, ovld, recurse
+from ovld import (
+    Dataclass,
+    OvldBase,
+    call_next,
+    ovld,
+    recurse,
+)
 
 from .exc import ValidationError, ValidationExceptionGroup
 from .model import (
@@ -100,31 +106,29 @@ class DataConverter(OvldBase):
     def serialize(self, typ: type[object], value: object):
         model = self.model(typ)
         if isinstance(model, Model):
-            return self.serialize(model, value)
+            return recurse(model, value)
         else:
-            return self.serialize.next(typ, value)
+            return call_next(typ, value)
 
     def serialize(self, typ: StructuredModel, value: object):
         return {
-            f.name: self.serialize(f.type, f.extract(value))
+            f.name: recurse(f.type, f.extract(value))
             for f in typ.fields.values()
         }
 
     def serialize(self, typ: MappingModel, value: object):
         return {
-            self.serialize(typ.key_type, k): self.serialize(typ.element_type, v)
+            recurse(typ.key_type, k): recurse(typ.element_type, v)
             for k, v in typ.extractor(value).items()
         }
 
     def serialize(self, typ: ListModel, value: object):
-        return [
-            self.serialize(typ.element_type, x) for x in typ.extractor(value)
-        ]
+        return [recurse(typ.element_type, x) for x in typ.extractor(value)]
 
     def serialize(self, typ: UnionModel, value: object):
         for opt in typ.options:
             if recognizes(opt, value):
-                return self.serialize(opt, value)
+                return recurse(opt, value)
         raise TypeError(
             f"Cannot serialize {value} under type {typ.original_type}"
         )

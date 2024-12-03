@@ -1,32 +1,52 @@
-from apischema import serialize as apischema_serialize
-from serieux import serialize as serieux_serialize
-from pydantic import TypeAdapter
 import marshmallow_dataclass
 import orjson as json
-from mashumaro.codecs.json import JSONDecoder, JSONEncoder
+from apischema import serialize as apischema_serialize
+from mashumaro.codecs.basic import BasicEncoder
+from mashumaro.codecs.orjson import ORJSONEncoder
+from pydantic import TypeAdapter
+
+from serieux import default_converter
+from serieux.serialization import default
 
 
 class SerieuxInterface:
     __name__ = "serieux"
 
     def serializer_for_type(self, t):
-        return lambda x: serieux_serialize(t, x)
+        func = default.serialize.resolve_for_types(t)
+        return func.__get__(default_converter, type(default_converter))
 
     def json_for_type(self, t):
-        return lambda x: json.dumps(serieux_serialize(t, x))
+        func = default.serialize.resolve_for_types(t)
+        return lambda x: json.dumps(func(None, x))
 
 
 serieux = SerieuxInterface()
+
+
+class OldSerieuxInterface:
+    __name__ = "old_serieux"
+
+    def serializer_for_type(self, t):
+        fn = default_converter.serialize
+        return lambda x: fn(t, x)
+
+    def json_for_type(self, t):
+        fn = default_converter.serialize
+        return lambda x: json.dumps(fn(t, x))
+
+
+old_serieux = OldSerieuxInterface()
 
 
 class ApischemaInterface:
     __name__ = "apischema"
 
     def serializer_for_type(self, t):
-        return lambda x: apischema_serialize(t, x)
+        return lambda x: apischema_serialize(t, x, check_type=False)
 
     def json_for_type(self, t):
-        return lambda x: json.dumps(apischema_serialize(t, x))
+        return lambda x: json.dumps(apischema_serialize(t, x, check_type=False))
 
 
 apischema = ApischemaInterface()
@@ -36,12 +56,10 @@ class PydanticInterface:
     __name__ = "pydantic"
 
     def serializer_for_type(self, t):
-        adapter = TypeAdapter(t)
-        return lambda x: json.loads(adapter.serializer.to_json(x))
+        return TypeAdapter(t).serializer.to_python
 
     def json_for_type(self, t):
-        adapter = TypeAdapter(t)
-        return lambda x: adapter.serializer.to_json(x)
+        return TypeAdapter(t).serializer.to_json
 
 
 pydantic = PydanticInterface()
@@ -66,12 +84,10 @@ class MashumaroInterface:
     __name__ = "mashumaro"
 
     def serializer_for_type(self, t):
-        schema = JSONEncoder(t)
-        return lambda x: json.loads(schema.encode(x))
+        return BasicEncoder(t).encode
 
     def json_for_type(self, t):
-        schema = JSONEncoder(t)
-        return lambda x: schema.encode(x)
+        return ORJSONEncoder(t).encode
 
 
 mashumaro = MashumaroInterface()
