@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import itertools
 import json
 from dataclasses import dataclass
 
@@ -12,6 +15,12 @@ from .interfaces import (
     pydantic,
     serieux,
 )
+
+
+@dataclass
+class Tree:
+    left: Tree | int
+    right: Tree | int
 
 
 @dataclass
@@ -71,34 +80,68 @@ roboland = Country(
 )
 
 
-@pytest.mark.benchmark(group="serialize_simple")
-@pytest.mark.parametrize(
-    "interface",
-    [serieux, old_serieux, apischema, pydantic, marshmallow, mashumaro],
+tree = Tree(1, Tree(Tree(2, 3), Tree(4, 5)))
+
+
+id_to_thing = {id(v): k for k, v in globals().items()}
+
+
+def bench(interfaces, data):
+    cases = list(itertools.product(data, interfaces))
+    return pytest.mark.parametrize(
+        "data,interface",
+        cases,
+        ids=[f"{id_to_thing[id(d)]},{id_to_thing[id(i)]}" for d, i in cases],
+    )
+
+
+@bench(
+    interfaces=[
+        serieux,
+        old_serieux,
+        apischema,
+        pydantic,
+        marshmallow,
+        mashumaro,
+    ],
+    data=[world, roboland, tree],
 )
-def test_serialize(interface, benchmark):
-    fn = interface.serializer_for_type(World)
-    result = benchmark(fn, world)
-    assert result == serialize(World, world)
+def test_serialize(interface, data, benchmark):
+    fn = interface.serializer_for_type(type(data))
+    result = benchmark(fn, data)
+    assert result == serialize(type(data), data)
 
 
-@pytest.mark.benchmark(group="json_simple")
-@pytest.mark.parametrize(
-    "interface",
-    [serieux, old_serieux, apischema, pydantic, marshmallow, mashumaro],
+@bench(
+    interfaces=[
+        serieux,
+        old_serieux,
+        apischema,
+        pydantic,
+        marshmallow,
+        mashumaro,
+    ],
+    data=[roboland],
 )
-def test_json(interface, benchmark):
-    fn = interface.json_for_type(World)
-    result = benchmark(fn, world)
-    assert json.loads(result) == serialize(World, world)
+def test_json(interface, data, benchmark):
+    fn = interface.json_for_type(type(data))
+    result = benchmark(fn, data)
+    assert json.loads(result) == serialize(type(data), data)
 
 
-@pytest.mark.benchmark(group="serialize_roboland")
-@pytest.mark.parametrize(
-    "interface",
-    [serieux, old_serieux, apischema, pydantic, marshmallow, mashumaro],
+@bench(
+    interfaces=[
+        serieux,
+        old_serieux,
+        apischema,
+        pydantic,
+        marshmallow,
+        mashumaro,
+    ],
+    data=[world, roboland, tree],
 )
-def test_serialize_roboland(interface, benchmark):
-    fn = interface.serializer_for_type(Country)
-    result = benchmark(fn, roboland)
-    assert result == serialize(Country, roboland)
+def test_deserialize(interface, data, benchmark):
+    data_ser = serialize(data)
+    fn = interface.deserializer_for_type(type(data))
+    result = benchmark(fn, data_ser)
+    assert result == data
