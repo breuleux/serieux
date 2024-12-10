@@ -1,7 +1,6 @@
 from dataclasses import fields
 from enum import Enum
 from types import NoneType
-from typing import Union
 
 from ovld import (
     Dataclass,
@@ -30,9 +29,25 @@ from .proxy import (
     get_annotations,
     proxy,
 )
-from .utils import typename
+from .utils import UnionAlias
 
-UnionAlias = type(Union[int, str])
+
+@ovld
+def typename(t: type):
+    if issubclass(t, Proxy):
+        return recurse(t._self_cls)
+    else:
+        return t.__qualname__
+
+
+@ovld
+def typename(t: Model):  # noqa: F811
+    return f"{recurse(t.original_type)} ({type(t).__qualname__})"
+
+
+@ovld
+def typename(t: object):  # noqa: F811
+    return repr(t)
 
 
 def decompose(cls, default_args=[]):

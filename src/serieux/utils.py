@@ -1,9 +1,22 @@
+import importlib
 import sys
+import typing
+from itertools import count
+from types import GenericAlias, NoneType, UnionType
+from typing import (
+    ForwardRef,
+    TypeVar,
+    Union,
+    _GenericAlias,
+    get_args,
+    get_origin,
+)
 
-from ovld import ovld, recurse
+from ovld import parametrized_class_check
 
-from .model import Model
 from .proxy import Accessor, Proxy, Source
+
+UnionAlias = type(Union[int, str])
 
 
 def _color(code, text):
@@ -72,19 +85,79 @@ def display_context(*args, file=sys.stdout, **kwargs):
     print(cs, file=file)
 
 
-@ovld
-def typename(t: type):
-    if issubclass(t, Proxy):
-        return recurse(t._self_cls)
+class NameDatabase:
+    def __init__(self):
+        self.count = count()
+        self.vars = {}
+        self.seen = set()
+
+    def gensym(self, prefix):
+        return f"{prefix}{next(self.count)}"
+
+    def stash(self, v, prefix="TMP"):
+        var = f"{prefix}{next(self.count)}"
+        self.vars[var] = v
+        return f"${var}"
+
+
+#################
+# evaluate_hint #
+#################
+
+
+def evaluate_hint(typ, ctx=None, lcl=None, typesub=None):
+    if isinstance(typ, str):
+        if ctx is not None and not isinstance(ctx, dict):
+            if isinstance(ctx, (GenericAlias, _GenericAlias)):
+                origin = get_origin(ctx)
+                if hasattr(origin, "__type_params__"):
+                    subs = {
+                        p: arg
+                        for p, arg in zip(origin.__type_params__, get_args(ctx))
+                    }
+                    typesub = {**subs, **(typesub or {})}
+                ctx = origin
+            if hasattr(ctx, "__type_params__"):
+                lcl = {p.__name__: p for p in ctx.__type_params__}
+            ctx = importlib.import_module(ctx.__module__).__dict__
+        return evaluate_hint(eval(typ, ctx, lcl), ctx, lcl, typesub)
+
+    elif isinstance(typ, (UnionType, GenericAlias, _GenericAlias)):
+        origin = get_origin(typ)
+        args = get_args(typ)
+        if origin is UnionType:
+            origin = Union
+        new_args = [evaluate_hint(arg, ctx, lcl, typesub) for arg in args]
+        return origin[tuple(new_args)]
+
+    elif isinstance(typ, TypeVar):
+        return typesub.get(typ, typ) if typesub else typ
+
+    elif isinstance(typ, ForwardRef):
+        return typ._evaluate(ctx, lcl, recursive_guard=frozenset())
+
+    elif isinstance(typ, type):
+        return typ
+
     else:
-        return t.__qualname__
+        raise TypeError("Cannot evaluate hint:", typ, type(typ))
 
 
-@ovld
-def typename(t: Model):  # noqa: F811
-    return f"{recurse(t.original_type)} ({type(t).__qualname__})"
+def _json_type_check(t, bound=object):
+    origin = get_origin(t)
+    if t is typing.Union:
+        return all(_json_type_check(t2) for t2 in get_args(t))
+    if not isinstance(origin or t, type) or not issubclass(origin or t, bound):
+        return False
+    if t in (int, float, str, bool, NoneType):
+        return True
+    if origin is list:
+        (et,) = get_args(t)
+        return _json_type_check(et)
+    if origin is dict:
+        kt, vt = get_args(t)
+        return (kt is str) and _json_type_check(vt)
+    return False
 
 
-@ovld
-def typename(t: object):  # noqa: F811
-    return repr(t)
+JSONType = parametrized_class_check(_json_type_check)

@@ -80,7 +80,7 @@ roboland = Country(
 )
 
 
-tree = Tree(1, Tree(Tree(2, 3), Tree(4, 5)))
+tree = Tree(1, Tree(Tree(2, 3), Tree(4, Tree(5, Tree(6, Tree(7, Tree(8, 9)))))))
 
 
 id_to_thing = {id(v): k for k, v in globals().items()}

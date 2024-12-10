@@ -1,5 +1,4 @@
 from dataclasses import fields
-from itertools import count
 from types import NoneType
 from typing import get_args, get_origin
 
@@ -13,23 +12,7 @@ from ovld import (
     recurse,
 )
 
-from .core import UnionAlias
-from .model import evaluate_hint
-
-
-class NameDatabase:
-    def __init__(self):
-        self.count = count()
-        self.vars = {}
-        self.seen = set()
-
-    def gensym(self, prefix):
-        return f"{prefix}{next(self.count)}"
-
-    def stash(self, v, prefix="TMP"):
-        var = f"{prefix}{next(self.count)}"
-        self.vars[var] = v
-        return f"${var}"
+from .utils import JSONType, NameDatabase, UnionAlias, evaluate_hint
 
 
 class Serializer(OvldPerInstanceBase):
@@ -44,28 +27,30 @@ class Serializer(OvldPerInstanceBase):
     # serialize_codegen #
     #####################
 
-    def _guard(self, ndb, typ, accessor, body):
+    def guard_codegen(self, ndb, typ, accessor, body):
         if not self.validate_serialization:
             return body.replace("$$$", accessor)
         else:
             tmp = ndb.gensym("tmp")
             otyp = get_origin(typ) or typ
-            typ_embed = ndb.stash(typ, prefix="T")
-            if typ is otyp:
-                otyp_embed = typ_embed
-            else:
-                otyp_embed = ndb.stash(otyp, prefix="T")
+            otyp_embed = ndb.stash(typ if typ is otyp else otyp, prefix="T")
             body = body.replace("$$$", tmp)
-            code = f"({body} if isinstance({tmp} := {accessor}, {otyp_embed}) else $recurse({typ_embed}, {accessor}))"
+            dflt = self.default_codegen(ndb, typ, accessor)
+            code = f"({body} if isinstance({tmp} := {accessor}, {otyp_embed}) else {dflt})"
             return code
+
+    def default_codegen(
+        self, ndb: NameDatabase, typ: type[object], accessor: str
+    ):
+        t = ndb.stash(typ, prefix="T")
+        return f"$recurse(None, {t}, {accessor})"
 
     @ovld(priority=100)
     def serialize_codegen(
         self, ndb: NameDatabase, typ: type[object], accessor, /
     ):
         if typ in ndb.seen and typ not in (int, str, bool, NoneType):
-            t = ndb.stash(typ, prefix="T")
-            return f"$recurse({t}, {accessor})"
+            return self.default_codegen(ndb, typ, accessor)
         else:
             ndb.seen.add(typ)
             return call_next(ndb, typ, accessor)
@@ -74,12 +59,16 @@ class Serializer(OvldPerInstanceBase):
         self, ndb: NameDatabase, dc: type[Dataclass], accessor, /
     ):
         parts = []
+        tsub = {}
+        if (origin := get_origin(dc)) is not None:
+            tsub = dict(zip(origin.__type_params__, get_args(dc)))
+            dc = origin
         for f in fields(dc):
-            ftype = evaluate_hint(f.type, ctx=dc)
+            ftype = evaluate_hint(f.type, ctx=dc, typesub=tsub)
             setter = recurse(ndb, ftype, f"$$$.{f.name}")
             parts.append(f"'{f.name}': {setter}")
         code = "{" + ",".join(parts) + "}"
-        return self._guard(ndb, dc, accessor, code)
+        return self.guard_codegen(ndb, dc, accessor, code)
 
     def serialize_codegen(self, ndb: NameDatabase, x: type[dict], accessor, /):
         kt, vt = get_args(x)
@@ -88,13 +77,22 @@ class Serializer(OvldPerInstanceBase):
         kx = recurse(ndb, kt, ktmp)
         vx = recurse(ndb, vt, vtmp)
         code = f"{{{kx}: {vx} for {ktmp}, {vtmp} in $$$.items()}}"
-        return self._guard(ndb, x, accessor, code)
+        return self.guard_codegen(ndb, x, accessor, code)
 
     def serialize_codegen(self, ndb: NameDatabase, x: type[list], accessor, /):
         (et,) = get_args(x)
         etmp = ndb.gensym("elt")
         ex = recurse(ndb, et, etmp)
-        return self._guard(ndb, x, accessor, f"[{ex} for {etmp} in $$$]")
+        return self.guard_codegen(ndb, x, accessor, f"[{ex} for {etmp} in $$$]")
+
+    @ovld(priority=1)
+    def serialize_codegen(
+        self, ndb: NameDatabase, x: type[JSONType[object]], accessor, /
+    ):
+        if self.validate_serialization:
+            return call_next(ndb, x, accessor)
+        else:
+            return accessor
 
     def serialize_codegen(
         self,
@@ -103,7 +101,7 @@ class Serializer(OvldPerInstanceBase):
         accessor,
         /,
     ):
-        return self._guard(ndb, x, accessor, "$$$")
+        return self.guard_codegen(ndb, x, accessor, "$$$")
 
     def serialize_codegen(
         self, ndb: NameDatabase, x: type[NoneType], accessor, /
@@ -113,12 +111,6 @@ class Serializer(OvldPerInstanceBase):
             return f"({tmp} if ({tmp} := {accessor}) is None else {call_next(ndb, x, tmp)})"
         else:
             return accessor
-
-    def serialize_codegen(
-        self, ndb: NameDatabase, x: type[object], accessor, /
-    ):
-        t = ndb.stash(x, prefix="T")
-        return f"$recurse({t}, {accessor})"
 
     def serialize_codegen(
         self, ndb: NameDatabase, x: type[UnionAlias], accessor, /
@@ -131,9 +123,17 @@ class Serializer(OvldPerInstanceBase):
             code = f"({ocode} if isinstance({accessor}, {t}) else {code})"
         return code
 
+    def serialize_codegen(
+        self, ndb: NameDatabase, x: type[object], accessor, /
+    ):
+        raise NotImplementedError()
+
     def make_code(self, typ: type[object], accessor, recurse, /):
         ndb = NameDatabase()
-        expr = self.serialize_codegen(ndb, typ, accessor)
+        try:
+            expr = self.serialize_codegen(ndb, typ, accessor)
+        except NotImplementedError:
+            return None
         return CodeGen(f"return {expr}", recurse=recurse, **ndb.vars)
 
     #############
@@ -145,9 +145,10 @@ class Serializer(OvldPerInstanceBase):
         return self.make_code(x, "x", recurse)
 
     @code_generator
-    def serialize(self, typ: type[Dataclass], value: object):
+    def serialize(self, typ: type[object], value: object):
         (x,) = get_args(typ)
         return self.make_code(x, "value", recurse)
 
 
 default = Serializer()
+serialize = default.serialize

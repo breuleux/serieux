@@ -10,8 +10,7 @@ from ovld import (
     recurse,
 )
 
-from .model import evaluate_hint
-from .serialization import NameDatabase
+from .utils import NameDatabase, evaluate_hint
 
 
 class Deserializer(OvldPerInstanceBase):
