@@ -60,12 +60,17 @@ def test_serialize_tree():
     }
 
 
+def test_error_basic():
+    with pytest.raises(ValidationError, match=r"No way to serialize"):
+        serialize_check(int, "oh no")
+
+
 def test_error_serialize_tree():
     from .definitions_py312 import Tree
 
-    tree = Tree(Tree(1, 2), 3)
+    tree = Tree(Tree("a", 2), "b")
 
-    with pytest.raises(ValidationError, match=r"\.left\.left"):
+    with pytest.raises(ValidationError, match=r"At path \.left\.right"):
         serialize_check(Tree[str], tree)
 
 

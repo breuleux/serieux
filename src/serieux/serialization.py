@@ -1,4 +1,3 @@
-import sys
 from dataclasses import fields
 from types import NoneType
 from typing import get_args, get_origin
@@ -17,21 +16,18 @@ from .exc import ValidationError
 from .proxy import TrackingProxy, get_annotations
 from .utils import JSONType, NameDatabase, UnionAlias, evaluate_hint
 
-
-def is_top(self, skip=1):
-    fr = sys._getframe(skip)
-    while fr := fr.f_back:
-        if fr.f_locals.get("self", None) is self:
-            return False
-    return True
-
-
 _codegen_template = """
 try:
     return {expr}
 except Exception as exc:
     return self.serialize_handle_exception($typ, {obj}, exc)
 """
+
+
+def _compatible(t1, t2):
+    if issubclass(t2, TrackingProxy):
+        t2 = t2._self_cls
+    return issubclass(t2, get_origin(t1) or t1)
 
 
 class Serializer(OvldPerInstanceBase):
@@ -153,8 +149,12 @@ class Serializer(OvldPerInstanceBase):
             expr = self.serialize_codegen(ndb, typ, accessor)
         except NotImplementedError:
             return None
+        if toplevel:
+            code = _codegen_template.format(expr=expr, obj=accessor)
+        else:
+            code = f"return {expr}"
         return CodeGen(
-            _codegen_template.format(expr=expr, obj=accessor),
+            code,
             typ=typ,
             recurse=recurse,
             **ndb.vars,
@@ -166,20 +166,40 @@ class Serializer(OvldPerInstanceBase):
 
     @code_generator
     def serialize(self, x: object):
-        return self.make_code(x, "x", recurse)
+        return self.make_code(
+            x, "x", self.serialize_sync.__ovld__.dispatch, toplevel=True
+        )
 
     @code_generator
     def serialize(self, typ: type[object], value: object):
-        (x,) = get_args(typ)
-        if issubclass(value, TrackingProxy):
-            value = value._self_cls
-        if issubclass(value, get_origin(x) or x):
-            return self.make_code(x, "value", recurse)
-        else:
-            return None
+        (t,) = get_args(typ)
+        if _compatible(t, value):
+            return self.make_code(
+                t, "value", self.serialize_sync.__ovld__.dispatch, toplevel=True
+            )
+
+    def serialize(self, typ, value):
+        try:
+            return self.serialize_sync(typ, value)
+        except Exception as exc:
+            self.serialize_handle_exception(typ, value, exc)
+
+    ##################
+    # serialize_sync #
+    ##################
+
+    @code_generator
+    def serialize_sync(self, x: object):
+        return self.make_code(x, "x", recurse)
+
+    @code_generator
+    def serialize_sync(self, typ: type[object], value: object):
+        (t,) = get_args(typ)
+        if _compatible(t, value):
+            return self.make_code(t, "value", recurse)
 
     @ovld(priority=10)
-    def serialize(self, typ: type[object], value: TrackingProxy):
+    def serialize_sync(self, typ: type[object], value: TrackingProxy):
         try:
             return call_next(typ, value)
         except ValidationError:
@@ -188,8 +208,11 @@ class Serializer(OvldPerInstanceBase):
             raise ValidationError(exc=exc, ctx=get_annotations(value))
 
     @ovld(priority=-1)
-    def serialize(self, typ: type[object], value: object):
-        raise TypeError(f"No way to serialize {type(value)} as {typ}")
+    def serialize_sync(self, typ: type[object], value: object):
+        tv = type(value)
+        if isinstance(value, TrackingProxy):
+            tv = tv._self_cls
+        raise TypeError(f"No way to serialize {tv} as {typ}")
 
     ###############################
     # serialize exception handler #
@@ -203,10 +226,7 @@ class Serializer(OvldPerInstanceBase):
         raise ValidationError(exc=exc, ctx=value._self_ann)
 
     def serialize_handle_exception(self, typ, value, exc):
-        if is_top(self, 4):
-            return self.serialize(typ, TrackingProxy.make(value))
-        else:
-            raise
+        return self.serialize(typ, TrackingProxy.make(value))
 
 
 default = Serializer()
