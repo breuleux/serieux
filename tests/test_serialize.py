@@ -1,4 +1,7 @@
-from serieux.serialization import serialize
+import pytest
+
+from serieux.exc import ValidationError
+from serieux.serialization import serialize, serialize_check
 
 from .common import Point, one_test_per_assert
 
@@ -55,5 +58,26 @@ def test_serialize_tree():
         },
         "right": {"left": {"left": 6, "right": 7}, "right": 8},
     }
-    # with pytest.raises(TypeError):
-    #     serialize(Tree[str], tree)
+
+
+def test_error_serialize_tree():
+    from .definitions_py312 import Tree
+
+    tree = Tree(Tree(1, 2), 3)
+
+    with pytest.raises(ValidationError, match=r"\.left\.left"):
+        serialize_check(Tree[str], tree)
+
+
+def test_error_serialize_list():
+    li = [0, 1, 2, 3, "oops", 5, 6]
+
+    with pytest.raises(ValidationError, match=r"At path \[4\]"):
+        serialize_check(list[int], li)
+
+
+def test_error_serialize_list_of_lists():
+    li = [[0, 1], [2, 3, "oops", 5, 6]]
+
+    with pytest.raises(ValidationError, match=r"At path \[1\]\[2\]"):
+        serialize_check(list[list[int]], li)

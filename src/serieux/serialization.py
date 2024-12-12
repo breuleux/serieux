@@ -1,3 +1,4 @@
+import sys
 from dataclasses import fields
 from types import NoneType
 from typing import get_args, get_origin
@@ -12,7 +13,25 @@ from ovld import (
     recurse,
 )
 
+from .exc import ValidationError
+from .proxy import TrackingProxy, get_annotations
 from .utils import JSONType, NameDatabase, UnionAlias, evaluate_hint
+
+
+def is_top(self, skip=1):
+    fr = sys._getframe(skip)
+    while fr := fr.f_back:
+        if fr.f_locals.get("self", None) is self:
+            return False
+    return True
+
+
+_codegen_template = """
+try:
+    return {expr}
+except Exception as exc:
+    return self.serialize_handle_exception($typ, {obj}, exc)
+"""
 
 
 class Serializer(OvldPerInstanceBase):
@@ -43,7 +62,7 @@ class Serializer(OvldPerInstanceBase):
         self, ndb: NameDatabase, typ: type[object], accessor: str
     ):
         t = ndb.stash(typ, prefix="T")
-        return f"$recurse(None, {t}, {accessor})"
+        return f"$recurse(self, {t}, {accessor})"
 
     @ovld(priority=100)
     def serialize_codegen(
@@ -128,13 +147,18 @@ class Serializer(OvldPerInstanceBase):
     ):
         raise NotImplementedError()
 
-    def make_code(self, typ: type[object], accessor, recurse, /):
+    def make_code(self, typ: type[object], accessor, recurse, toplevel=False):
         ndb = NameDatabase()
         try:
             expr = self.serialize_codegen(ndb, typ, accessor)
         except NotImplementedError:
             return None
-        return CodeGen(f"return {expr}", recurse=recurse, **ndb.vars)
+        return CodeGen(
+            _codegen_template.format(expr=expr, obj=accessor),
+            typ=typ,
+            recurse=recurse,
+            **ndb.vars,
+        )
 
     #############
     # serialize #
@@ -147,8 +171,46 @@ class Serializer(OvldPerInstanceBase):
     @code_generator
     def serialize(self, typ: type[object], value: object):
         (x,) = get_args(typ)
-        return self.make_code(x, "value", recurse)
+        if issubclass(value, TrackingProxy):
+            value = value._self_cls
+        if issubclass(value, get_origin(x) or x):
+            return self.make_code(x, "value", recurse)
+        else:
+            return None
+
+    @ovld(priority=10)
+    def serialize(self, typ: type[object], value: TrackingProxy):
+        try:
+            return call_next(typ, value)
+        except ValidationError:
+            raise
+        except Exception as exc:
+            raise ValidationError(exc=exc, ctx=get_annotations(value))
+
+    @ovld(priority=-1)
+    def serialize(self, typ: type[object], value: object):
+        raise TypeError(f"No way to serialize {type(value)} as {typ}")
+
+    ###############################
+    # serialize exception handler #
+    ###############################
+
+    @ovld(priority=10)
+    def serialize_handle_exception(self, typ, value, exc: ValidationError):
+        raise
+
+    def serialize_handle_exception(self, typ, value: TrackingProxy, exc):
+        raise ValidationError(exc=exc, ctx=value._self_ann)
+
+    def serialize_handle_exception(self, typ, value, exc):
+        if is_top(self, 4):
+            return self.serialize(typ, TrackingProxy.make(value))
+        else:
+            raise
 
 
 default = Serializer()
 serialize = default.serialize
+
+default_check = Serializer(validate_serialization=True)
+serialize_check = default_check.serialize
