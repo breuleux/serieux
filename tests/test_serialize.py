@@ -1,7 +1,8 @@
 import pytest
+from ovld import extend_super
 
 from serieux.exc import ValidationError
-from serieux.serialization import serialize, serialize_check
+from serieux.serialization import Serializer, serialize, serialize_check
 
 from .common import Point, one_test_per_assert
 
@@ -86,3 +87,22 @@ def test_error_serialize_list_of_lists():
 
     with pytest.raises(ValidationError, match=r"At path \[1\]\[2\]"):
         serialize_check(list[list[int]], li)
+
+
+class SpecialSerializer(Serializer):
+    @extend_super
+    def serialize_sync(self, typ: type[int], value: int):
+        return value * 10
+
+    def serialize_sync(self, typ: type[int], value: str):
+        return value * 2
+
+
+def test_override():
+    ss = SpecialSerializer()
+    assert ss.serialize_sync(int, 3) == 30
+    assert ss.serialize_sync(int, "quack") == "quackquack"
+    assert ss.serialize_sync(list[int], [1, 2, 3]) == [10, 20, 30]
+    assert ss.serialize_sync(list[int], [1, "2", 3]) == [10, "22", 30]
+    assert ss.serialize_sync(Point, Point(8, 9)) == {"x": 80, "y": 90}
+    assert ss.serialize(3) == 30

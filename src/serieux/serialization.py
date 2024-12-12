@@ -16,6 +16,12 @@ from .exc import ValidationError
 from .proxy import TrackingProxy, get_annotations
 from .utils import JSONType, NameDatabase, UnionAlias, evaluate_hint
 
+
+def standard_code_generator(fn):
+    fn.standard_codegen = True
+    return code_generator(fn)
+
+
 _codegen_template = """
 try:
     return {expr}
@@ -36,7 +42,10 @@ class Serializer(OvldPerInstanceBase):
 
     @classmethod
     def ovld_instance_key(cls, validate_serialization=False):
-        return (("validate_serialization", validate_serialization),)
+        return (
+            ("this", cls),
+            ("validate_serialization", validate_serialization),
+        )
 
     #####################
     # serialize_codegen #
@@ -66,9 +75,15 @@ class Serializer(OvldPerInstanceBase):
     ):
         if typ in ndb.seen and typ not in (int, str, bool, NoneType):
             return self.default_codegen(ndb, typ, accessor)
-        else:
+        elif not ndb.seen or self.serialize_is_standard(typ):
+            # * ndb.seen is empty for the top level generation, and we always proceed.
+            # * Otherwise, we are generating code recursively for subfields, but
+            #   we only do this if the main serialize_sync method is the standard
+            #   code generation method.
             ndb.seen.add(typ)
             return call_next(ndb, typ, accessor)
+        else:
+            return self.default_codegen(ndb, typ, accessor)
 
     def serialize_codegen(
         self, ndb: NameDatabase, dc: type[Dataclass], accessor, /
@@ -104,7 +119,9 @@ class Serializer(OvldPerInstanceBase):
     def serialize_codegen(
         self, ndb: NameDatabase, x: type[JSONType[object]], accessor, /
     ):
-        if self.validate_serialization:
+        if self.validate_serialization or not self.serialize_is_standard(
+            x, True
+        ):
             return call_next(ndb, x, accessor)
         else:
             return accessor
@@ -164,19 +181,27 @@ class Serializer(OvldPerInstanceBase):
     # serialize #
     #############
 
-    @code_generator
+    @standard_code_generator
     def serialize(self, x: object):
-        return self.make_code(
-            x, "x", self.serialize_sync.__ovld__.dispatch, toplevel=True
-        )
+        if self.serialize_is_standard(x):
+            return self.make_code(
+                x, "x", self.serialize_sync.__ovld__.dispatch, toplevel=True
+            )
 
-    @code_generator
+    @standard_code_generator
     def serialize(self, typ: type[object], value: object):
         (t,) = get_args(typ)
-        if _compatible(t, value):
+        if _compatible(t, value) and self.serialize_is_standard(t):
             return self.make_code(
                 t, "value", self.serialize_sync.__ovld__.dispatch, toplevel=True
             )
+
+    def serialize(self, x):
+        typ = type(x)
+        try:
+            return self.serialize_sync(typ, x)
+        except Exception as exc:
+            self.serialize_handle_exception(typ, x, exc)
 
     def serialize(self, typ, value):
         try:
@@ -184,15 +209,37 @@ class Serializer(OvldPerInstanceBase):
         except Exception as exc:
             self.serialize_handle_exception(typ, value, exc)
 
+    #########################
+    # serialize_is_standard #
+    #########################
+
+    def serialize_is_standard(self, typ, recursive=False):
+        """Return whether serialize_sync::(type[typ], typ) is standard.
+
+        Codegen for standard implementations can be nested.
+        """
+        resolved = self.serialize_sync.map.mro(
+            (type[typ], typ), specialize=False
+        )
+        rval = (
+            resolved
+            and resolved[0]
+            and getattr(resolved[0][0].base_handler, "standard_codegen", False)
+        )
+        if rval and recursive:
+            return rval and all(
+                self.serialize_is_standard(arg, recursive=True)
+                for arg in get_args(typ)
+            )
+        else:
+            return rval
+
     ##################
     # serialize_sync #
     ##################
 
-    @code_generator
-    def serialize_sync(self, x: object):
-        return self.make_code(x, "x", recurse)
-
-    @code_generator
+    @ovld
+    @standard_code_generator
     def serialize_sync(self, typ: type[object], value: object):
         (t,) = get_args(typ)
         if _compatible(t, value):
