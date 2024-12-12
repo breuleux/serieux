@@ -43,9 +43,7 @@ class AssertTransformer(NodeTransformer):
         newfns = []
         for i, stmt in enumerate(node.body):
             if not isinstance(stmt, ast.Assert):
-                raise Exception(
-                    "@one_test_per_assert requires all statements to be asserts"
-                )
+                raise Exception("@one_test_per_assert requires all statements to be asserts")
             else:
                 newfns.append(
                     ast.FunctionDef(

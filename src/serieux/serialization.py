@@ -42,10 +42,7 @@ class Serializer(OvldPerInstanceBase):
 
     @classmethod
     def ovld_instance_key(cls, validate_serialization=False):
-        return (
-            ("this", cls),
-            ("validate_serialization", validate_serialization),
-        )
+        return (("this", cls), ("validate_serialization", validate_serialization))
 
     #####################
     # serialize_codegen #
@@ -63,16 +60,12 @@ class Serializer(OvldPerInstanceBase):
             code = f"({body} if isinstance({tmp} := {accessor}, {otyp_embed}) else {dflt})"
             return code
 
-    def default_codegen(
-        self, ndb: NameDatabase, typ: type[object], accessor: str
-    ):
+    def default_codegen(self, ndb: NameDatabase, typ: type[object], accessor: str):
         t = ndb.stash(typ, prefix="T")
         return f"$recurse(self, {t}, {accessor})"
 
     @ovld(priority=100)
-    def serialize_codegen(
-        self, ndb: NameDatabase, typ: type[object], accessor, /
-    ):
+    def serialize_codegen(self, ndb: NameDatabase, typ: type[object], accessor, /):
         if typ in ndb.seen and typ not in (int, str, bool, NoneType):
             return self.default_codegen(ndb, typ, accessor)
         elif not ndb.seen or self.serialize_is_standard(typ):
@@ -85,9 +78,7 @@ class Serializer(OvldPerInstanceBase):
         else:
             return self.default_codegen(ndb, typ, accessor)
 
-    def serialize_codegen(
-        self, ndb: NameDatabase, dc: type[Dataclass], accessor, /
-    ):
+    def serialize_codegen(self, ndb: NameDatabase, dc: type[Dataclass], accessor, /):
         parts = []
         tsub = {}
         if (origin := get_origin(dc)) is not None:
@@ -116,12 +107,8 @@ class Serializer(OvldPerInstanceBase):
         return self.guard_codegen(ndb, x, accessor, f"[{ex} for {etmp} in $$$]")
 
     @ovld(priority=1)
-    def serialize_codegen(
-        self, ndb: NameDatabase, x: type[JSONType[object]], accessor, /
-    ):
-        if self.validate_serialization or not self.serialize_is_standard(
-            x, True
-        ):
+    def serialize_codegen(self, ndb: NameDatabase, x: type[JSONType[object]], accessor, /):
+        if self.validate_serialization or not self.serialize_is_standard(x, True):
             return call_next(ndb, x, accessor)
         else:
             return accessor
@@ -135,18 +122,14 @@ class Serializer(OvldPerInstanceBase):
     ):
         return self.guard_codegen(ndb, x, accessor, "$$$")
 
-    def serialize_codegen(
-        self, ndb: NameDatabase, x: type[NoneType], accessor, /
-    ):
+    def serialize_codegen(self, ndb: NameDatabase, x: type[NoneType], accessor, /):
         if self.validate_serialization:
             tmp = ndb.gensym("tmp")
             return f"({tmp} if ({tmp} := {accessor}) is None else {call_next(ndb, x, tmp)})"
         else:
             return accessor
 
-    def serialize_codegen(
-        self, ndb: NameDatabase, x: type[UnionAlias], accessor, /
-    ):
+    def serialize_codegen(self, ndb: NameDatabase, x: type[UnionAlias], accessor, /):
         o1, *rest = get_args(x)
         code = recurse(ndb, o1, accessor)
         for opt in rest:
@@ -155,9 +138,7 @@ class Serializer(OvldPerInstanceBase):
             code = f"({ocode} if isinstance({accessor}, {t}) else {code})"
         return code
 
-    def serialize_codegen(
-        self, ndb: NameDatabase, x: type[object], accessor, /
-    ):
+    def serialize_codegen(self, ndb: NameDatabase, x: type[object], accessor, /):
         raise NotImplementedError()
 
     def make_code(self, typ: type[object], accessor, recurse, toplevel=False):
@@ -170,12 +151,7 @@ class Serializer(OvldPerInstanceBase):
             code = _codegen_template.format(expr=expr, obj=accessor)
         else:
             code = f"return {expr}"
-        return CodeGen(
-            code,
-            typ=typ,
-            recurse=recurse,
-            **ndb.vars,
-        )
+        return CodeGen(code, typ=typ, recurse=recurse, **ndb.vars)
 
     #############
     # serialize #
@@ -184,17 +160,13 @@ class Serializer(OvldPerInstanceBase):
     @standard_code_generator
     def serialize(self, x: object):
         if self.serialize_is_standard(x):
-            return self.make_code(
-                x, "x", self.serialize_sync.__ovld__.dispatch, toplevel=True
-            )
+            return self.make_code(x, "x", self.serialize_sync.__ovld__.dispatch, toplevel=True)
 
     @standard_code_generator
     def serialize(self, typ: type[object], value: object):
         (t,) = get_args(typ)
         if _compatible(t, value) and self.serialize_is_standard(t):
-            return self.make_code(
-                t, "value", self.serialize_sync.__ovld__.dispatch, toplevel=True
-            )
+            return self.make_code(t, "value", self.serialize_sync.__ovld__.dispatch, toplevel=True)
 
     def serialize(self, x):
         typ = type(x)
@@ -218,9 +190,7 @@ class Serializer(OvldPerInstanceBase):
 
         Codegen for standard implementations can be nested.
         """
-        resolved = self.serialize_sync.map.mro(
-            (type[typ], typ), specialize=False
-        )
+        resolved = self.serialize_sync.map.mro((type[typ], typ), specialize=False)
         rval = (
             resolved
             and resolved[0]
@@ -228,8 +198,7 @@ class Serializer(OvldPerInstanceBase):
         )
         if rval and recursive:
             return rval and all(
-                self.serialize_is_standard(arg, recursive=True)
-                for arg in get_args(typ)
+                self.serialize_is_standard(arg, recursive=True) for arg in get_args(typ)
             )
         else:
             return rval

@@ -29,11 +29,7 @@ class Proxy(ObjectProxy):
         proxy_cache[cls, typ] = type(
             f"{cls.__name__}[{typ.__qualname__}]",
             (cls,),
-            {
-                "_self_basis": cls,
-                "_self_cls": typ,
-                **members,
-            },
+            {"_self_basis": cls, "_self_cls": typ, **members},
         )
         return proxy_cache[cls, typ]
 
@@ -157,9 +153,7 @@ _basic_class_members = list(vars(type("_dummy", (), {})).keys())
 
 def _specialize_TrackingProxy(type):
     def deco(cls):
-        members = {
-            k: v for k, v in vars(cls).items() if k not in _basic_class_members
-        }
+        members = {k: v for k, v in vars(cls).items() if k not in _basic_class_members}
         return TrackingProxy.newclass(type, members)
 
     return deco
@@ -168,9 +162,7 @@ def _specialize_TrackingProxy(type):
 @_specialize_TrackingProxy(dict)
 class _tp_dict:
     def items(self):
-        yield from (
-            (k, self._wrap(v, Item(k))) for k, v in self.__wrapped__.items()
-        )
+        yield from ((k, self._wrap(v, Item(k))) for k, v in self.__wrapped__.items())
 
     def values(self):
         yield from (self._wrap(v, Item(k)) for k, v in self.__wrapped__.items())
