@@ -116,7 +116,7 @@ class Serializer(OvldPerInstanceBase):
     def serialize_codegen(
         self,
         ndb: NameDatabase,
-        x: type[int] | type[str] | type[bool],
+        x: type[int] | type[str] | type[bool] | type[float],
         accessor,
         /,
     ):
@@ -125,7 +125,7 @@ class Serializer(OvldPerInstanceBase):
     def serialize_codegen(self, ndb: NameDatabase, x: type[NoneType], accessor, /):
         if self.validate_serialization:
             tmp = ndb.gensym("tmp")
-            return f"({tmp} if ({tmp} := {accessor}) is None else {call_next(ndb, x, tmp)})"
+            return f"({tmp} if ({tmp} := {accessor}) is None else {self.default_codegen(ndb, x, tmp)})"
         else:
             return accessor
 
@@ -168,6 +168,7 @@ class Serializer(OvldPerInstanceBase):
         if _compatible(t, value) and self.serialize_is_standard(t):
             return self.make_code(t, "value", self.serialize_sync.__ovld__.dispatch, toplevel=True)
 
+    @ovld(priority=-1)
     def serialize(self, x):
         typ = type(x)
         try:
@@ -175,6 +176,7 @@ class Serializer(OvldPerInstanceBase):
         except Exception as exc:
             self.serialize_handle_exception(typ, x, exc)
 
+    @ovld(priority=-1)
     def serialize(self, typ, value):
         try:
             return self.serialize_sync(typ, value)
