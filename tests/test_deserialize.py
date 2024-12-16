@@ -93,7 +93,7 @@ def test_deserialize_overlapping_union():
 
 
 def test_deserialize_scalar_error():
-    with pytest.raises(ValidationError, match=r"No way to deserialize"):
+    with pytest.raises(ValidationError, match=r"No way to transform"):
         deserialize(int, "foo")
 
 

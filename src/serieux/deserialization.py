@@ -21,7 +21,7 @@ _codegen_template = """
 try:
     return {expr}
 except Exception as exc:
-    return self.deserialize_handle_exception($typ, {obj}, exc)
+    return self.handle_exception($typ, {obj}, exc)
 """
 
 
@@ -58,30 +58,30 @@ class KeyTell(Tell):
 
 
 class Deserializer(OvldPerInstanceBase):
-    def __init__(self, validate_deserialization=True):
-        self.validate_deserialization = validate_deserialization
+    def __init__(self, validate=True):
+        self.validate = validate
 
     @classmethod
-    def ovld_instance_key(cls, validate_deserialization=True):
-        return (("this", cls), ("validate_deserialization", validate_deserialization))
+    def ovld_instance_key(cls, validate=True):
+        return (("this", cls), ("validate", validate))
 
-    #####################
-    # deserialize_tells #
-    #####################
+    #########
+    # tells #
+    #########
 
-    def deserialize_tells(self, typ: type[int] | type[str] | type[bool] | type[float]):
+    def tells(self, typ: type[int] | type[str] | type[bool] | type[float]):
         return {TypeTell(typ)}
 
-    def deserialize_tells(self, dc: type[Dataclass]):
+    def tells(self, dc: type[Dataclass]):
         dc = get_origin(dc) or dc
         return {TypeTell(dict)} | {KeyTell(f.name) for f in fields(dc)}
 
-    #######################
-    # deserialize_codegen #
-    #######################
+    ###########
+    # codegen #
+    ###########
 
     def guard_codegen(self, ndb, typ, accessor, body):
-        if not self.validate_deserialization:
+        if not self.validate:
             return body.replace("$$$", accessor)
         else:
             tmp = ndb.gensym("tmp")
@@ -97,12 +97,12 @@ class Deserializer(OvldPerInstanceBase):
         return f"$recurse(self, {t}, {accessor})"
 
     @ovld(priority=100)
-    def deserialize_codegen(self, ndb: NameDatabase, typ: type[object], accessor, /):
+    def codegen(self, ndb: NameDatabase, typ: type[object], accessor, /):
         if (ndb.seen and not ndb.nest) or (
             typ in ndb.seen and typ not in (int, str, bool, NoneType)
         ):
             return self.default_codegen(ndb, typ, accessor)
-        elif not ndb.seen or self.deserialize_is_standard(typ):
+        elif not ndb.seen or self.transform_is_standard(typ):
             # * ndb.seen is empty for the top level generation, and we always proceed.
             # * Otherwise, we are generating code recursively for subfields, but
             #   we only do this if the main serialize_sync method is the standard
@@ -112,7 +112,7 @@ class Deserializer(OvldPerInstanceBase):
         else:
             return self.default_codegen(ndb, typ, accessor)
 
-    def deserialize_codegen(self, ndb: NameDatabase, dc: type[Dataclass], accessor, /):
+    def codegen(self, ndb: NameDatabase, dc: type[Dataclass], accessor, /):
         parts = []
         tsub = {}
         if (origin := get_origin(dc)) is not None:
@@ -125,7 +125,7 @@ class Deserializer(OvldPerInstanceBase):
             parts.append(setter)
         return f"{cons}(" + ",".join(parts) + ")"
 
-    def deserialize_codegen(self, ndb: NameDatabase, x: type[dict], accessor, /):
+    def codegen(self, ndb: NameDatabase, x: type[dict], accessor, /):
         kt, vt = get_args(x)
         kt = evaluate_hint(kt)
         vt = evaluate_hint(vt)
@@ -135,7 +135,7 @@ class Deserializer(OvldPerInstanceBase):
         vx = recurse(ndb, vt, vtmp)
         return f"{{{kx}: {vx} for {ktmp}, {vtmp} in {accessor}.items()}}"
 
-    def deserialize_codegen(self, ndb: NameDatabase, x: type[list], accessor, /):
+    def codegen(self, ndb: NameDatabase, x: type[list], accessor, /):
         (et,) = get_args(x)
         et = evaluate_hint(et)
         etmp = ndb.gensym("elt")
@@ -143,9 +143,9 @@ class Deserializer(OvldPerInstanceBase):
         # TODO: check that it is a list, because this will accidentally work with dicts
         return f"[{ex} for {etmp} in {accessor}]"
 
-    def deserialize_codegen(self, ndb: NameDatabase, x: type[UnionAlias], accessor, /):
+    def codegen(self, ndb: NameDatabase, x: type[UnionAlias], accessor, /):
         options = get_args(x)
-        tells = [self.deserialize_tells(o) for o in options]
+        tells = [self.tells(o) for o in options]
         for tl1, tl2 in pairwise(tells):
             inter = tl1 & tl2
             tl1 -= inter
@@ -168,13 +168,13 @@ class Deserializer(OvldPerInstanceBase):
         return code
 
     @ovld(priority=1)
-    def deserialize_codegen(self, ndb: NameDatabase, x: type[JSONType[object]], accessor, /):
-        if self.validate_deserialization or not self.deserialize_is_standard(x, True):
+    def codegen(self, ndb: NameDatabase, x: type[JSONType[object]], accessor, /):
+        if self.validate or not self.transform_is_standard(x, True):
             return call_next(ndb, x, accessor)
         else:
             return accessor
 
-    def deserialize_codegen(
+    def codegen(
         self,
         ndb: NameDatabase,
         x: type[int] | type[str] | type[bool] | type[float],
@@ -183,8 +183,8 @@ class Deserializer(OvldPerInstanceBase):
     ):
         return self.guard_codegen(ndb, x, accessor, "$$$")
 
-    def deserialize_codegen(self, ndb: NameDatabase, x: type[NoneType], accessor, /):
-        if self.validate_deserialization:
+    def codegen(self, ndb: NameDatabase, x: type[NoneType], accessor, /):
+        if self.validate:
             tmp = ndb.gensym("tmp")
             return f"({tmp} if ({tmp} := {accessor}) is None else {self.default_codegen(ndb, x, tmp)})"
         else:
@@ -194,7 +194,7 @@ class Deserializer(OvldPerInstanceBase):
         typ = evaluate_hint(typ)
         ndb = NameDatabase(nest=nest)
         try:
-            expr = self.deserialize_codegen(ndb, typ, accessor)
+            expr = self.codegen(ndb, typ, accessor)
         except NotImplementedError:
             return None
         if toplevel:
@@ -203,11 +203,11 @@ class Deserializer(OvldPerInstanceBase):
             code = f"return {expr}"
         return CodeGen(code, typ=typ, recurse=recurse, **ndb.vars)
 
-    ###########################
-    # deserialize_is_standard #
-    ###########################
+    #########################
+    # transform_is_standard #
+    #########################
 
-    def deserialize_standard_pair(self, typ):
+    def standard_pair(self, typ):
         t = get_origin(typ) or typ
         if t is Union or t is UnionType:
             return (type[typ], dict | int | float | str | bool | NoneType)
@@ -218,13 +218,13 @@ class Deserializer(OvldPerInstanceBase):
         else:
             return (type[typ], dict)
 
-    def deserialize_is_standard(self, typ, recursive=False):
-        """Return whether deserialize_sync::(type[typ], typ) is standard.
+    def transform_is_standard(self, typ, recursive=False):
+        """Return whether transform_sync::(type[typ], typ) is standard.
 
         Codegen for standard implementations can be nested.
         """
-        type_tuple = self.deserialize_standard_pair(typ)
-        resolved = self.deserialize_sync.map.mro(type_tuple, specialize=False)
+        type_tuple = self.standard_pair(typ)
+        resolved = self.transform_sync.map.mro(type_tuple, specialize=False)
         rval = (
             resolved
             and resolved[0]
@@ -232,7 +232,7 @@ class Deserializer(OvldPerInstanceBase):
         )
         if rval and recursive:
             return rval and all(
-                self.deserialize_is_standard(arg, recursive=True) for arg in get_args(typ)
+                self.transform_is_standard(arg, recursive=True) for arg in get_args(typ)
             )
         else:
             return rval
@@ -242,34 +242,34 @@ class Deserializer(OvldPerInstanceBase):
     ###############
 
     @standard_code_generator
-    def deserialize(self, typ: type[object], value: object):
+    def transform(self, typ: type[object], value: object):
         (t,) = get_args(typ)
-        typ, vtyp = self.deserialize_standard_pair(t)
-        if _compatible(vtyp, value) and self.deserialize_is_standard(t):
+        typ, vtyp = self.standard_pair(t)
+        if _compatible(vtyp, value) and self.transform_is_standard(t):
             if issubclass(value, TrackingProxy):
                 return self.make_code(
-                    t, "value", self.deserialize_sync.__ovld__.dispatch, toplevel=True, nest=False
+                    t, "value", self.transform_sync.__ovld__.dispatch, toplevel=True, nest=False
                 )
             else:
                 return self.make_code(
-                    t, "value", self.deserialize_sync.__ovld__.dispatch, toplevel=True
+                    t, "value", self.transform_sync.__ovld__.dispatch, toplevel=True
                 )
 
-    def deserialize(self, typ, value):
+    def transform(self, typ, value):
         try:
-            return self.deserialize_sync(typ, value)
+            return self.transform_sync(typ, value)
         except Exception as exc:
-            self.deserialize_handle_exception(typ, value, exc)
+            self.handle_exception(typ, value, exc)
 
     ####################
-    # deserialize_sync #
+    # transform_sync #
     ####################
 
     @ovld
     @standard_code_generator
-    def deserialize_sync(self, typ: type[object], value: object):
+    def transform_sync(self, typ: type[object], value: object):
         (t,) = get_args(typ)
-        typ, vtyp = self.deserialize_standard_pair(t)
+        typ, vtyp = self.standard_pair(t)
         if _compatible(vtyp, value):
             if issubclass(value, TrackingProxy):
                 return self.make_code(t, "value", recurse, nest=False)
@@ -277,7 +277,7 @@ class Deserializer(OvldPerInstanceBase):
                 return self.make_code(t, "value", recurse)
 
     @ovld(priority=10)
-    def deserialize_sync(self, typ: type[object], value: TrackingProxy):
+    def transform_sync(self, typ: type[object], value: TrackingProxy):
         try:
             return call_next(typ, value)
         except ValidationError:
@@ -286,30 +286,30 @@ class Deserializer(OvldPerInstanceBase):
             raise ValidationError(exc=exc, ctx=get_annotations(value))
 
     @ovld(priority=-1)
-    def deserialize_sync(self, typ: type[object], value: object):
+    def transform_sync(self, typ: type[object], value: object):
         tv = type(value)
         if isinstance(value, TrackingProxy):
             tv = tv._self_cls
-        raise TypeError(f"No way to deserialize {tv} as {typ}")
+        raise TypeError(f"No way to transform {tv} as {typ}")
 
-    ###############################
-    # deserialize exception handler #
-    ###############################
+    #####################
+    # exception handler #
+    #####################
 
     @ovld(priority=10)
-    def deserialize_handle_exception(self, typ, value, exc: ValidationError):
+    def handle_exception(self, typ, value, exc: ValidationError):
         raise
 
-    def deserialize_handle_exception(self, typ, value: TrackingProxy, exc):
+    def handle_exception(self, typ, value: TrackingProxy, exc):
         raise ValidationError(exc=exc, ctx=value._self_ann)
 
-    def deserialize_handle_exception(self, typ, value, exc):
-        return self.deserialize(typ, TrackingProxy.make(value))
+    def handle_exception(self, typ, value, exc):
+        return self.transform(typ, TrackingProxy.make(value))
 
 
 default = Deserializer()
-deserialize = default.deserialize
+deserialize = default.transform
 
 
-default_check = Deserializer(validate_deserialization=True)
-deserialize_check = default_check.deserialize
+default_check = Deserializer(validate=True)
+deserialize_check = default_check.transform

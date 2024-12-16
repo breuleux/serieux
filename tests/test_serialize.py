@@ -62,7 +62,7 @@ def test_serialize_tree():
 
 
 def test_error_basic():
-    with pytest.raises(ValidationError, match=r"No way to serialize"):
+    with pytest.raises(ValidationError, match=r"No way to transform"):
         serialize_check(int, "oh no")
 
 
@@ -91,18 +91,18 @@ def test_error_serialize_list_of_lists():
 
 class SpecialSerializer(Serializer):
     @extend_super
-    def serialize_sync(self, typ: type[int], value: int):
+    def transform_sync(self, typ: type[int], value: int):
         return value * 10
 
-    def serialize_sync(self, typ: type[int], value: str):
+    def transform_sync(self, typ: type[int], value: str):
         return value * 2
 
 
 def test_override():
     ss = SpecialSerializer()
-    assert ss.serialize_sync(int, 3) == 30
-    assert ss.serialize_sync(int, "quack") == "quackquack"
-    assert ss.serialize_sync(list[int], [1, 2, 3]) == [10, 20, 30]
-    assert ss.serialize_sync(list[int], [1, "2", 3]) == [10, "22", 30]
-    assert ss.serialize_sync(Point, Point(8, 9)) == {"x": 80, "y": 90}
-    assert ss.serialize(3) == 30
+    assert ss.transform_sync(int, 3) == 30
+    assert ss.transform_sync(int, "quack") == "quackquack"
+    assert ss.transform_sync(list[int], [1, 2, 3]) == [10, 20, 30]
+    assert ss.transform_sync(list[int], [1, "2", 3]) == [10, "22", 30]
+    assert ss.transform_sync(Point, Point(8, 9)) == {"x": 80, "y": 90}
+    assert ss.transform(3) == 30
