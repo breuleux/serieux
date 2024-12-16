@@ -1,6 +1,7 @@
-from dataclasses import fields
-from types import NoneType
-from typing import get_args, get_origin
+from dataclasses import dataclass, fields
+from itertools import pairwise
+from types import NoneType, UnionType
+from typing import Union, get_args, get_origin
 
 from ovld import (
     CodeGen,
@@ -14,7 +15,7 @@ from ovld import (
 from .exc import ValidationError
 from .proxy import TrackingProxy, get_annotations
 from .serialization import _compatible, standard_code_generator
-from .utils import JSONType, NameDatabase, evaluate_hint
+from .utils import JSONType, NameDatabase, UnionAlias, evaluate_hint
 
 _codegen_template = """
 try:
@@ -30,6 +31,32 @@ def _compatible(t1, t2):
     return issubclass(t2, t1)
 
 
+class Tell:
+    def cost(self):
+        return 1
+
+
+@dataclass(frozen=True)
+class TypeTell(Tell):
+    t: type
+
+    def gen(self, ndb, accessor):
+        t = ndb.stash(self.t, prefix="T")
+        return f"isinstance({accessor}, {t})"
+
+
+@dataclass(frozen=True)
+class KeyTell(Tell):
+    key: str
+
+    def gen(self, ndb, accessor):
+        k = ndb.stash(self.key, prefix="K")
+        return f"(isinstance({accessor}, dict) and {k} in {accessor})"
+
+    def cost(self):
+        return 2
+
+
 class Deserializer(OvldPerInstanceBase):
     def __init__(self, validate_deserialization=True):
         self.validate_deserialization = validate_deserialization
@@ -37,6 +64,17 @@ class Deserializer(OvldPerInstanceBase):
     @classmethod
     def ovld_instance_key(cls, validate_deserialization=True):
         return (("this", cls), ("validate_deserialization", validate_deserialization))
+
+    #####################
+    # deserialize_tells #
+    #####################
+
+    def deserialize_tells(self, typ: type[int] | type[str] | type[bool] | type[float]):
+        return {TypeTell(typ)}
+
+    def deserialize_tells(self, dc: type[Dataclass]):
+        dc = get_origin(dc) or dc
+        return {TypeTell(dict)} | {KeyTell(f.name) for f in fields(dc)}
 
     #######################
     # deserialize_codegen #
@@ -76,9 +114,13 @@ class Deserializer(OvldPerInstanceBase):
 
     def deserialize_codegen(self, ndb: NameDatabase, dc: type[Dataclass], accessor, /):
         parts = []
+        tsub = {}
+        if (origin := get_origin(dc)) is not None:
+            tsub = dict(zip(origin.__type_params__, get_args(dc)))
+            dc = origin
         cons = ndb.stash(dc, prefix="T")
         for f in fields(dc):
-            ftype = evaluate_hint(f.type, ctx=dc)
+            ftype = evaluate_hint(f.type, ctx=dc, typesub=tsub)
             setter = recurse(ndb, ftype, f"{accessor}['{f.name}']")
             parts.append(setter)
         return f"{cons}(" + ",".join(parts) + ")"
@@ -100,6 +142,30 @@ class Deserializer(OvldPerInstanceBase):
         ex = recurse(ndb, et, etmp)
         # TODO: check that it is a list, because this will accidentally work with dicts
         return f"[{ex} for {etmp} in {accessor}]"
+
+    def deserialize_codegen(self, ndb: NameDatabase, x: type[UnionAlias], accessor, /):
+        options = get_args(x)
+        tells = [self.deserialize_tells(o) for o in options]
+        for tl1, tl2 in pairwise(tells):
+            inter = tl1 & tl2
+            tl1 -= inter
+            tl2 -= inter
+
+        if sum(not tl for tl in tells) > 1:
+            raise Exception("Cannot differentiate the possible union members.")
+
+        options = list(zip(tells, options))
+        options.sort(key=lambda x: len(x[0]))
+
+        (_, o1), *rest = options
+
+        code = recurse(ndb, o1, accessor)
+        for tls, opt in rest:
+            ocode = recurse(ndb, opt, accessor)
+            tl = min(tls, key=lambda tl: tl.cost())
+            cond = tl.gen(ndb, accessor)
+            code = f"({ocode} if {cond} else {code})"
+        return code
 
     @ovld(priority=1)
     def deserialize_codegen(self, ndb: NameDatabase, x: type[JSONType[object]], accessor, /):
@@ -125,6 +191,7 @@ class Deserializer(OvldPerInstanceBase):
             return accessor
 
     def make_code(self, typ: type[object], accessor, recurse, toplevel=False, nest=True):
+        typ = evaluate_hint(typ)
         ndb = NameDatabase(nest=nest)
         try:
             expr = self.deserialize_codegen(ndb, typ, accessor)
@@ -142,7 +209,9 @@ class Deserializer(OvldPerInstanceBase):
 
     def deserialize_standard_pair(self, typ):
         t = get_origin(typ) or typ
-        if issubclass(t, (int, float, str, bool, NoneType)):
+        if t is Union or t is UnionType:
+            return (type[typ], dict | int | float | str | bool | NoneType)
+        elif issubclass(t, (int, float, str, bool, NoneType)):
             return (type[typ], typ)
         elif issubclass(t, list):
             return (type[typ], list)
