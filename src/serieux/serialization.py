@@ -2,32 +2,12 @@ from dataclasses import fields
 from types import NoneType
 from typing import get_args, get_origin
 
-from ovld import (
-    CodeGen,
-    Dataclass,
-    OvldPerInstanceBase,
-    call_next,
-    code_generator,
-    ovld,
-    recurse,
-)
+from ovld import Dataclass, call_next, extend_super, ovld, recurse
 
 from .exc import ValidationError
 from .proxy import TrackingProxy, get_annotations
+from .transform import Transformer, standard_code_generator
 from .utils import JSONType, NameDatabase, UnionAlias, evaluate_hint
-
-
-def standard_code_generator(fn):
-    fn.standard_codegen = True
-    return code_generator(fn)
-
-
-_codegen_template = """
-try:
-    return {expr}
-except Exception as exc:
-    return self.handle_exception($typ, {obj}, exc)
-"""
 
 
 def _compatible(t1, t2):
@@ -36,13 +16,8 @@ def _compatible(t1, t2):
     return issubclass(t2, get_origin(t1) or t1)
 
 
-class Serializer(OvldPerInstanceBase):
-    def __init__(self, validate=False):
-        self.validate = validate
-
-    @classmethod
-    def ovld_instance_key(cls, validate=False):
-        return (("this", cls), ("validate", validate))
+class Serializer(Transformer):
+    validate_by_default = False
 
     ###########
     # codegen #
@@ -60,24 +35,7 @@ class Serializer(OvldPerInstanceBase):
             code = f"({body} if isinstance({tmp} := {accessor}, {otyp_embed}) else {dflt})"
             return code
 
-    def default_codegen(self, ndb: NameDatabase, typ: type[object], accessor: str):
-        t = ndb.stash(typ, prefix="T")
-        return f"$recurse(self, {t}, {accessor})"
-
-    @ovld(priority=100)
-    def codegen(self, ndb: NameDatabase, typ: type[object], accessor, /):
-        if typ in ndb.seen and typ not in (int, str, bool, NoneType):
-            return self.default_codegen(ndb, typ, accessor)
-        elif not ndb.seen or self.transform_is_standard(typ):
-            # * ndb.seen is empty for the top level generation, and we always proceed.
-            # * Otherwise, we are generating code recursively for subfields, but
-            #   we only do this if the main transform_sync method is the standard
-            #   code generation method.
-            ndb.seen.add(typ)
-            return call_next(ndb, typ, accessor)
-        else:
-            return self.default_codegen(ndb, typ, accessor)
-
+    @extend_super
     def codegen(self, ndb: NameDatabase, dc: type[Dataclass], accessor, /):
         parts = []
         tsub = {}
@@ -141,17 +99,12 @@ class Serializer(OvldPerInstanceBase):
     def codegen(self, ndb: NameDatabase, x: type[object], accessor, /):
         raise NotImplementedError()
 
-    def make_code(self, typ: type[object], accessor, recurse, toplevel=False):
-        ndb = NameDatabase()
-        try:
-            expr = self.codegen(ndb, typ, accessor)
-        except NotImplementedError:
-            return None
-        if toplevel:
-            code = _codegen_template.format(expr=expr, obj=accessor)
-        else:
-            code = f"return {expr}"
-        return CodeGen(code, typ=typ, recurse=recurse, **ndb.vars)
+    #################
+    # standard_pair #
+    #################
+
+    def standard_pair(self, typ):
+        return (type[typ], typ)
 
     #############
     # transform #
@@ -183,28 +136,6 @@ class Serializer(OvldPerInstanceBase):
         except Exception as exc:
             self.handle_exception(typ, value, exc)
 
-    #########################
-    # transform_is_standard #
-    #########################
-
-    def transform_is_standard(self, typ, recursive=False):
-        """Return whether transform_sync::(type[typ], typ) is standard.
-
-        Codegen for standard implementations can be nested.
-        """
-        resolved = self.transform_sync.map.mro((type[typ], typ), specialize=False)
-        rval = (
-            resolved
-            and resolved[0]
-            and getattr(resolved[0][0].base_handler, "standard_codegen", False)
-        )
-        if rval and recursive:
-            return rval and all(
-                self.transform_is_standard(arg, recursive=True) for arg in get_args(typ)
-            )
-        else:
-            return rval
-
     ##################
     # transform_sync #
     ##################
@@ -231,20 +162,6 @@ class Serializer(OvldPerInstanceBase):
         if isinstance(value, TrackingProxy):
             tv = tv._self_cls
         raise TypeError(f"No way to transform {tv} as {typ}")
-
-    #####################
-    # exception handler #
-    #####################
-
-    @ovld(priority=10)
-    def handle_exception(self, typ, value, exc: ValidationError):
-        raise
-
-    def handle_exception(self, typ, value: TrackingProxy, exc):
-        raise ValidationError(exc=exc, ctx=value._self_ann)
-
-    def handle_exception(self, typ, value, exc):
-        return self.transform(typ, TrackingProxy.make(value))
 
 
 default = Serializer()
