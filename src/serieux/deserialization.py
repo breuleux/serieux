@@ -5,17 +5,8 @@ from typing import Union, get_args, get_origin
 
 from ovld import Dataclass, call_next, extend_super, ovld, recurse
 
-from .exc import ValidationError
-from .proxy import TrackingProxy, get_annotations
-from .serialization import _compatible
-from .transform import Transformer, standard_code_generator
+from .transform import Transformer
 from .utils import JSONType, NameDatabase, UnionAlias, evaluate_hint
-
-
-def _compatible(t1, t2):
-    if issubclass(t2, TrackingProxy):
-        t2 = t2._self_cls
-    return issubclass(t2, t1)
 
 
 class Tell:
@@ -45,6 +36,8 @@ class KeyTell(Tell):
 
 
 class Deserializer(Transformer):
+    validate_by_default = True
+
     #########
     # tells #
     #########
@@ -59,18 +52,6 @@ class Deserializer(Transformer):
     ###########
     # codegen #
     ###########
-
-    def guard_codegen(self, ndb, typ, accessor, body):
-        if not self.validate:
-            return body.replace("$$$", accessor)
-        else:
-            tmp = ndb.gensym("tmp")
-            otyp = get_origin(typ) or typ
-            otyp_embed = ndb.stash(typ if typ is otyp else otyp, prefix="T")
-            body = body.replace("$$$", tmp)
-            dflt = self.default_codegen(ndb, typ, accessor)
-            code = f"({body} if isinstance({tmp} := {accessor}, {otyp_embed}) else {dflt})"
-            return code
 
     @extend_super
     def codegen(self, ndb: NameDatabase, dc: type[Dataclass], accessor, /):
@@ -164,61 +145,6 @@ class Deserializer(Transformer):
             return (type[typ], list)
         else:
             return (type[typ], dict)
-
-    #############
-    # transform #
-    #############
-
-    @standard_code_generator
-    def transform(self, typ: type[object], value: object):
-        (t,) = get_args(typ)
-        typ, vtyp = self.standard_pair(t)
-        if _compatible(vtyp, value) and self.transform_is_standard(t):
-            if issubclass(value, TrackingProxy):
-                return self.make_code(
-                    t, "value", self.transform_sync.__ovld__.dispatch, toplevel=True, nest=False
-                )
-            else:
-                return self.make_code(
-                    t, "value", self.transform_sync.__ovld__.dispatch, toplevel=True
-                )
-
-    def transform(self, typ, value):
-        try:
-            return self.transform_sync(typ, value)
-        except Exception as exc:
-            self.handle_exception(typ, value, exc)
-
-    ##################
-    # transform_sync #
-    ##################
-
-    @ovld
-    @standard_code_generator
-    def transform_sync(self, typ: type[object], value: object):
-        (t,) = get_args(typ)
-        typ, vtyp = self.standard_pair(t)
-        if _compatible(vtyp, value):
-            if issubclass(value, TrackingProxy):
-                return self.make_code(t, "value", recurse, nest=False)
-            else:
-                return self.make_code(t, "value", recurse)
-
-    @ovld(priority=10)
-    def transform_sync(self, typ: type[object], value: TrackingProxy):
-        try:
-            return call_next(typ, value)
-        except ValidationError:
-            raise
-        except Exception as exc:
-            raise ValidationError(exc=exc, ctx=get_annotations(value))
-
-    @ovld(priority=-1)
-    def transform_sync(self, typ: type[object], value: object):
-        tv = type(value)
-        if isinstance(value, TrackingProxy):
-            tv = tv._self_cls
-        raise TypeError(f"No way to transform {tv} as {typ}")
 
 
 default = Deserializer()

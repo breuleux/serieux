@@ -4,16 +4,8 @@ from typing import get_args, get_origin
 
 from ovld import Dataclass, call_next, extend_super, ovld, recurse
 
-from .exc import ValidationError
-from .proxy import TrackingProxy, get_annotations
 from .transform import Transformer, standard_code_generator
 from .utils import JSONType, NameDatabase, UnionAlias, evaluate_hint
-
-
-def _compatible(t1, t2):
-    if issubclass(t2, TrackingProxy):
-        t2 = t2._self_cls
-    return issubclass(t2, get_origin(t1) or t1)
 
 
 class Serializer(Transformer):
@@ -22,18 +14,6 @@ class Serializer(Transformer):
     ###########
     # codegen #
     ###########
-
-    def guard_codegen(self, ndb, typ, accessor, body):
-        if not self.validate:
-            return body.replace("$$$", accessor)
-        else:
-            tmp = ndb.gensym("tmp")
-            otyp = get_origin(typ) or typ
-            otyp_embed = ndb.stash(typ if typ is otyp else otyp, prefix="T")
-            body = body.replace("$$$", tmp)
-            dflt = self.default_codegen(ndb, typ, accessor)
-            code = f"({body} if isinstance({tmp} := {accessor}, {otyp_embed}) else {dflt})"
-            return code
 
     @extend_super
     def codegen(self, ndb: NameDatabase, dc: type[Dataclass], accessor, /):
@@ -110,16 +90,11 @@ class Serializer(Transformer):
     # transform #
     #############
 
+    @extend_super
     @standard_code_generator
     def transform(self, x: object):
         if self.transform_is_standard(x):
             return self.make_code(x, "x", self.transform_sync.__ovld__.dispatch, toplevel=True)
-
-    @standard_code_generator
-    def transform(self, typ: type[object], value: object):
-        (t,) = get_args(typ)
-        if _compatible(t, value) and self.transform_is_standard(t):
-            return self.make_code(t, "value", self.transform_sync.__ovld__.dispatch, toplevel=True)
 
     @ovld(priority=-1)
     def transform(self, x):
@@ -128,40 +103,6 @@ class Serializer(Transformer):
             return self.transform_sync(typ, x)
         except Exception as exc:
             self.handle_exception(typ, x, exc)
-
-    @ovld(priority=-1)
-    def transform(self, typ, value):
-        try:
-            return self.transform_sync(typ, value)
-        except Exception as exc:
-            self.handle_exception(typ, value, exc)
-
-    ##################
-    # transform_sync #
-    ##################
-
-    @ovld
-    @standard_code_generator
-    def transform_sync(self, typ: type[object], value: object):
-        (t,) = get_args(typ)
-        if _compatible(t, value):
-            return self.make_code(t, "value", recurse)
-
-    @ovld(priority=10)
-    def transform_sync(self, typ: type[object], value: TrackingProxy):
-        try:
-            return call_next(typ, value)
-        except ValidationError:
-            raise
-        except Exception as exc:
-            raise ValidationError(exc=exc, ctx=get_annotations(value))
-
-    @ovld(priority=-1)
-    def transform_sync(self, typ: type[object], value: object):
-        tv = type(value)
-        if isinstance(value, TrackingProxy):
-            tv = tv._self_cls
-        raise TypeError(f"No way to transform {tv} as {typ}")
 
 
 default = Serializer()

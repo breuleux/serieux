@@ -1,10 +1,10 @@
-from types import NoneType
-from typing import get_args
+from types import NoneType, UnionType
+from typing import Union, get_args, get_origin
 
-from ovld import CodeGen, OvldPerInstanceBase, call_next, code_generator, ovld
+from ovld import CodeGen, OvldPerInstanceBase, call_next, code_generator, ovld, recurse
 
 from .exc import ValidationError
-from .proxy import TrackingProxy
+from .proxy import TrackingProxy, get_annotations
 from .utils import NameDatabase, evaluate_hint
 
 _codegen_template = """
@@ -20,6 +20,14 @@ def standard_code_generator(fn):
     return code_generator(fn)
 
 
+def compatible(t1, t2):
+    if issubclass(t2, TrackingProxy):
+        t2 = t2._self_cls
+    if (orig := get_origin(t1)) and orig not in (Union, UnionType):
+        t1 = orig
+    return issubclass(t2, t1)
+
+
 class BaseTransformer(OvldPerInstanceBase):
     ###########
     # Codegen #
@@ -28,6 +36,18 @@ class BaseTransformer(OvldPerInstanceBase):
     def default_codegen(self, ndb: NameDatabase, typ: type[object], accessor: str):
         t = ndb.stash(typ, prefix="T")
         return f"$recurse(self, {t}, {accessor})"
+
+    def guard_codegen(self, ndb, typ, accessor, body):
+        if not self.validate:
+            return body.replace("$$$", accessor)
+        else:
+            tmp = ndb.gensym("tmp")
+            otyp = get_origin(typ) or typ
+            otyp_embed = ndb.stash(typ if typ is otyp else otyp, prefix="T")
+            body = body.replace("$$$", tmp)
+            dflt = self.default_codegen(ndb, typ, accessor)
+            code = f"({body} if isinstance({tmp} := {accessor}, {otyp_embed}) else {dflt})"
+            return code
 
     @ovld(priority=100)
     def codegen(self, ndb: NameDatabase, typ: type[object], accessor, /):
@@ -80,6 +100,62 @@ class BaseTransformer(OvldPerInstanceBase):
             )
         else:
             return rval
+
+    #############
+    # transform #
+    #############
+
+    @ovld(priority=-1)
+    def transform(self, typ, value):
+        try:
+            return self.transform_sync(typ, value)
+        except Exception as exc:
+            self.handle_exception(typ, value, exc)
+
+    @standard_code_generator
+    def transform(self, typ: type[object], value: object):
+        (t,) = get_args(typ)
+        typ, vtyp = self.standard_pair(t)
+        if compatible(vtyp, value) and self.transform_is_standard(t):
+            if issubclass(value, TrackingProxy):
+                return self.make_code(
+                    t, "value", self.transform_sync.__ovld__.dispatch, toplevel=True, nest=False
+                )
+            else:
+                return self.make_code(
+                    t, "value", self.transform_sync.__ovld__.dispatch, toplevel=True
+                )
+
+    ##################
+    # transform_sync #
+    ##################
+
+    @ovld
+    @standard_code_generator
+    def transform_sync(self, typ: type[object], value: object):
+        (t,) = get_args(typ)
+        typ, vtyp = self.standard_pair(t)
+        if compatible(vtyp, value):
+            if issubclass(value, TrackingProxy):
+                return self.make_code(t, "value", recurse, nest=False)
+            else:
+                return self.make_code(t, "value", recurse)
+
+    @ovld(priority=10)
+    def transform_sync(self, typ: type[object], value: TrackingProxy):
+        try:
+            return call_next(typ, value)
+        except ValidationError:
+            raise
+        except Exception as exc:
+            raise ValidationError(exc=exc, ctx=get_annotations(value))
+
+    @ovld(priority=-1)
+    def transform_sync(self, typ: type[object], value: object):
+        tv = type(value)
+        if isinstance(value, TrackingProxy):
+            tv = tv._self_cls
+        raise TypeError(f"No way to transform {tv} as {typ}")
 
     #####################
     # exception handler #
