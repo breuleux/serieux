@@ -101,8 +101,7 @@ class Deserializer(Transformer):
         et = evaluate_hint(et)
         etmp = ndb.gensym("elt")
         ex = recurse(ndb, et, etmp)
-        # TODO: check that it is a list, because this will accidentally work with dicts
-        return f"[{ex} for {etmp} in {accessor}]"
+        return self.guard_codegen(ndb, list, accessor, f"[{ex} for {etmp} in {accessor}]")
 
     def codegen(self, ndb: NameDatabase, x: type[UnionAlias], accessor, /):
         options = get_args(x)

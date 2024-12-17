@@ -9,11 +9,6 @@ def pytest_benchmark_group_stats(config, benchmarks, group_by):
     results = defaultdict(list)
     for bench in benchmarks:
         iface = bench["params"]["interface"].__name__
-        group = (
-            bench["name"]
-            .replace(iface, "")
-            .replace(",]", "]")
-            .replace("[]", "")
-        )
+        group = bench["name"].replace(iface, "").replace(",]", "]").replace("[]", "")
         results[group].append(bench)
     outcome.force_result(results.items())

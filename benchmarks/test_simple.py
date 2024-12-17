@@ -11,7 +11,6 @@ from .interfaces import (
     apischema,
     marshmallow,
     mashumaro,
-    old_serieux,
     pydantic,
     serieux,
 )
@@ -98,7 +97,6 @@ def bench(interfaces, data):
 @bench(
     interfaces=[
         serieux,
-        old_serieux,
         apischema,
         pydantic,
         marshmallow,
@@ -115,7 +113,6 @@ def test_serialize(interface, data, benchmark):
 @bench(
     interfaces=[
         serieux,
-        old_serieux,
         apischema,
         pydantic,
         marshmallow,
@@ -132,7 +129,6 @@ def test_json(interface, data, benchmark):
 @bench(
     interfaces=[
         serieux,
-        old_serieux,
         apischema,
         pydantic,
         marshmallow,

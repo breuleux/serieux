@@ -6,7 +6,6 @@ from mashumaro.codecs.basic import BasicDecoder, BasicEncoder
 from mashumaro.codecs.orjson import ORJSONEncoder
 from pydantic import TypeAdapter
 
-from serieux import default_converter
 from serieux.deserialization import default as deser_default
 from serieux.serialization import default as ser_default
 
@@ -15,38 +14,19 @@ class SerieuxInterface:
     __name__ = "serieux"
 
     def serializer_for_type(self, t):
-        func = ser_default.serialize.resolve_for_types(t)
-        return func.__get__(default_converter, type(default_converter))
+        func = ser_default.transform.resolve_for_types(t)
+        return func.__get__(ser_default, type(ser_default))
 
     def json_for_type(self, t):
-        func = ser_default.serialize.resolve_for_types(t)
-        return lambda x: json.dumps(func(None, x))
+        func = ser_default.transform.resolve_for_types(t)
+        return lambda x: json.dumps(func(ser_default, x))
 
     def deserializer_for_type(self, t):
-        func = deser_default.deserialize.resolve_for_types(type[t], t)
-        return lambda x: func(None, t, x)
+        func = deser_default.transform.resolve_for_types(type[t], t)
+        return lambda x: func(deser_default, t, x)
 
 
 serieux = SerieuxInterface()
-
-
-class OldSerieuxInterface:
-    __name__ = "old_serieux"
-
-    def serializer_for_type(self, t):
-        fn = default_converter.serialize
-        return lambda x: fn(t, x)
-
-    def json_for_type(self, t):
-        fn = default_converter.serialize
-        return lambda x: json.dumps(fn(t, x))
-
-    def deserializer_for_type(self, t):
-        fn = default_converter.deserialize
-        return lambda x: fn(t, x)
-
-
-old_serieux = OldSerieuxInterface()
 
 
 class ApischemaInterface:
