@@ -2,7 +2,6 @@ import inspect
 from dataclasses import dataclass, field, replace
 from types import FunctionType, MethodType
 
-from ovld import subclasscheck
 from wrapt import ObjectProxy
 
 BuiltinType = type("x".startswith)
@@ -11,14 +10,6 @@ proxy_cache = {}
 
 class Proxy(ObjectProxy):
     _self_cls = object
-
-    @classmethod
-    def __is_subtype__(cls, other):
-        return subclasscheck(cls._self_cls, other)
-
-    @classmethod
-    def __is_supertype__(cls, other):
-        return subclasscheck(other, cls._self_cls)
 
     @classmethod
     def make(cls, obj, ann):

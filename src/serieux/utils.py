@@ -86,10 +86,11 @@ def display_context(*args, file=sys.stdout, **kwargs):
 
 
 class NameDatabase:
-    def __init__(self):
+    def __init__(self, nest=True):
         self.count = count()
         self.vars = {}
         self.seen = set()
+        self.nest = nest
 
     def gensym(self, prefix):
         return f"{prefix}{next(self.count)}"
@@ -111,10 +112,7 @@ def evaluate_hint(typ, ctx=None, lcl=None, typesub=None):
             if isinstance(ctx, (GenericAlias, _GenericAlias)):
                 origin = get_origin(ctx)
                 if hasattr(origin, "__type_params__"):
-                    subs = {
-                        p: arg
-                        for p, arg in zip(origin.__type_params__, get_args(ctx))
-                    }
+                    subs = {p: arg for p, arg in zip(origin.__type_params__, get_args(ctx))}
                     typesub = {**subs, **(typesub or {})}
                 ctx = origin
             if hasattr(ctx, "__type_params__"):
