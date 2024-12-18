@@ -1,18 +1,27 @@
+from itertools import count
 from types import NoneType, UnionType
 from typing import Union, get_args, get_origin
 
-from ovld import CodeGen, OvldPerInstanceBase, call_next, code_generator, ovld, recurse
+from ovld import Code, OvldPerInstanceBase, call_next, code_generator, ovld, recurse
 
 from .exc import ValidationError
 from .proxy import TrackingProxy, get_annotations
-from .utils import NameDatabase, evaluate_hint
+from .utils import evaluate_hint
 
-_codegen_template = """
+_toplevel_template = """
 try:
-    return {expr}
+    return $expr
 except Exception as exc:
-    return self.handle_exception($typ, {obj}, exc)
+    return self.handle_exception($typ, $obj, exc)
 """
+
+_intermediary_template = "return $expr"
+
+
+class CodegenState:
+    def __init__(self, nest=True):
+        self.seen = set()
+        self.nest = nest
 
 
 def standard_code_generator(fn):
@@ -28,55 +37,64 @@ def compatible(t1, t2):
     return issubclass(t2, t1)
 
 
+_gensym_count = count()
+
+
+def gensym(*prefixes):
+    if not prefixes:
+        prefixes = ("tmp",)
+    codes = [Code(f"{prefix}__{next(_gensym_count)}") for prefix in prefixes]
+    return codes[0] if len(codes) == 1 else codes
+
+
 class BaseTransformer(OvldPerInstanceBase):
     ###########
     # Codegen #
     ###########
 
-    def default_codegen(self, ndb: NameDatabase, typ: type[object], accessor: str):
-        t = ndb.stash(typ, prefix="T")
-        return f"$recurse(self, {t}, {accessor})"
+    def default_codegen(self, state: CodegenState, typ: type[object], accessor: Code):
+        return Code("$recurse(self, $typ, $accessor)", typ=typ, accessor=accessor)
 
     def guard_codegen(self, ndb, typ, accessor, body):
         if not self.validate:
-            return body.replace("$$$", accessor)
+            return body
         else:
-            tmp = ndb.gensym("tmp")
-            otyp = get_origin(typ) or typ
-            otyp_embed = ndb.stash(typ if typ is otyp else otyp, prefix="T")
-            body = body.replace("$$$", tmp)
-            dflt = self.default_codegen(ndb, typ, accessor)
-            code = f"({body} if isinstance({tmp} := {accessor}, {otyp_embed}) else {dflt})"
-            return code
+            tmp = gensym()
+            return Code(
+                "$body if isinstance($tmp := $accessor, $otyp) else $dflt",
+                body=body.sub(accessor=tmp),
+                tmp=tmp,
+                accessor=accessor,
+                otyp=get_origin(typ) or typ,
+                dflt=self.default_codegen(ndb, typ, tmp),
+            )
 
     @ovld(priority=100)
-    def codegen(self, ndb: NameDatabase, typ: type[object], accessor, /):
-        if (ndb.seen and not ndb.nest) or (
-            typ in ndb.seen and typ not in (int, str, bool, NoneType)
+    def codegen(self, state: CodegenState, typ: type[object], accessor, /):
+        if (state.seen and not state.nest) or (
+            typ in state.seen and typ not in (int, str, bool, NoneType)
         ):
-            return self.default_codegen(ndb, typ, accessor)
-        elif not ndb.seen or self.transform_is_standard(typ):
-            # * ndb.seen is empty for the top level generation, and we always proceed.
+            return self.default_codegen(state, typ, accessor)
+        elif not state.seen or self.transform_is_standard(typ):
+            # * state.seen is empty for the top level generation, and we always proceed.
             # * Otherwise, we are generating code recursively for subfields, but
             #   we only do this if the main serialize_sync method is the standard
             #   code generation method.
-            ndb.seen.add(typ)
-            return call_next(ndb, typ, accessor)
+            state.seen.add(typ)
+            return call_next(state, typ, accessor)
         else:
-            return self.default_codegen(ndb, typ, accessor)
+            return self.default_codegen(state, typ, accessor)
 
     def make_code(self, typ: type[object], accessor, recurse, toplevel=False, nest=True):
+        accessor = accessor if isinstance(accessor, Code) else Code(accessor)
         typ = evaluate_hint(typ)
-        ndb = NameDatabase(nest=nest)
+        state = CodegenState(nest=nest)
         try:
-            expr = self.codegen(ndb, typ, accessor)
+            expr = self.codegen(state, typ, accessor)
         except NotImplementedError:
             return None
-        if toplevel:
-            code = _codegen_template.format(expr=expr, obj=accessor)
-        else:
-            code = f"return {expr}"
-        return CodeGen(code, typ=typ, recurse=recurse, **ndb.vars)
+        template = _toplevel_template if toplevel else _intermediary_template
+        return Code(template, typ=typ, recurse=recurse, obj=accessor, expr=expr)
 
     #########################
     # transform_is_standard #

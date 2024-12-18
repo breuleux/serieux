@@ -1,7 +1,6 @@
 import importlib
 import sys
 import typing
-from itertools import count
 from types import GenericAlias, NoneType, UnionType
 from typing import (
     ForwardRef,
@@ -83,22 +82,6 @@ def context_string(
 def display_context(*args, file=sys.stdout, **kwargs):
     cs = context_string(*args, **kwargs)
     print(cs, file=file)
-
-
-class NameDatabase:
-    def __init__(self, nest=True):
-        self.count = count()
-        self.vars = {}
-        self.seen = set()
-        self.nest = nest
-
-    def gensym(self, prefix):
-        return f"{prefix}{next(self.count)}"
-
-    def stash(self, v, prefix="TMP"):
-        var = f"{prefix}{next(self.count)}"
-        self.vars[var] = v
-        return f"${var}"
 
 
 #################

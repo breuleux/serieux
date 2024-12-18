@@ -3,13 +3,16 @@ from itertools import pairwise
 from types import NoneType, UnionType
 from typing import Union, get_args, get_origin
 
-from ovld import Dataclass, call_next, extend_super, ovld, recurse
+from ovld import Code, Dataclass, call_next, extend_super, ovld, recurse
 
-from .transform import Transformer
-from .utils import JSONType, NameDatabase, UnionAlias, evaluate_hint
+from .transform import CodegenState, Transformer, gensym
+from .utils import JSONType, UnionAlias, evaluate_hint
 
 
 class Tell:
+    def __lt__(self, other):
+        return self.cost() < other.cost()
+
     def cost(self):
         return 1
 
@@ -18,18 +21,16 @@ class Tell:
 class TypeTell(Tell):
     t: type
 
-    def gen(self, ndb, accessor):
-        t = ndb.stash(self.t, prefix="T")
-        return f"isinstance({accessor}, {t})"
+    def gen(self, arg):
+        return Code("isinstance($arg, $t)", arg=arg, t=self.t)
 
 
 @dataclass(frozen=True)
 class KeyTell(Tell):
     key: str
 
-    def gen(self, ndb, accessor):
-        k = ndb.stash(self.key, prefix="K")
-        return f"(isinstance({accessor}, dict) and {k} in {accessor})"
+    def gen(self, arg):
+        return Code("(isinstance($arg, dict) and $k in $arg)", arg=arg, k=self.key)
 
     def cost(self):
         return 2
@@ -54,37 +55,39 @@ class Deserializer(Transformer):
     ###########
 
     @extend_super
-    def codegen(self, ndb: NameDatabase, dc: type[Dataclass], accessor, /):
-        parts = []
+    def codegen(self, state: CodegenState, dc: type[Dataclass], accessor, /):
         tsub = {}
         if (origin := get_origin(dc)) is not None:
             tsub = dict(zip(origin.__type_params__, get_args(dc)))
             dc = origin
-        cons = ndb.stash(dc, prefix="T")
-        for f in fields(dc):
-            ftype = evaluate_hint(f.type, ctx=dc, typesub=tsub)
-            setter = recurse(ndb, ftype, f"{accessor}['{f.name}']")
-            parts.append(setter)
-        return f"{cons}(" + ",".join(parts) + ")"
+        return Code(
+            "$dc($[,]parts)",
+            dc=dc,
+            parts=[
+                recurse(
+                    state,
+                    evaluate_hint(f.type, ctx=dc, typesub=tsub),
+                    Code("$accessor[$fname]", accessor=accessor, fname=f.name),
+                )
+                for f in fields(dc)
+            ],
+        )
 
-    def codegen(self, ndb: NameDatabase, x: type[dict], accessor, /):
+    def codegen(self, state: CodegenState, x: type[dict], accessor, /):
         kt, vt = get_args(x)
-        kt = evaluate_hint(kt)
-        vt = evaluate_hint(vt)
-        ktmp = ndb.gensym("key")
-        vtmp = ndb.gensym("value")
-        kx = recurse(ndb, kt, ktmp)
-        vx = recurse(ndb, vt, vtmp)
-        return f"{{{kx}: {vx} for {ktmp}, {vtmp} in {accessor}.items()}}"
+        ktmp, vtmp = gensym("key", "value")
+        kx = recurse(state, evaluate_hint(kt), ktmp)
+        vx = recurse(state, evaluate_hint(vt), vtmp)
+        return Code("{$kx: $vx for $ktmp, $vtmp in $accessor.items()}", locals())
 
-    def codegen(self, ndb: NameDatabase, x: type[list], accessor, /):
+    def codegen(self, state: CodegenState, x: type[list], accessor, /):
         (et,) = get_args(x)
-        et = evaluate_hint(et)
-        etmp = ndb.gensym("elt")
-        ex = recurse(ndb, et, etmp)
-        return self.guard_codegen(ndb, list, accessor, f"[{ex} for {etmp} in {accessor}]")
+        etmp = gensym("elt")
+        ex = recurse(state, evaluate_hint(et), etmp)
+        code = Code("[$ex for $etmp in $accessor]", locals())
+        return self.guard_codegen(state, list, accessor, code)
 
-    def codegen(self, ndb: NameDatabase, x: type[UnionAlias], accessor, /):
+    def codegen(self, state: CodegenState, x: type[UnionAlias], accessor, /):
         options = get_args(x)
         tells = [self.tells(o) for o in options]
         for tl1, tl2 in pairwise(tells):
@@ -100,34 +103,37 @@ class Deserializer(Transformer):
 
         (_, o1), *rest = options
 
-        code = recurse(ndb, o1, accessor)
+        code = recurse(state, o1, accessor)
         for tls, opt in rest:
-            ocode = recurse(ndb, opt, accessor)
-            tl = min(tls, key=lambda tl: tl.cost())
-            cond = tl.gen(ndb, accessor)
-            code = f"({ocode} if {cond} else {code})"
+            code = Code(
+                "($ocode if $cond else $code)",
+                cond=min(tls).gen(accessor),
+                code=code,
+                ocode=recurse(state, opt, accessor),
+            )
         return code
 
     @ovld(priority=1)
-    def codegen(self, ndb: NameDatabase, x: type[JSONType[object]], accessor, /):
+    def codegen(self, state: CodegenState, x: type[JSONType[object]], accessor, /):
         if self.validate or not self.transform_is_standard(x, True):
-            return call_next(ndb, x, accessor)
+            return call_next(state, x, accessor)
         else:
             return accessor
 
     def codegen(
         self,
-        ndb: NameDatabase,
+        state: CodegenState,
         x: type[int] | type[str] | type[bool] | type[float],
         accessor,
         /,
     ):
-        return self.guard_codegen(ndb, x, accessor, "$$$")
+        return self.guard_codegen(state, x, accessor, Code("$accessor", accessor=accessor))
 
-    def codegen(self, ndb: NameDatabase, x: type[NoneType], accessor, /):
+    def codegen(self, state: CodegenState, x: type[NoneType], accessor, /):
         if self.validate:
-            tmp = ndb.gensym("tmp")
-            return f"({tmp} if ({tmp} := {accessor}) is None else {self.default_codegen(ndb, x, tmp)})"
+            tmp = gensym("tmp")
+            dflt = self.default_codegen(state, x, tmp)
+            return Code("$tmp if ($tmp := $accessor) is None else $dflt", locals())
         else:
             return accessor
 
