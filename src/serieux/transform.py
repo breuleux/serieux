@@ -1,10 +1,12 @@
+from dataclasses import fields
 from itertools import count
 from types import NoneType, UnionType
 from typing import Union, get_args, get_origin
 
-from ovld import Code, OvldPerInstanceBase, call_next, code_generator, ovld, recurse
+from ovld import Code, Dataclass, OvldPerInstanceBase, call_next, code_generator, ovld, recurse
 
 from .exc import ValidationError
+from .model import Field, Model
 from .proxy import TrackingProxy, get_annotations
 from .utils import evaluate_hint
 
@@ -48,6 +50,33 @@ def gensym(*prefixes):
 
 
 class BaseTransformer(OvldPerInstanceBase):
+    #########
+    # Model #
+    #########
+
+    def model(self, dc: type[Dataclass]):
+        tsub = {}
+        constructor = dc
+        if (origin := get_origin(dc)) is not None:
+            tsub = dict(zip(origin.__type_params__, get_args(dc)))
+            constructor = origin
+
+        return Model(
+            original_type=dc,
+            fields=[
+                Field(
+                    name=field.name,
+                    type=evaluate_hint(field.type, ctx=dc, typesub=tsub),
+                    default=field.default,
+                    default_factory=field.default_factory,
+                    flatten=field.metadata.get("flatten", False),
+                    argument_name=field.name if field.kw_only else i,
+                )
+                for i, field in enumerate(fields(constructor))
+            ],
+            constructor=constructor,
+        )
+
     ###########
     # Codegen #
     ###########
@@ -197,5 +226,6 @@ class Transformer(BaseTransformer):
         self.validate = self.validate_by_default if validate is None else validate
 
     @classmethod
-    def ovld_instance_key(cls, validate=False):
+    def ovld_instance_key(cls, validate=None):
+        validate = cls.validate_by_default if validate is None else validate
         return (("this", cls), ("validate", validate))

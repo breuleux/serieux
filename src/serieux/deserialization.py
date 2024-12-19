@@ -55,24 +55,6 @@ class Deserializer(Transformer):
     ###########
 
     @extend_super
-    def codegen(self, state: CodegenState, dc: type[Dataclass], accessor, /):
-        tsub = {}
-        if (origin := get_origin(dc)) is not None:
-            tsub = dict(zip(origin.__type_params__, get_args(dc)))
-            dc = origin
-        return Code(
-            "$dc($[,]parts)",
-            dc=dc,
-            parts=[
-                recurse(
-                    state,
-                    evaluate_hint(f.type, ctx=dc, typesub=tsub),
-                    Code("$accessor[$fname]", accessor=accessor, fname=f.name),
-                )
-                for f in fields(dc)
-            ],
-        )
-
     def codegen(self, state: CodegenState, x: type[dict], accessor, /):
         kt, vt = get_args(x)
         ktmp, vtmp = gensym("key", "value")
@@ -112,6 +94,21 @@ class Deserializer(Transformer):
                 ocode=recurse(state, opt, accessor),
             )
         return code
+
+    def codegen(self, state: CodegenState, obj: type[object], accessor, /):
+        model = self.model(obj)
+        return Code(
+            "$cons($[,]parts)",
+            cons=model.constructor,
+            parts=[
+                recurse(
+                    state,
+                    f.type,
+                    Code("$accessor[$fname]", accessor=accessor, fname=f.serialized_name),
+                )
+                for f in model.fields
+            ],
+        )
 
     @ovld(priority=1)
     def codegen(self, state: CodegenState, x: type[JSONType[object]], accessor, /):

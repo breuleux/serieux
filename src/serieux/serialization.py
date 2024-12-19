@@ -1,8 +1,7 @@
-from dataclasses import fields
 from types import NoneType
-from typing import get_args, get_origin
+from typing import get_args
 
-from ovld import Code, Dataclass, call_next, extend_super, ovld, recurse
+from ovld import Code, call_next, extend_super, ovld, recurse
 
 from .transform import CodegenState, Transformer, gensym, standard_code_generator
 from .utils import JSONType, UnionAlias, evaluate_hint
@@ -16,29 +15,6 @@ class Serializer(Transformer):
     ###########
 
     @extend_super
-    def codegen(self, state: CodegenState, dc: type[Dataclass], accessor, /):
-        tsub = {}
-        if (origin := get_origin(dc)) is not None:
-            tsub = dict(zip(origin.__type_params__, get_args(dc)))
-            dc = origin
-
-        code = Code(
-            "{$[,]parts}",
-            parts=[
-                Code(
-                    "$fname: $setter",
-                    fname=f.name,
-                    setter=recurse(
-                        state,
-                        evaluate_hint(f.type, ctx=dc, typesub=tsub),
-                        Code(f"$accessor.{f.name}", accessor=accessor),
-                    ),
-                )
-                for f in fields(dc)
-            ],
-        )
-        return self.guard_codegen(state, dc, accessor, code)
-
     def codegen(self, state: CodegenState, x: type[dict], accessor, /):
         kt, vt = get_args(x)
         ktmp, vtmp = gensym("key", "value")
@@ -53,6 +29,33 @@ class Serializer(Transformer):
         ex = recurse(state, evaluate_hint(et), etmp)
         code = Code("[$ex for $etmp in $accessor]", locals())
         return self.guard_codegen(state, x, accessor, code)
+
+    def codegen(self, state: CodegenState, x: type[UnionAlias], accessor, /):
+        o1, *rest = get_args(x)
+        code = recurse(state, o1, accessor)
+        for opt in rest:
+            ocode = recurse(state, opt, accessor)
+            code = Code("$ocode if isinstance($accessor, $opt) else $code", locals())
+        return code
+
+    def codegen(self, state: CodegenState, obj: type[object], accessor, /):
+        model = self.model(obj)
+        code = Code(
+            "{$[,]parts}",
+            parts=[
+                Code(
+                    "$fname: $setter",
+                    fname=f.serialized_name,
+                    setter=recurse(
+                        state,
+                        f.type,
+                        Code(f"$accessor.{f.property_name}", accessor=accessor),
+                    ),
+                )
+                for f in model.fields
+            ],
+        )
+        return self.guard_codegen(state, obj, accessor, code)
 
     @ovld(priority=1)
     def codegen(self, state: CodegenState, x: type[JSONType[object]], accessor, /):
@@ -77,17 +80,6 @@ class Serializer(Transformer):
             return Code("$tmp if ($tmp := $accessor) is None else $dflt", locals())
         else:
             return accessor
-
-    def codegen(self, state: CodegenState, x: type[UnionAlias], accessor, /):
-        o1, *rest = get_args(x)
-        code = recurse(state, o1, accessor)
-        for opt in rest:
-            ocode = recurse(state, opt, accessor)
-            code = Code("$ocode if isinstance($accessor, $opt) else $code", locals())
-        return code
-
-    def codegen(self, state: CodegenState, x: type[object], accessor, /):
-        raise NotImplementedError()
 
     #################
     # standard_pair #
