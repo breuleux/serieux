@@ -1,5 +1,9 @@
-from dataclasses import dataclass
-from typing import Callable
+from dataclasses import dataclass, fields
+from typing import Callable, Union, get_args, get_origin
+
+from ovld import Dataclass, call_next, ovld, recurse
+
+from .utils import UnionAlias, evaluate_hint
 
 MISSING = object()
 
@@ -42,3 +46,85 @@ class Model:
     original_type: type
     fields: list[Field]
     constructor: Callable
+
+
+class Modell(type):
+    original_type = object
+    fields = []
+    constructor = None
+
+    @staticmethod
+    def make(
+        original_type,
+        fields,
+        constructor,
+    ):
+        return Modell(
+            f"Model[{original_type.__name__}]",
+            (Modell,),
+            {
+                "original_type": original_type,
+                "fields": fields,
+                "constructor": constructor,
+            },
+        )
+
+    def __class_getitem__(cls, t):
+        return model(t)
+
+
+_model_cache = {}
+_premade = {}
+
+
+def _take_premade(t):
+    _model_cache[t] = _premade.pop(t)
+    return _model_cache[t]
+
+
+@ovld(priority=100)
+def model(t: type[object]):
+    if t not in _model_cache:
+        _premade[t] = Modell.make(
+            original_type=t,
+            fields=[],
+            constructor=None,
+        )
+        _model_cache[t] = call_next(t)
+    return _model_cache[t]
+
+
+@ovld
+def model(dc: type[Dataclass]):
+    rval = _take_premade(dc)
+    tsub = {}
+    constructor = dc
+    if (origin := get_origin(dc)) is not None:
+        tsub = dict(zip(origin.__type_params__, get_args(dc)))
+        constructor = origin
+
+    rval.fields = [
+        Field(
+            name=field.name,
+            type=recurse(evaluate_hint(field.type, ctx=dc, typesub=tsub)),
+            default=field.default,
+            default_factory=field.default_factory,
+            flatten=field.metadata.get("flatten", False),
+            argument_name=field.name if field.kw_only else i,
+        )
+        for i, field in enumerate(fields(constructor))
+    ]
+    rval.constructor = constructor
+    return rval
+
+
+@ovld
+def model(u: type[UnionAlias]):
+    return Union[tuple(recurse(evaluate_hint(t)) for t in get_args(u))]
+
+
+@ovld
+def model(t: type[object]):
+    if (origin := get_origin(t)) is not None:
+        return origin[tuple(recurse(evaluate_hint(a)) for a in get_args(t))]
+    return t

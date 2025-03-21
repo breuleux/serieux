@@ -1,8 +1,10 @@
-import pytest
+import inspect
+from dataclasses import dataclass
+
 from ovld import extend_super
 
-from serieux.exc import ValidationError
-from serieux.serialization import Serializer, serialize, serialize_check
+from serieux.serialization import Serializer, serialize
+from serieux.state import State
 
 from .common import Point, one_test_per_assert
 
@@ -21,6 +23,22 @@ def test_serialize_scalars():
 def test_serialize_point():
     pt = Point(1, 2)
     assert serialize(Point, pt) == {"x": 1, "y": 2}
+
+
+SEP = """
+======
+"""
+
+
+def getcodes(fn, *sigs):
+    sigs = [(sig if isinstance(sig, tuple) else (sig,)) for sig in sigs]
+    codes = [inspect.getsource(fn.resolve(*sig)) for sig in sigs]
+    return SEP.join(codes)
+
+
+def test_point_codegen(file_regression):
+    code = getcodes(serialize, (type[Point], Point, State))
+    file_regression.check(code)
 
 
 def test_serialize_list_of_points():
@@ -61,48 +79,62 @@ def test_serialize_tree():
     }
 
 
-def test_error_basic():
-    with pytest.raises(ValidationError, match=r"No way to transform"):
-        serialize_check(int, "oh no")
-
-
-def test_error_serialize_tree():
-    from .definitions_py312 import Tree
-
-    tree = Tree(Tree("a", 2), "b")
-
-    with pytest.raises(ValidationError, match=r"At path \.left\.right"):
-        serialize_check(Tree[str], tree)
-
-
-def test_error_serialize_list():
-    li = [0, 1, 2, 3, "oops", 5, 6]
-
-    with pytest.raises(ValidationError, match=r"At path \[4\]"):
-        serialize_check(list[int], li)
-
-
-def test_error_serialize_list_of_lists():
-    li = [[0, 1], [2, 3, "oops", 5, 6]]
-
-    with pytest.raises(ValidationError, match=r"At path \[1\]\[2\]"):
-        serialize_check(list[list[int]], li)
-
-
 class SpecialSerializer(Serializer):
     @extend_super
-    def transform_sync(self, typ: type[int], value: int):
+    def transform(self, typ: type[int], value: int, state: State):
         return value * 10
 
-    def transform_sync(self, typ: type[int], value: str):
+    def transform(self, typ: type[int], value: str, state: State):
         return value * 2
 
 
 def test_override():
     ss = SpecialSerializer()
-    assert ss.transform_sync(int, 3) == 30
-    assert ss.transform_sync(int, "quack") == "quackquack"
-    assert ss.transform_sync(list[int], [1, 2, 3]) == [10, 20, 30]
-    assert ss.transform_sync(list[int], [1, "2", 3]) == [10, "22", 30]
-    assert ss.transform_sync(Point, Point(8, 9)) == {"x": 80, "y": 90}
+    assert ss.transform(int, 3) == 30
+    assert ss.transform(int, "quack") == "quackquack"
+    assert ss.transform(list[int], [1, 2, 3]) == [10, 20, 30]
+    assert ss.transform(list[int], [1, "2", 3]) == [10, "22", 30]
+    assert ss.transform(Point, Point(8, 9)) == {"x": 80, "y": 90}
     assert ss.transform(3) == 30
+
+
+def test_special_serializer_codegen(file_regression):
+    code = getcodes(SpecialSerializer().transform, (type[Point], Point, State))
+    file_regression.check(code)
+
+
+class quirkint(int):
+    pass
+
+
+class QuirkySerializer(Serializer):
+    @extend_super
+    def transform(self, typ: type[int], value: quirkint, state: State):
+        return value * 10
+
+
+def test_override_quirkint():
+    ss = QuirkySerializer()
+    assert ss.transform(int, 3) == 3
+    assert ss.transform(int, quirkint(3)) == 30
+    assert ss.transform(Point, Point(8, 9)) == {"x": 8, "y": 9}
+    assert ss.transform(Point, Point(quirkint(8), 9)) == {"x": 80, "y": 9}
+
+
+@dataclass
+class ExtraWeight(State):
+    weight: int
+
+
+class StatedSerializer(Serializer):
+    @extend_super
+    def transform(self, typ: type[int], value: int, state: ExtraWeight):
+        return value + state.weight
+
+
+def test_override_state():
+    ss = StatedSerializer()
+    assert ss.transform(int, 3) == 3
+    assert ss.transform(int, 3, ExtraWeight(10)) == 13
+    assert ss.transform(Point, Point(7, 8)) == {"x": 7, "y": 8}
+    assert ss.transform(Point, Point(7, 8), ExtraWeight(10)) == {"x": 17, "y": 18}

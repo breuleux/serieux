@@ -184,13 +184,13 @@ benchmark = [
     { name = "multimethod", specifier = ">=1.12" },
     { name = "multipledispatch", specifier = ">=1.0.0" },
     { name = "plum-dispatch", specifier = ">=2.5.2" },
-    { name = "pytest-benchmark", specifier = ">=4.0.0" },
     { name = "runtype", specifier = ">=0.5.0" },
 ]
 dev = [
     { name = "codefind", specifier = "~=0.1.6" },
     { name = "mkdocs", specifier = ">=1.6.1" },
     { name = "pytest", specifier = ">=8.3.2" },
+    { name = "pytest-benchmark", specifier = ">=4.0.0" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
     { name = "pytest-regressions", specifier = ">=2.5.0" },
 ]
@@ -317,6 +317,32 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-datadir"
+version = "1.6.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bb/0e/63301415b9233f0131339799d49ce0c0e8804d82f3f12615056a70e563c5/pytest_datadir-1.6.1.tar.gz", hash = "sha256:4d204cf93cfe62ddc37b19922df6c8c0f133c2899c224bd339b24920e84e7fd3", size = 9391 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/f1/5e4d95ce96c03332726d7fd87b7b500f178994b638ca6a88b4ed3ca64438/pytest_datadir-1.6.1-py3-none-any.whl", hash = "sha256:aa427f6218d3fc7481129d59c892bd7adfb8822613a2726ffc97f51968879cdb", size = 5156 },
+]
+
+[[package]]
+name = "pytest-regressions"
+version = "2.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+    { name = "pytest-datadir" },
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/07/40/2e233d49a86e2ba88325bcfdcad77fa56b05ba7ca61b58bc0212330e560a/pytest_regressions-2.7.0.tar.gz", hash = "sha256:4c30064e0923929012c94f5d6f35205be06fd8709c7f0dba0228e05c460af05e", size = 116270 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6d/83/3eaf30c06a1cf8bb58b1e5dba0345d1c747b720e889cbae81750c7659e9f/pytest_regressions-2.7.0-py3-none-any.whl", hash = "sha256:69f5e3f03493cf0ef84d96d23e50a546617c198b1d7746f2e2b9e441cbab4847", size = 24497 },
+]
+
+[[package]]
 name = "pyyaml"
 version = "6.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -365,6 +391,7 @@ benchmark = [
 dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
+    { name = "pytest-regressions" },
 ]
 
 [package.metadata]
@@ -387,6 +414,7 @@ benchmark = [
 dev = [
     { name = "pytest", specifier = ">=8.3.2" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
+    { name = "pytest-regressions", specifier = ">=2.7.0" },
 ]
 
 [[package]]

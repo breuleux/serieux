@@ -2,13 +2,14 @@ from typing import get_args
 
 from ovld import ovld, recurse, subclasscheck
 
-from serieux.typetags import TaggedType, make_tag
-from tests.common import one_test_per_assert
+from serieux.model import Modell
+from serieux.typetags import TaggedType, make_tag, pushdown
+from tests.common import Point, one_test_per_assert
 
 Apple = make_tag(name="Apple", priority=1)
 Banana = make_tag(name="Banana", priority=2)
 Carrot = make_tag(name="Carrot", priority=3)
-Dog = make_tag(name="Dog", priority=4)
+Dog = make_tag(name="Dog", priority=4, inherit=False)
 
 
 def test_typetag_idempotent():
@@ -40,9 +41,30 @@ def test_typetags():
 
 @one_test_per_assert
 def test_pushdown():
-    assert Apple[int].pushdown() is int
-    assert Apple[list[int]].pushdown() == list[Apple[int]]
-    assert Apple[Banana[list[int]]].pushdown() == list[Apple[Banana[int]]]
+    assert pushdown(int) is int
+    assert pushdown(Apple[int]) is int
+    assert pushdown(Apple[list[int]]) == list[Apple[int]]
+    assert pushdown(Apple[Banana[list[int]]]) == list[Apple[Banana[int]]]
+    assert pushdown(Apple[int | str]) == Apple[int] | Apple[str]
+
+
+@one_test_per_assert
+def test_pushdown_no_inherit():
+    # Dog is a tag that is not inherited when pushing down
+    assert pushdown(Dog[list[int]]) == list[int]
+    assert pushdown(Dog[Apple[list[int]]]) == list[Apple[int]]
+
+
+def test_pushdown_model():
+    t = Apple[Modell[Point]]
+    tp = t.pushdown()
+    assert tp.fields[0].type is Apple[int]
+    assert tp.fields[1].type is Apple[int]
+
+
+def test_on_model():
+    t = Modell[Apple[Point]]
+    assert t._cls is Modell[Point]
 
 
 @ovld

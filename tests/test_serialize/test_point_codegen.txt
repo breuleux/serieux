@@ -1,0 +1,2 @@
+def __GENERATED__(self, t, obj, state, /):
+    return {'x': obj.x if isinstance(obj.x, int) else transform(int, obj.x, state),'y': obj.y if isinstance(obj.y, int) else transform1(int, obj.y, state)}

@@ -1,19 +1,23 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cache
-from typing import get_args, get_origin
+from types import UnionType
+from typing import Union, get_args, get_origin
 
-from ovld import subclasscheck
+from ovld import recurse, subclasscheck
 from ovld.mro import Order
+
+from .model import Modell, model
 
 
 @dataclass(frozen=True)
 class Tag:
     name: str
     priority: int
+    inherit: bool = True
 
 
-def make_tag(name, priority):
-    tag = Tag(name=name, priority=priority)
+def make_tag(name, priority, inherit=True):
+    tag = Tag(name=name, priority=priority, inherit=inherit)
     return _create(frozenset({tag}), object)
 
 
@@ -61,9 +65,41 @@ class TaggedType(type):
 
     @classmethod
     def pushdown(self):
-        typ = self.strip(self)
-        if orig := get_origin(typ):
-            args = get_args(typ)
-            return orig[tuple([self[a] for a in args])]
-        else:
-            return typ
+        return pushdown(self)
+
+    @classmethod
+    def transfer(self, t):
+        return self[t]
+
+
+def pushdown(cls):
+    if not isinstance(cls, type) or not issubclass(cls, TaggedType):
+        return cls
+    typ = cls.strip(cls)
+    cls = _create(cls._tags - {tag for tag in cls._tags if not tag.inherit}, cls._cls)
+    if not isinstance(cls, type) or not issubclass(cls, TaggedType):
+        return cls
+    if isinstance(typ, type) and issubclass(typ, Modell):
+        return Modell.make(
+            original_type=typ.original_type,
+            fields=[replace(field, type=cls[field.type]) for field in typ.fields],
+            constructor=typ.constructor,
+        )
+    elif orig := get_origin(typ):
+        args = get_args(typ)
+        if orig is UnionType:
+            orig = Union
+        return orig[tuple([cls[a] for a in args])]
+    else:
+        return typ
+
+
+def strip_all(cls):
+    if isinstance(cls, type) and issubclass(cls, TaggedType):
+        return cls.strip(cls)
+    return cls
+
+
+@model.register
+def model(t: type[TaggedType]):
+    return t[recurse(t._cls)]
