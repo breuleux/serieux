@@ -6,7 +6,7 @@ from typing import Union, get_args, get_origin
 from ovld import recurse, subclasscheck
 from ovld.mro import Order
 
-from .model import Modell, model
+from .model import Model, model
 
 
 @dataclass(frozen=True)
@@ -79,8 +79,8 @@ def pushdown(cls):
     cls = _create(cls._tags - {tag for tag in cls._tags if not tag.inherit}, cls._cls)
     if not isinstance(cls, type) or not issubclass(cls, TaggedType):
         return cls
-    if isinstance(typ, type) and issubclass(typ, Modell):
-        return Modell.make(
+    if isinstance(typ, type) and issubclass(typ, Model):
+        return Model.make(
             original_type=typ.original_type,
             fields=[replace(field, type=cls[field.type]) for field in typ.fields],
             constructor=typ.constructor,

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, fields
+from types import UnionType
 from typing import Callable, Union, get_args, get_origin
 
 from ovld import Dataclass, call_next, ovld, recurse
@@ -41,14 +42,7 @@ class Field:
         return f"$$$.{self.property_name}"
 
 
-@dataclass(kw_only=True)
-class Model:
-    original_type: type
-    fields: list[Field]
-    constructor: Callable
-
-
-class Modell(type):
+class Model(type):
     original_type = object
     fields = []
     constructor = None
@@ -59,9 +53,9 @@ class Modell(type):
         fields,
         constructor,
     ):
-        return Modell(
-            f"Model[{original_type.__name__}]",
-            (Modell,),
+        return Model(
+            f"Model[{getattr(original_type, '__name__', str(original_type))}]",
+            (Model,),
             {
                 "original_type": original_type,
                 "fields": fields,
@@ -84,8 +78,9 @@ def _take_premade(t):
 
 @ovld(priority=100)
 def model(t: type[object]):
+    t = evaluate_hint(t)
     if t not in _model_cache:
-        _premade[t] = Modell.make(
+        _premade[t] = Model.make(
             original_type=t,
             fields=[],
             constructor=None,
@@ -119,7 +114,7 @@ def model(dc: type[Dataclass]):
 
 
 @ovld
-def model(u: type[UnionAlias]):
+def model(u: type[UnionAlias] | type[UnionType]):
     return Union[tuple(recurse(evaluate_hint(t)) for t in get_args(u))]
 
 

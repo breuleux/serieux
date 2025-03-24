@@ -3,7 +3,7 @@ from typing import get_origin
 
 from ovld import Code, Dataclass, ovld
 
-from .model import Modell as Model
+from .model import Model
 
 
 class Tell:

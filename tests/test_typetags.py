@@ -2,7 +2,7 @@ from typing import get_args
 
 from ovld import ovld, recurse, subclasscheck
 
-from serieux.model import Modell
+from serieux.model import Model
 from serieux.typetags import TaggedType, make_tag, pushdown
 from tests.common import Point, one_test_per_assert
 
@@ -56,15 +56,15 @@ def test_pushdown_no_inherit():
 
 
 def test_pushdown_model():
-    t = Apple[Modell[Point]]
+    t = Apple[Model[Point]]
     tp = t.pushdown()
     assert tp.fields[0].type is Apple[int]
     assert tp.fields[1].type is Apple[int]
 
 
 def test_on_model():
-    t = Modell[Apple[Point]]
-    assert t._cls is Modell[Point]
+    t = Model[Apple[Point]]
+    assert t._cls is Model[Point]
 
 
 @ovld
