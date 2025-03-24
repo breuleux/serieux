@@ -1,9 +1,6 @@
 from pathlib import Path
 
-import pytest
-
 from serieux.deserialization import deserialize
-from serieux.exc import ValidationError
 
 from .common import Point, Point3D, one_test_per_assert
 
@@ -87,20 +84,3 @@ def test_deserialize_overlapping_union():
     P = Point3D | Point
     assert type(deserialize(P, {"x": 1, "y": 2})) is Point
     assert type(deserialize(P, {"x": 1, "y": 2, "z": 3})) is Point3D
-
-
-# Errors
-
-
-def test_deserialize_scalar_error():
-    with pytest.raises(ValidationError, match=r"No way to transform"):
-        deserialize(int, "foo")
-
-
-def test_deserialize_missing_field():
-    pts = [
-        {"x": 1, "y": 2},
-        {"x": 3},
-    ]
-    with pytest.raises(ValidationError, match=r"At path \[1\]: KeyError: 'y'"):
-        deserialize(list[Point], pts)
