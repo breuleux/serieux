@@ -1,5 +1,5 @@
 from types import NoneType
-from typing import Any, get_args
+from typing import Any, get_args, get_origin
 
 from ovld import (
     Code,
@@ -97,6 +97,25 @@ class BaseTransformer(OvldPerInstanceBase):
         def transform(self, t: type[T], obj: T, state: State, /):
             (t,) = get_args(t)
             return Lambda(self.guard_codegen(t, "$obj", "$obj"))
+
+    @standard_code_generator
+    def transform(self, t: type[list], obj: list, state: State, /):
+        (t,) = get_args(t)
+        (lt,) = get_args(t)
+        return Lambda(
+            self.guard_codegen(get_origin(t), "$obj", "[$lbody for X in $obj]"),
+            lbody=self.subcode(lt, "X", state),
+        )
+
+    @standard_code_generator
+    def transform(self, t: type[dict], obj: dict, state: State, /):
+        (t,) = get_args(t)
+        kt, vt = get_args(t)
+        return Lambda(
+            "{$kbody: $vbody for K, V in $obj.items()}",
+            kbody=self.subcode(kt, "K", state),
+            vbody=self.subcode(vt, "V", state),
+        )
 
     ###########################
     # transform: entry points #

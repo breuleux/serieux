@@ -39,25 +39,6 @@ class Serializer(BaseTransformer):
         )
 
     @standard_code_generator
-    def transform(self, t: type[list], obj: list, state: State, /):
-        (t,) = get_args(t)
-        (lt,) = get_args(t)
-        return Lambda(
-            self.guard_codegen(get_origin(t), "$obj", "[$lbody for X in $obj]"),
-            lbody=self.subcode(lt, "X", state),
-        )
-
-    @standard_code_generator
-    def transform(self, t: type[dict], obj: dict, state: State, /):
-        (t,) = get_args(t)
-        kt, vt = get_args(t)
-        return Lambda(
-            "{$kbody: $vbody for K, V in $obj.items()}",
-            kbody=self.subcode(kt, "K", state),
-            vbody=self.subcode(vt, "V", state),
-        )
-
-    @standard_code_generator
     def transform(self, t: type[UnionAlias], obj: Any, state: State, /):
         (t,) = get_args(t)
         o1, *rest = get_args(t)
