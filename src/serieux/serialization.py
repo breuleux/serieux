@@ -1,23 +1,15 @@
-from typing import Any, get_args, get_origin
+from typing import Any, get_args
 
-from ovld import Code, Lambda, extend_super, subclasscheck
+from ovld import Code, Def, Lambda, extend_super
 
 from .base import BaseTransformer, standard_code_generator
-from .model import Modell as Model
+from .model import Model
 from .state import State
 from .typetags import strip_all
 from .utils import UnionAlias
 
 
 class Serializer(BaseTransformer):
-    ###########
-    # helpers #
-    ###########
-
-    def embed_condition(self, t):
-        if not subclasscheck(t, UnionAlias):
-            return t
-
     ######################
     # transform: codegen #
     ######################
@@ -26,17 +18,25 @@ class Serializer(BaseTransformer):
     @standard_code_generator
     def transform(self, t: type[Model], obj: object, state: State, /):
         (t,) = get_args(t)
-        return Lambda(
-            "{$[,]parts}",
+        stmts = []
+        for i, f in enumerate(t.fields):
+            stmt = Code(
+                f"v_{i} = $setter",
+                setter=self.subcode(f.type, f"$obj.{f.property_name}", state),
+            )
+            stmts.append(stmt)
+        final = Code(
+            "return {$[,]parts}",
             parts=[
                 Code(
-                    "$fname: $setter",
+                    f"$fname: v_{i}",
                     fname=f.serialized_name,
-                    setter=self.subcode(f.type, f"$obj.{f.property_name}", state),
                 )
-                for f in t.fields
+                for i, f in enumerate(t.fields)
             ],
         )
+        stmts.append(final)
+        return Def(stmts)
 
     @standard_code_generator
     def transform(self, t: type[UnionAlias], obj: Any, state: State, /):

@@ -1,2 +1,4 @@
 def __GENERATED__(self, t, obj, state, /):
-    return {'x': recurse(int, obj.x, state),'y': recurse1(int, obj.y, state)}
+    v_0 = recurse(int, obj.x, state)
+    v_1 = recurse1(int, obj.y, state)
+    return {'x': v_0,'y': v_1}

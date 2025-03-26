@@ -49,10 +49,10 @@ class BaseTransformer(OvldPerInstanceBase):
         if ec is not None:
             try:
                 fn = self.transform.resolve(type[t], ec, state_t, after=after)
-                lbda = getattr(fn, "__lambda__", None)
-                if lbda:
-                    return lbda(None, t, accessor, "$state")
-            except CodegenInProgress:
+                cg = getattr(fn, "__codegen__", None)
+                if cg:
+                    return cg.create_expression([None, t, accessor, "$state"])
+            except (CodegenInProgress, ValueError):
                 pass
         return self.default_codegen(t, accessor) if default else None
 
@@ -88,8 +88,8 @@ class BaseTransformer(OvldPerInstanceBase):
         if mt == t:
             return None
         else:
-            code = self.subcode(mt, "$obj", state, after=current_code, objt=obj)
-            return code and Lambda(code)
+            nxt = self.transform.resolve(type[mt], obj, state, after=current_code)
+            return getattr(nxt, "__codegen__", None)
 
     for T in (int, str, bool, float, NoneType):
 
