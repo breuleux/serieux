@@ -2,7 +2,7 @@ from pathlib import Path
 
 from serieux.deserialization import deserialize
 
-from .common import Point, Point3D, one_test_per_assert
+from .common import Defaults, Point, Point3D, one_test_per_assert
 
 here = Path(__file__).parent
 
@@ -84,3 +84,18 @@ def test_deserialize_overlapping_union():
     P = Point3D | Point
     assert type(deserialize(P, {"x": 1, "y": 2})) is Point
     assert type(deserialize(P, {"x": 1, "y": 2, "z": 3})) is Point3D
+
+
+def test_deserialize_defaults():
+    data1 = {"name": "bob"}
+    data2 = {"cool": True, "name": "alice"}
+
+    x1 = deserialize(Defaults, data1)
+    assert not x1.cool
+
+    x2 = deserialize(Defaults, data2)
+    assert x2.cool
+
+    assert not x1.aliases
+    assert not x2.aliases
+    assert x1.aliases is not x2.aliases

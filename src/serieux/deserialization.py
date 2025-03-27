@@ -1,14 +1,15 @@
+from dataclasses import MISSING
 from itertools import pairwise
 from types import UnionType
 from typing import Any, get_args
 
-from ovld import Code, Lambda, extend_super
+from ovld import Code, Def, Lambda, extend_super, ovld
+from ovld.dependent import HasKey
 
 from .base import BaseTransformer, standard_code_generator
-from .model import Modell as Model
+from .model import Model
 from .state import State
 from .tell import tells as get_tells
-from .typetags import make_tag
 from .utils import UnionAlias
 
 
@@ -21,21 +22,42 @@ class Deserializer(BaseTransformer):
     @standard_code_generator
     def transform(self, t: type[Model], obj: dict, state: State, /):
         (t,) = get_args(t)
-        return Lambda(
-            "$constructor($[,]parts)",
-            constructor=t.constructor,
-            parts=[
-                Code(
-                    f"{f.argument_name}=$setter"
-                    if isinstance(f.argument_name, str)
-                    else "$setter",
-                    setter=self.subcode(
-                        f.type, Code("$obj[$pname]", pname=f.property_name), state
-                    ),
+        stmts = []
+        args = []
+        for i, f in enumerate(t.fields):
+            processed = self.subcode(f.type, Code("$obj[$pname]", pname=f.property_name), state)
+            if f.required:
+                expr = processed
+            elif f.default is not MISSING:
+                expr = Code(
+                    "($processed) if $pname in $obj else $dflt",
+                    dflt=f.default,
+                    pname=f.property_name,
+                    processed=processed,
                 )
-                for f in t.fields
-            ],
+            elif f.default_factory is not MISSING:
+                expr = Code(
+                    "($processed) if $pname in $obj else $dflt()",
+                    dflt=f.default_factory,
+                    pname=f.property_name,
+                    processed=processed,
+                )
+            stmt = Code(f"v_{i} = $expr", expr=expr)
+            stmts.append(stmt)
+            if isinstance(f.argument_name, str):
+                arg = f"{f.argument_name}=v_{i}"
+            else:
+                arg = f"v_{i}"
+            args.append(arg)
+
+        final = Code(
+            "return $constructor($[,]parts)",
+            constructor=t.constructor,
+            parts=[Code(a) for a in args],
         )
+
+        stmts.append(final)
+        return Def(stmts)
 
     @standard_code_generator
     def transform(self, t: type[UnionAlias] | type[UnionType], obj: Any, state: State, /):

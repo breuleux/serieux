@@ -1,4 +1,4 @@
-from dataclasses import dataclass, fields
+from dataclasses import MISSING, dataclass, fields
 from types import UnionType
 from typing import Callable, Union, get_args, get_origin
 
@@ -6,7 +6,7 @@ from ovld import Dataclass, call_next, ovld, recurse
 
 from .utils import UnionAlias, evaluate_hint
 
-MISSING = object()
+UNDEFINED = object()
 
 
 @dataclass(kw_only=True)
@@ -16,30 +16,24 @@ class Field:
     default: object = MISSING
     default_factory: Callable = MISSING
 
-    argument_name: str | int = MISSING
-    property_name: str = MISSING
-    serialized_name: str = MISSING
+    argument_name: str | int = UNDEFINED
+    property_name: str = UNDEFINED
+    serialized_name: str = UNDEFINED
 
     # Not implemented yet
     flatten: bool = False
 
     def __post_init__(self):
-        if self.property_name is MISSING:
+        if self.property_name is UNDEFINED:
             self.property_name = self.name
-        if self.argument_name is MISSING:
+        if self.argument_name is UNDEFINED:
             self.argument_name = self.name
-        if self.serialized_name is MISSING:
+        if self.serialized_name is UNDEFINED:
             self.serialized_name = self.name
 
     @property
     def required(self):
         return self.default is MISSING and self.default_factory is MISSING
-
-    def extract(self, value):
-        return getattr(value, self.property_name)
-
-    def extract_codegen(self):
-        return f"$$$.{self.property_name}"
 
 
 class Model(type):
