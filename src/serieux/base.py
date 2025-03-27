@@ -80,7 +80,7 @@ class BaseTransformer(OvldPerInstanceBase):
     # transform: codegen #
     ######################
 
-    @ovld(priority=1)
+    @ovld
     @standard_code_generator
     def transform(self, t: type[object], obj: Any, state: State, /):
         (t,) = get_args(t)
