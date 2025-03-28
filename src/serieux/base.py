@@ -1,5 +1,5 @@
 from types import NoneType
-from typing import Any, get_args, get_origin
+from typing import get_args, get_origin
 
 from ovld import (
     Code,
@@ -7,14 +7,13 @@ from ovld import (
     Lambda,
     OvldPerInstanceBase,
     code_generator,
-    current_code,
     ovld,
     recurse,
 )
 from ovld.types import All
 
-from .model import model
 from .state import State, empty
+from .typetags import TaggedType
 
 
 def standard_code_generator(fn):
@@ -80,17 +79,6 @@ class BaseTransformer(OvldPerInstanceBase):
     # transform: codegen #
     ######################
 
-    @ovld
-    @standard_code_generator
-    def transform(self, t: type[object], obj: Any, state: State, /):
-        (t,) = get_args(t)
-        mt = model(t)
-        if mt == t:
-            return None
-        else:
-            nxt = self.transform.resolve(type[mt], obj, state, after=current_code)
-            return getattr(nxt, "__codegen__", None)
-
     for T in (int, str, bool, float, NoneType):
 
         @standard_code_generator
@@ -120,6 +108,10 @@ class BaseTransformer(OvldPerInstanceBase):
     ###########################
     # transform: entry points #
     ###########################
+
+    @ovld(priority=-1)
+    def transform(self, t: type[TaggedType], obj: object, state: State, /):
+        return recurse(t.pushdown(), obj, state)
 
     def transform(self, obj: object, /):
         return recurse(type(obj), obj, empty)

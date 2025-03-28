@@ -3,7 +3,7 @@ from typing import Any, get_args
 from ovld import Code, Def, Lambda, extend_super
 
 from .base import BaseTransformer, standard_code_generator
-from .model import Model
+from .model import Modelizable, model
 from .state import State
 from .typetags import strip_all
 from .utils import UnionAlias
@@ -16,8 +16,9 @@ class Serializer(BaseTransformer):
 
     @extend_super
     @standard_code_generator
-    def transform(self, t: type[Model], obj: object, state: State, /):
+    def transform(self, t: type[Modelizable], obj: object, state: State, /):
         (t,) = get_args(t)
+        t = model(t)
         stmts = []
         for i, f in enumerate(t.fields):
             stmt = Code(

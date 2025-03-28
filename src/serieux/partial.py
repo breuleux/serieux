@@ -1,9 +1,9 @@
 from dataclasses import field, fields, make_dataclass
 from functools import reduce
 
-from ovld import Dataclass, call_next, ovld, recurse
+from ovld import call_next, ovld, recurse
 
-from .model import Model, model
+from .model import Modelizable, model
 from .module import Module
 from .state import State
 from .typetags import make_tag
@@ -36,19 +36,15 @@ partials = Module()
 
 
 @ovld
-def partialize(t: type[Dataclass]):
+def partialize(t: type[Modelizable]):
+    m = model(t)
     dc = make_dataclass(
         cls_name=f"Partial[{t.__name__}]",
         bases=(PartialBase,),
-        fields=[(f.name, f.type, field(default=NOT_GIVEN)) for f in fields(t)],
+        fields=[(f.name, f.type, field(default=NOT_GIVEN)) for f in m.fields],
     )
-    dc._original_dc = t
+    dc._constructor = m.constructor
     return dc
-
-
-@ovld
-def partialize(t: type[Model]):
-    return recurse(t.original_type)
 
 
 @ovld
@@ -94,7 +90,7 @@ def merge(x: NOT_GIVEN_T, y: NOT_GIVEN_T):
 
 @ovld
 def merge(x: PartialBase, y: PartialBase):
-    assert (dc := x._original_dc) is y._original_dc
+    assert (dc := x._constructor) is y._constructor
     args = {}
     for f in fields(dc):
         xv = getattr(x, f.name)
@@ -138,8 +134,12 @@ def instantiate(xs: list):
 
 @ovld
 def instantiate(p: PartialBase):
-    dc = p._original_dc
-    args = {f.name: recurse(value) for f in fields(dc) if (value := getattr(p, f.name)) is not NOT_GIVEN}
+    dc = p._constructor
+    args = {
+        f.name: recurse(value)
+        for f in fields(dc)
+        if (value := getattr(p, f.name)) is not NOT_GIVEN
+    }
     return dc(**args)
 
 

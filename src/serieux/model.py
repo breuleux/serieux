@@ -2,11 +2,17 @@ from dataclasses import MISSING, dataclass, fields
 from types import UnionType
 from typing import Callable, Union, get_args, get_origin
 
-from ovld import Dataclass, call_next, ovld, recurse
+from ovld import Dataclass, call_next, class_check, ovld, recurse
 
 from .utils import UnionAlias, evaluate_hint
 
 UNDEFINED = object()
+
+
+@class_check
+def Modelizable(t):
+    m = model(t)
+    return isinstance(m, type) and issubclass(m, Model)
 
 
 @dataclass(kw_only=True)

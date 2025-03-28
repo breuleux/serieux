@@ -3,11 +3,10 @@ from itertools import pairwise
 from types import UnionType
 from typing import Any, get_args
 
-from ovld import Code, Def, Lambda, extend_super, ovld
-from ovld.dependent import HasKey
+from ovld import Code, Def, Lambda, extend_super
 
 from .base import BaseTransformer, standard_code_generator
-from .model import Model
+from .model import Modelizable, model
 from .state import State
 from .tell import tells as get_tells
 from .utils import UnionAlias
@@ -20,8 +19,9 @@ class Deserializer(BaseTransformer):
 
     @extend_super
     @standard_code_generator
-    def transform(self, t: type[Model], obj: dict, state: State, /):
+    def transform(self, t: type[Modelizable], obj: dict, state: State, /):
         (t,) = get_args(t)
+        t = model(t)
         stmts = []
         args = []
         for i, f in enumerate(t.fields):
@@ -63,7 +63,7 @@ class Deserializer(BaseTransformer):
     def transform(self, t: type[UnionAlias] | type[UnionType], obj: Any, state: State, /):
         (t,) = get_args(t)
         options = get_args(t)
-        tells = [get_tells(o) for o in options]
+        tells = [get_tells(model(o)) for o in options]
         for tl1, tl2 in pairwise(tells):
             inter = tl1 & tl2
             tl1 -= inter
