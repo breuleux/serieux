@@ -1,4 +1,4 @@
-def __GENERATED__(self, t, obj, state, /):
-    v_0 = recurse(int, obj.x, state)
-    v_1 = recurse1(int, obj.y, state)
+def __GENERATED__(self, t, obj, ctx, /):
+    v_0 = serialize(self, int, obj.x, ctx)
+    v_1 = serialize(self, int, obj.y, ctx)
     return {'x': v_0,'y': v_1}

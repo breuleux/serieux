@@ -1,10 +1,9 @@
 import inspect
-from dataclasses import dataclass
 
-from ovld import extend_super
+from ovld import Medley
 
-from serieux.serialization import Serializer, serialize
-from serieux.state import State
+from serieux.ctx import Context
+from serieux.impl import BaseImplementation, serialize
 
 from .common import Point, one_test_per_assert
 
@@ -37,7 +36,7 @@ def getcodes(fn, *sigs):
 
 
 def test_point_codegen(file_regression):
-    code = getcodes(serialize, (type[Point], Point, State))
+    code = getcodes(serialize, (type[Point], Point, Context))
     file_regression.check(code)
 
 
@@ -79,27 +78,27 @@ def test_serialize_tree():
     }
 
 
-class SpecialSerializer(Serializer):
-    @extend_super
-    def transform(self, typ: type[int], value: int, state: State):
+class Special(Medley):
+    def serialize(self, typ: type[int], value: int, ctx: Context):
         return value * 10
 
-    def transform(self, typ: type[int], value: str, state: State):
+    def serialize(self, typ: type[int], value: str, ctx: Context):
         return value * 2
 
 
 def test_override():
-    ss = SpecialSerializer()
-    assert ss.transform(int, 3) == 30
-    assert ss.transform(int, "quack") == "quackquack"
-    assert ss.transform(list[int], [1, 2, 3]) == [10, 20, 30]
-    assert ss.transform(list[int], [1, "2", 3]) == [10, "22", 30]
-    assert ss.transform(Point, Point(8, 9)) == {"x": 80, "y": 90}
-    assert ss.transform(3) == 30
+    ss = (BaseImplementation + Special)()
+    assert ss.serialize(int, 3) == 30
+    assert ss.serialize(int, "quack") == "quackquack"
+    assert ss.serialize(list[int], [1, 2, 3]) == [10, 20, 30]
+    assert ss.serialize(list[int], [1, "2", 3]) == [10, "22", 30]
+    assert ss.serialize(Point, Point(8, 9)) == {"x": 80, "y": 90}
+    assert ss.serialize(3) == 30
 
 
 def test_special_serializer_codegen(file_regression):
-    code = getcodes(SpecialSerializer().transform, (type[Point], Point, State))
+    custom = (BaseImplementation + Special)()
+    code = getcodes(custom.serialize, (type[Point], Point, Context))
     file_regression.check(code)
 
 
@@ -107,34 +106,31 @@ class quirkint(int):
     pass
 
 
-class QuirkySerializer(Serializer):
-    @extend_super
-    def transform(self, typ: type[int], value: quirkint, state: State):
+class Quirky(Medley):
+    def serialize(self, typ: type[int], value: quirkint, ctx: Context):
         return value * 10
 
 
 def test_override_quirkint():
-    ss = QuirkySerializer()
-    assert ss.transform(int, 3) == 3
-    assert ss.transform(int, quirkint(3)) == 30
-    assert ss.transform(Point, Point(8, 9)) == {"x": 8, "y": 9}
-    assert ss.transform(Point, Point(quirkint(8), 9)) == {"x": 80, "y": 9}
+    ss = (BaseImplementation + Quirky)()
+    assert ss.serialize(int, 3) == 3
+    assert ss.serialize(int, quirkint(3)) == 30
+    assert ss.serialize(Point, Point(8, 9)) == {"x": 8, "y": 9}
+    assert ss.serialize(Point, Point(quirkint(8), 9)) == {"x": 80, "y": 9}
 
 
-@dataclass
-class ExtraWeight(State):
+class ExtraWeight(Context):
     weight: int
 
 
-class StatedSerializer(Serializer):
-    @extend_super
-    def transform(self, typ: type[int], value: int, state: ExtraWeight):
-        return value + state.weight
+class WeightedImpl(Medley):
+    def serialize(self, typ: type[int], value: int, ctx: ExtraWeight):
+        return value + ctx.weight
 
 
 def test_override_state():
-    ss = StatedSerializer()
-    assert ss.transform(int, 3) == 3
-    assert ss.transform(int, 3, ExtraWeight(10)) == 13
-    assert ss.transform(Point, Point(7, 8)) == {"x": 7, "y": 8}
-    assert ss.transform(Point, Point(7, 8), ExtraWeight(10)) == {"x": 17, "y": 18}
+    ss = (BaseImplementation + WeightedImpl)()
+    assert ss.serialize(int, 3) == 3
+    assert ss.serialize(int, 3, ExtraWeight(10)) == 13
+    assert ss.serialize(Point, Point(7, 8)) == {"x": 7, "y": 8}
+    assert ss.serialize(Point, Point(7, 8), ExtraWeight(10)) == {"x": 17, "y": 18}

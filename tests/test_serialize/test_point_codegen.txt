@@ -1,4 +1,4 @@
-def __GENERATED__(self, t, obj, state, /):
-    v_0 = obj.x if isinstance(obj.x, int) else recurse(int, obj.x, state)
-    v_1 = obj.y if isinstance(obj.y, int) else recurse1(int, obj.y, state)
+def __GENERATED__(self, t, obj, ctx, /):
+    v_0 = obj.x if isinstance(obj.x, int) else serialize(self, int, obj.x, ctx)
+    v_1 = obj.y if isinstance(obj.y, int) else serialize(self, int, obj.y, ctx)
     return {'x': v_0,'y': v_1}

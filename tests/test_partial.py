@@ -1,8 +1,8 @@
-from serieux.module import create
-from serieux.partial import Partial, Sources, partials
+from serieux.impl import BaseImplementation
+from serieux.partial import Partial, PartialFeature, Sources
 from tests.common import Point
 
-deserialize = create(partials).deserialize
+deserialize = (BaseImplementation + PartialFeature)().deserialize
 
 
 def test_partial():

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from serieux.deserialization import deserialize
+from serieux.impl import deserialize
 
 from .common import Defaults, Point, Point3D, one_test_per_assert
 

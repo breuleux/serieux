@@ -1,7 +1,7 @@
 import ast
 import inspect
 from ast import NodeTransformer
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from textwrap import dedent
 
 from _pytest.assertion.rewrite import AssertionRewriter
@@ -36,6 +36,13 @@ class Point:
 @dataclass
 class Point3D(Point):
     z: int
+
+
+@dataclass
+class Defaults:
+    name: str
+    aliases: list[str] = field(default_factory=list)
+    cool: bool = False
 
 
 class AssertTransformer(NodeTransformer):

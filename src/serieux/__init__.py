@@ -1,6 +1,5 @@
-from .deserialization import deserialize
 from .exc import ValidationError, ValidationExceptionGroup
-from .serialization import serialize
+from .impl import deserialize, serialize
 
 __all__ = [
     "serialize",

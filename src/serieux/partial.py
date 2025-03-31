@@ -1,11 +1,10 @@
 from dataclasses import field, fields, make_dataclass
 from functools import reduce
 
-from ovld import call_next, ovld, recurse
+from ovld import Medley, call_next, ovld, recurse
 
+from .ctx import Context
 from .model import Modelizable, model
-from .module import Module
-from .state import State
 from .typetags import make_tag
 
 #############
@@ -32,9 +31,6 @@ class Sources:
         self.sources = sources
 
 
-partials = Module()
-
-
 @ovld
 def partialize(t: type[Modelizable]):
     m = model(t)
@@ -57,10 +53,10 @@ def partialize(t: object):
 ###################
 
 
-@partials.deserializer
-def _(self, t: type[object], obj: Sources, state: State, /):
-    parts = [self.transform(Partial[t], src, state) for src in obj.sources]
-    return instantiate(reduce(merge, parts))
+class PartialFeature(Medley):
+    def deserialize(self, t: type[object], obj: Sources, ctx: Context, /):
+        parts = [recurse(Partial[t], src, ctx) for src in obj.sources]
+        return instantiate(reduce(merge, parts))
 
 
 @model.register
