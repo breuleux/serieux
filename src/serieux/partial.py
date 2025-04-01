@@ -1,5 +1,6 @@
 from dataclasses import field, fields, make_dataclass
 from functools import reduce
+from typing import TYPE_CHECKING, Annotated, TypeVar
 
 from ovld import Medley, call_next, ovld, recurse
 
@@ -12,7 +13,11 @@ from .typetags import make_tag
 #############
 
 
-Partial = make_tag("Partial", 1)
+if TYPE_CHECKING:  # pragma: no cover
+    T = TypeVar("T")
+    Partial = Annotated[T, None]
+else:
+    Partial = make_tag("Partial", 1)
 
 
 class NOT_GIVEN_T:
