@@ -9,6 +9,7 @@ from ovld import (
     Def,
     Lambda,
     Medley,
+    call_next,
     code_generator,
     ovld,
     recurse,
@@ -17,6 +18,7 @@ from ovld.types import All
 
 from .ctx import Context, empty
 from .model import Modelizable, model
+from .schema import Schema
 from .tell import tells as get_tells
 from .typetags import TaggedType, strip_all
 from .utils import UnionAlias
@@ -25,6 +27,9 @@ from .utils import UnionAlias
 class BaseImplementation(Medley):
     validate_serialize: bool = True
     validate_deserialize: bool = True
+
+    def __post_init__(self):
+        self._schema_cache = {}
 
     ##################
     # Global helpers #
@@ -115,6 +120,22 @@ class BaseImplementation(Medley):
     def deserialize(self, t: type[object], obj: object, /):
         return recurse(t, obj, empty)
 
+    ####################################
+    # schema: helpers and entry points #
+    ####################################
+
+    @ovld(priority=1000)
+    def schema(self, t: type[object], ctx: Context, /):
+        t = model(t)
+        if t not in self._schema_cache:
+            self._schema_cache[t] = holder = Schema()
+            result = call_next(t, ctx)
+            holder.update(result)
+        return self._schema_cache[t]
+
+    def schema(self, t: type[object], /):
+        return recurse(t, empty)
+
     ################################
     # Implementations: basic types #
     ################################
@@ -128,6 +149,21 @@ class BaseImplementation(Medley):
         @code_generator
         def deserialize(self, t: type[T], obj: T, ctx: Context, /):
             return Lambda(Code("$obj"))
+
+    def schema(self, t: type[int], ctx: Context, /):
+        return {"type": "integer"}
+
+    def schema(self, t: type[float], ctx: Context, /):
+        return {"type": "number"}
+
+    def schema(self, t: type[str], ctx: Context, /):
+        return {"type": "string"}
+
+    def schema(self, t: type[bool], ctx: Context, /):
+        return {"type": "boolean"}
+
+    def schema(self, t: type[NoneType], ctx: Context, /):
+        return {"type": "null"}
 
     ##########################
     # Implementations: lists #
@@ -146,6 +182,10 @@ class BaseImplementation(Medley):
     @code_generator
     def deserialize(self, t: type[list], obj: list, ctx: Context, /):
         return self.__generic_codegen_list("deserialize", t, obj, ctx)
+
+    def schema(self, t: type[list], ctx: Context, /):
+        (lt,) = get_args(t)
+        return {"type": "array", "items": recurse(lt, ctx)}
 
     ##########################
     # Implementations: dicts #
@@ -168,6 +208,10 @@ class BaseImplementation(Medley):
     @code_generator
     def deserialize(self, t: type[dict], obj: dict, ctx: Context, /):
         return self.__generic_codegen_dict("deserialize", t, obj, ctx)
+
+    def schema(self, t: type[dict], ctx: Context, /):
+        kt, vt = get_args(t)
+        return {"type": "object", "additionalProperties": recurse(vt, ctx)}
 
     ################################
     # Implementations: Modelizable #
@@ -240,6 +284,18 @@ class BaseImplementation(Medley):
         stmts.append(final)
         return Def(stmts)
 
+    def schema(self, t: type[Modelizable], ctx: Context, /):
+        t = model(t)
+        properties = {}
+        required = []
+
+        for f in t.fields:
+            properties[f.property_name] = recurse(f.type, ctx)
+            if f.required:
+                required.append(f.property_name)
+
+        return {"type": "object", "properties": properties, "required": required}
+
     ###########################
     # Implementations: Unions #
     ###########################
@@ -286,6 +342,10 @@ class BaseImplementation(Medley):
             )
         return Lambda(code)
 
+    def schema(self, t: type[UnionAlias], ctx: Context, /):
+        options = get_args(t)
+        return {"oneOf": [recurse(opt, ctx) for opt in options]}
+
 
 default_implementation = BaseImplementation(
     validate_serialize=True,
@@ -293,3 +353,4 @@ default_implementation = BaseImplementation(
 )
 serialize = default_implementation.serialize
 deserialize = default_implementation.deserialize
+schema = default_implementation.schema
