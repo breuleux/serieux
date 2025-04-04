@@ -115,7 +115,7 @@ def evaluate_hint(typ, ctx=None, lcl=None, typesub=None):
         return typesub.get(typ, typ) if typesub else typ
 
     elif isinstance(typ, ForwardRef):
-        return typ._evaluate(ctx, lcl, recursive_guard=frozenset())
+        return typ._evaluate(ctx, lcl, type_params=None, recursive_guard=frozenset())
 
     elif isinstance(typ, type):
         return typ
