@@ -16,9 +16,16 @@ class Tag:
     inherit: bool = True
 
 
-def make_tag(name, priority, inherit=True):
+def make_tag(name, priority=1, inherit=True) -> type:
     tag = Tag(name=name, priority=priority, inherit=inherit)
     return _create(frozenset({tag}), object)
+
+
+class NewTag:
+    def __class_getitem__(cls, params) -> type:
+        if not isinstance(params, tuple):
+            params = (params,)
+        return make_tag(*params)
 
 
 @cache
