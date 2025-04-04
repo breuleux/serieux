@@ -431,12 +431,3 @@ class BaseImplementation(Medley):
             "type": "string",
             "pattern": r"^[+-]?(\d+[dhms]|\d+ms|\d+us)+$",
         }
-
-
-default_implementation = BaseImplementation(
-    validate_serialize=True,
-    validate_deserialize=True,
-)
-serialize = default_implementation.serialize
-deserialize = default_implementation.deserialize
-schema = default_implementation.schema

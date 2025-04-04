@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from serieux.impl import deserialize
+from serieux import deserialize
 
 from .common import Color, Defaults, Level, Point, Point3D, one_test_per_assert
 

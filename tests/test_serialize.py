@@ -3,8 +3,8 @@ from datetime import date, datetime, timedelta
 
 from ovld import Medley
 
+from serieux import Serieux, serialize
 from serieux.ctx import Context
-from serieux.impl import BaseImplementation, serialize
 
 from .common import Color, Level, Point, one_test_per_assert
 
@@ -88,7 +88,7 @@ class Special(Medley):
 
 
 def test_override():
-    ss = (BaseImplementation + Special)()
+    ss = (Serieux + Special)()
     assert ss.serialize(int, 3) == 30
     assert ss.serialize(int, "quack") == "quackquack"
     assert ss.serialize(list[int], [1, 2, 3]) == [10, 20, 30]
@@ -98,7 +98,7 @@ def test_override():
 
 
 def test_special_serializer_codegen(file_regression):
-    custom = (BaseImplementation + Special)()
+    custom = (Serieux + Special)()
     code = getcodes(custom.serialize, (type[Point], Point, Context))
     file_regression.check(code)
 
@@ -113,7 +113,7 @@ class Quirky(Medley):
 
 
 def test_override_quirkint():
-    ss = (BaseImplementation + Quirky)()
+    ss = (Serieux + Quirky)()
     assert ss.serialize(int, 3) == 3
     assert ss.serialize(int, quirkint(3)) == 30
     assert ss.serialize(Point, Point(8, 9)) == {"x": 8, "y": 9}
@@ -130,7 +130,7 @@ class WeightedImpl(Medley):
 
 
 def test_override_state():
-    ss = (BaseImplementation + WeightedImpl)()
+    ss = (Serieux + WeightedImpl)()
     assert ss.serialize(int, 3) == 3
     assert ss.serialize(int, 3, ExtraWeight(10)) == 13
     assert ss.serialize(Point, Point(7, 8)) == {"x": 7, "y": 8}

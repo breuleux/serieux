@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta
 
-from serieux.impl import schema as _schema
+from serieux import schema as _schema
 
 from .common import Color, Defaults, Point
 
