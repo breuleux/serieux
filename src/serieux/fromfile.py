@@ -3,7 +3,7 @@ import tomllib
 from pathlib import Path
 
 import yaml
-from ovld import Medley, dependent_check, ovld, recurse
+from ovld import dependent_check, ovld, recurse
 from ovld.dependent import HasKey
 
 from .ctx import Context
@@ -34,7 +34,7 @@ class WorkingDirectory(Context):
     directory: Path
 
 
-class FromFileFeature(Medley):
+class FromFileFeature(PartialFeature):
     @ovld(priority=1)
     def deserialize(self, t: type[object], obj: HasKey["$include"], ctx: Context):
         obj = dict(obj)
@@ -45,6 +45,3 @@ class FromFileFeature(Medley):
             obj = ctx.directory / obj
         data = parse(obj)
         return recurse(t, data, ctx + WorkingDirectory(obj.parent))
-
-
-FromFileFeature += PartialFeature
