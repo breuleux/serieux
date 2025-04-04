@@ -1,11 +1,12 @@
 import inspect
+from datetime import date, datetime, timedelta
 
 from ovld import Medley
 
 from serieux.ctx import Context
 from serieux.impl import BaseImplementation, serialize
 
-from .common import Point, one_test_per_assert
+from .common import Color, Level, Point, one_test_per_assert
 
 
 @one_test_per_assert
@@ -134,3 +135,42 @@ def test_override_state():
     assert ss.serialize(int, 3, ExtraWeight(10)) == 13
     assert ss.serialize(Point, Point(7, 8)) == {"x": 7, "y": 8}
     assert ss.serialize(Point, Point(7, 8), ExtraWeight(10)) == {"x": 17, "y": 18}
+
+
+def test_serialize_enum():
+    assert serialize(Color, Color.RED) == "red"
+    assert serialize(list[Color], [Color.GREEN, Color.BLUE, Color.GREEN]) == [
+        "green",
+        "blue",
+        "green",
+    ]
+
+
+def test_serialize_enum_int():
+    assert serialize(Level, Level.MED) == 1
+    assert serialize(list[Level], [Level.HI, Level.LO, Level.HI]) == [2, 0, 2]
+
+
+def test_serialize_date():
+    assert serialize(date, date(2023, 5, 15)) == "2023-05-15"
+    assert serialize(list[date], [date(2023, 5, 15), date(2024, 1, 1)]) == [
+        "2023-05-15",
+        "2024-01-01",
+    ]
+
+
+def test_serialize_datetime():
+    assert serialize(datetime, datetime(2023, 5, 15, 12, 30, 45)) == "2023-05-15T12:30:45"
+    assert serialize(
+        list[datetime], [datetime(2023, 5, 15, 12, 30, 45), datetime(2024, 1, 1, 0, 0, 0)]
+    ) == ["2023-05-15T12:30:45", "2024-01-01T00:00:00"]
+
+
+def test_serialize_timedelta():
+    assert serialize(timedelta, timedelta(seconds=42)) == "42s"
+    assert serialize(timedelta, timedelta(seconds=42, microseconds=500000)) == "42500000us"
+    assert serialize(timedelta, timedelta(seconds=-10)) == "-10s"
+    assert serialize(list[timedelta], [timedelta(seconds=30), timedelta(days=5)]) == [
+        "30s",
+        "432000s",
+    ]

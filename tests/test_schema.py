@@ -1,6 +1,8 @@
+from datetime import date, datetime, timedelta
+
 from serieux.impl import schema as _schema
 
-from .common import Defaults, Point
+from .common import Color, Defaults, Point
 
 
 def schema(t, root=False, use_defs=False):
@@ -17,6 +19,25 @@ def test_schema_bool():
 
 def test_schema_str():
     assert schema(str) == {"type": "string"}
+
+
+def test_schema_enum():
+    assert schema(Color) == {"enum": ["red", "green", "blue"]}
+
+
+def test_schema_date():
+    assert schema(date) == {"type": "string", "format": "date"}
+
+
+def test_schema_datetime():
+    assert schema(datetime) == {"type": "string", "format": "date-time"}
+
+
+def test_schema_timedelta():
+    assert schema(timedelta) == {
+        "type": "string",
+        "pattern": r"^[+-]?(\d+[dhms]|\d+ms|\d+us)+$",
+    }
 
 
 def test_schema_list():

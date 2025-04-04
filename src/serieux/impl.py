@@ -1,4 +1,7 @@
+import re
 from dataclasses import MISSING
+from datetime import date, datetime, timedelta
+from enum import Enum
 from itertools import pairwise
 from types import NoneType, UnionType
 from typing import Any, get_args, get_origin
@@ -6,6 +9,7 @@ from typing import Any, get_args, get_origin
 from ovld import (
     Code,
     CodegenInProgress,
+    CodegenParameter,
     Def,
     Lambda,
     Medley,
@@ -25,8 +29,8 @@ from .utils import UnionAlias
 
 
 class BaseImplementation(Medley):
-    validate_serialize: bool = True
-    validate_deserialize: bool = True
+    validate_serialize: CodegenParameter[bool] = True
+    validate_deserialize: CodegenParameter[bool] = True
 
     def __post_init__(self):
         self._schema_cache = {}
@@ -345,6 +349,88 @@ class BaseImplementation(Medley):
     def schema(self, t: type[UnionAlias], ctx: Context, /):
         options = get_args(t)
         return {"oneOf": [recurse(opt, ctx) for opt in options]}
+
+    ##########################
+    # Implementations: Enums #
+    ##########################
+
+    @code_generator
+    def serialize(self, t: type[Enum], obj: Enum, ctx: Context, /):
+        return Lambda(Code("$obj.value"))
+
+    @code_generator
+    def deserialize(self, t: type[Enum], obj: Any, ctx: Context, /):
+        (t,) = get_args(t)
+        return Lambda(Code("$t($obj)", t=t))
+
+    def schema(self, t: type[Enum], ctx: Context, /):
+        return {"enum": [e.value for e in t]}
+
+    ##########################
+    # Implementations: Dates #
+    ##########################
+
+    @code_generator
+    def serialize(self, t: type[date] | type[datetime], obj: date | datetime, ctx: Context, /):
+        return Lambda(Code("$obj.isoformat()"))
+
+    @code_generator
+    def deserialize(self, t: type[date] | type[datetime], obj: str, ctx: Context, /):
+        (t,) = get_args(t)
+        return Lambda(Code("$t.fromisoformat($obj)", t=t))
+
+    def schema(self, t: type[date], ctx: Context, /):
+        return {"type": "string", "format": "date"}
+
+    def schema(self, t: type[datetime], ctx: Context, /):
+        return {"type": "string", "format": "date-time"}
+
+    ##############################
+    # Implementations: timedelta #
+    ##############################
+
+    def serialize(self, t: type[timedelta], obj: timedelta, ctx: Context):
+        """Serialize timedelta as Xs (seconds) or Xus (microseconds)."""
+        seconds = int(obj.total_seconds())
+        if obj.microseconds:
+            return f"{seconds}{obj.microseconds:06}us"
+        else:
+            return f"{seconds}s"
+
+    def deserialize(self, t: type[timedelta], obj: str, ctx: Context):
+        """Deserialize a combination of days, hours, etc. as a timedelta."""
+        units = {
+            "d": "days",
+            "h": "hours",
+            "m": "minutes",
+            "s": "seconds",
+            "ms": "milliseconds",
+            "us": "microseconds",
+        }
+        sign = 1
+        if obj.startswith("-"):
+            obj = obj[1:]
+            sign = -1
+        kw = {}
+        parts = re.split(string=obj, pattern="([a-z ]+)")
+        if parts[-1] != "":
+            raise TypeError("timedelta representation must end with a unit")
+        for i in range(len(parts) // 2):
+            n = parts[i * 2]
+            unit = parts[i * 2 + 1].strip()
+            if unit not in units:
+                raise TypeError(f"'{unit}' is not a valid timedelta unit")
+            try:
+                kw[units[unit]] = float(n)
+            except ValueError as err:
+                raise TypeError(f"Could not convert '{n}' ({units[unit]}) to float") from err
+        return sign * timedelta(**kw)
+
+    def schema(self, t: type[timedelta], ctx: Context, /):
+        return {
+            "type": "string",
+            "pattern": r"^[+-]?(\d+[dhms]|\d+ms|\d+us)+$",
+        }
 
 
 default_implementation = BaseImplementation(

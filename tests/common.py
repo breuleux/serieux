@@ -2,6 +2,7 @@ import ast
 import inspect
 from ast import NodeTransformer
 from dataclasses import dataclass, field
+from enum import Enum
 from textwrap import dedent
 
 from _pytest.assertion.rewrite import AssertionRewriter
@@ -36,6 +37,18 @@ class Point:
 @dataclass
 class Point3D(Point):
     z: int
+
+
+class Color(Enum):
+    RED = "red"
+    GREEN = "green"
+    BLUE = "blue"
+
+
+class Level(Enum):
+    HI = 2
+    MED = 1
+    LO = 0
 
 
 @dataclass
