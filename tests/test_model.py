@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from numbers import Number
 
 from serieux.model import model
@@ -34,3 +35,30 @@ def test_model_default():
 
 def test_model_idempotent():
     assert model(model(int)) is model(int)
+
+
+@dataclass
+class Pig:
+    # How pink the pig is
+    pinkness: float
+
+    weight: float
+    """Weight of the pig, in kilograms"""
+
+    # Is the pig...
+    # truly...
+    beautiful: bool = True  # ...beautiful?
+
+
+def test_field_descriptions():
+    m = model(Pig)
+    p, w, b = m.fields
+
+    assert p.name == "pinkness"
+    assert p.description == "How pink the pig is"
+
+    assert w.name == "weight"
+    assert w.description == "Weight of the pig, in kilograms"
+
+    assert b.name == "beautiful"
+    assert b.description == "Is the pig...\ntruly...\n...beautiful?"

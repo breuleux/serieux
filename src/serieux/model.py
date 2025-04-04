@@ -4,6 +4,7 @@ from typing import Callable, Union, get_args, get_origin
 
 from ovld import Dataclass, call_next, class_check, ovld, recurse
 
+from .docstrings import get_attribute_docstrings
 from .utils import UnionAlias, evaluate_hint
 
 UNDEFINED = object()
@@ -19,6 +20,7 @@ def Modelizable(t):
 class Field:
     name: str
     type: type
+    description: str = None
     default: object = MISSING
     default_factory: Callable = MISSING
 
@@ -98,9 +100,12 @@ def model(dc: type[Dataclass]):
         tsub = dict(zip(origin.__type_params__, get_args(dc)))
         constructor = origin
 
+    attributes = get_attribute_docstrings(dc)
+
     rval.fields = [
         Field(
             name=field.name,
+            description=attributes.get(field.name, None),
             type=recurse(evaluate_hint(field.type, ctx=dc, typesub=tsub)),
             default=field.default,
             default_factory=field.default_factory,
