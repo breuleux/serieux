@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from serieux.impl import BaseImplementation
 from serieux.partial import Partial, PartialFeature, Sources
 from tests.common import Point
@@ -30,3 +32,46 @@ def test_complicated_partial():
         ),
     )
     assert d == {"a": Point(3, 2), "b": "wow"}
+
+
+@dataclass
+class Climate:
+    hot: bool
+    sunny: bool
+
+
+@dataclass
+class City:
+    name: str
+    population: int
+    climate: Climate
+
+
+@dataclass
+class Country:
+    name: str
+    capital: City
+
+
+def test_nested():
+    d = deserialize(
+        Country,
+        Sources(
+            {"name": "Canada"},
+            {"capital": {"name": "Ottawa"}},
+            {"capital": {"population": 800000}},
+            {"capital": {"climate": {"hot": False}}},
+            {"capital": {"climate": {"sunny": False}}},
+        ),
+    )
+    assert d == Country(
+        name="Canada",
+        capital=City(
+            name="Ottawa",
+            population=800_000,
+            climate=Climate(
+                hot=False,
+                sunny=False,
+            ),
+        ),
+    )

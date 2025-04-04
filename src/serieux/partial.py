@@ -42,7 +42,7 @@ def partialize(t: type[Modelizable]):
     dc = make_dataclass(
         cls_name=f"Partial[{t.__name__}]",
         bases=(PartialBase,),
-        fields=[(f.name, f.type, field(default=NOT_GIVEN)) for f in m.fields],
+        fields=[(f.name, partialize(f.type), field(default=NOT_GIVEN)) for f in m.fields],
     )
     dc._constructor = m.constructor
     return dc
