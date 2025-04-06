@@ -21,11 +21,12 @@ from ovld import (
 from ovld.types import All
 
 from .ctx import Context, empty
+from .exc import ValidationError
 from .model import Modelizable, model
 from .schema import AnnotatedSchema, Schema
 from .tell import tells as get_tells
 from .typetags import TaggedType, strip_all
-from .utils import UnionAlias
+from .utils import UnionAlias, clsstring
 
 
 class BaseImplementation(Medley):
@@ -40,39 +41,45 @@ class BaseImplementation(Medley):
     ##################
 
     @classmethod
-    def subcode(self, method, t, accessor, ctx_t, after=None):
-        if ec := getattr(self, f"{method}_embed_condition")(t):
+    def subcode(
+        self, method_name, t, accessor, ctx_t, ctx_expr=Code("$ctx"), after=None, validate=None
+    ):
+        accessor = accessor if isinstance(accessor, Code) else Code(accessor)
+        if validate is None:
+            validate = getattr(self, f"validate_{method_name}")
+        method = getattr(self, method_name)
+        if ec := getattr(self, f"{method_name}_embed_condition")(t):
             ec = All[ec]
         if ec is not None:
             try:
-                fn = getattr(self, method).resolve(type[t], ec, ctx_t, after=after)
+                fn = method.resolve(type[t], ec, ctx_t, after=after)
                 cg = getattr(fn, "__codegen__", None)
                 if cg:
-                    return self.guard_codegen(
-                        method,
-                        get_origin(t) or t,
-                        accessor,
-                        cg.create_expression([None, t, accessor, "$ctx"]),
-                    )
+                    body = cg.create_expression([None, t, accessor, ctx_expr])
+                    ot = get_origin(t) or t
+                    if not validate:
+                        return Code(body)
+                    else:
+                        return Code(
+                            "$body if isinstance($accessor, $t) else $recurse($self, $t, $accessor, $ctx_expr)",
+                            body=Code(body),
+                            accessor=accessor,
+                            t=ot,
+                            recurse=method,
+                            ctx_expr=ctx_expr,
+                        )
             except (CodegenInProgress, ValueError):  # pragma: no cover
                 # This is important if we are going to inline recursively
                 # a type that refers to itself down the line.
                 # We currently never do that.
                 pass
-        return getattr(self, f"{method}_default_codegen")(t, accessor)
-
-    @classmethod
-    def guard_codegen(self, method, t, accessor, body):
-        if not getattr(self, f"validate_{method}"):
-            return Code(body)
-        else:
-            return Code(
-                "$body if isinstance($accessor, $t) else $dflt",
-                body=Code(body),
-                accessor=Code(accessor),
-                t=t,
-                dflt=getattr(self, f"{method}_default_codegen")(t, accessor),
-            )
+        return Code(
+            "$recurse($self, $t, $accessor, $ctx_expr)",
+            t=t,
+            accessor=accessor,
+            recurse=method,
+            ctx_expr=ctx_expr,
+        )
 
     ########################################
     # serialize:  helpers and entry points #
@@ -83,13 +90,12 @@ class BaseImplementation(Medley):
         if t in (int, str, bool, float, NoneType):
             return t
 
-    @classmethod
-    def serialize_default_codegen(self, t, accessor):
-        return Code(
-            "$recurse($self, $t, $accessor, $ctx)",
-            t=t,
-            accessor=accessor if isinstance(accessor, Code) else Code(accessor),
-            recurse=self.serialize,
+    @ovld(priority=-100)
+    def serialize(self, t: type[object], obj: object, ctx: Context, /):
+        raise ValidationError(
+            f"Cannot serialize object of type '{clsstring(type(obj))}'"
+            f" into expected type '{clsstring(t)}'.",
+            ctx=ctx,
         )
 
     @ovld(priority=-1)
@@ -108,13 +114,12 @@ class BaseImplementation(Medley):
 
     deserialize_embed_condition = serialize_embed_condition
 
-    @classmethod
-    def deserialize_default_codegen(self, t, accessor):
-        return Code(
-            "$recurse($self, $t, $accessor, $ctx)",
-            t=t,
-            accessor=accessor if isinstance(accessor, Code) else Code(accessor),
-            recurse=self.deserialize,
+    @ovld(priority=-100)
+    def deserialize(self, t: type[object], obj: object, ctx: Context, /):
+        raise ValidationError(
+            f"Cannot deserialize object of type '{clsstring(type(obj))}'"
+            f" into expected type '{clsstring(t)}'.",
+            ctx=ctx,
         )
 
     @ovld(priority=-1)
@@ -180,7 +185,14 @@ class BaseImplementation(Medley):
     def __generic_codegen_list(self, method, t, obj, ctx):
         (t,) = get_args(t)
         (lt,) = get_args(t)
-        return Lambda("[$lbody for X in $obj]", lbody=self.subcode(method, lt, "X", ctx))
+        if hasattr(ctx, "follow"):
+            ctx_expr = Code("$ctx.follow($objt, $obj, IDX)", objt=obj)
+            return Lambda(
+                "[$lbody for IDX, X in enumerate($obj)]",
+                lbody=self.subcode(method, lt, "X", ctx, ctx_expr=ctx_expr),
+            )
+        else:
+            return Lambda("[$lbody for X in $obj]", lbody=self.subcode(method, lt, "X", ctx))
 
     @code_generator
     def serialize(self, t: type[list], obj: list, ctx: Context, /):
@@ -202,10 +214,15 @@ class BaseImplementation(Medley):
     def __generic_codegen_dict(self, method, t: type[dict], obj: dict, ctx: Context, /):
         (t,) = get_args(t)
         kt, vt = get_args(t)
+        ctx_expr = (
+            Code("$ctx.follow($objt, $obj, K)", objt=obj)
+            if hasattr(ctx, "follow")
+            else Code("$ctx")
+        )
         return Lambda(
             "{$kbody: $vbody for K, V in $obj.items()}",
-            kbody=self.subcode(method, kt, "K", ctx),
-            vbody=self.subcode(method, vt, "V", ctx),
+            kbody=self.subcode(method, kt, "K", ctx, ctx_expr=ctx_expr),
+            vbody=self.subcode(method, vt, "V", ctx, ctx_expr=ctx_expr),
         )
 
     @code_generator
@@ -228,11 +245,21 @@ class BaseImplementation(Medley):
     def serialize(self, t: type[Modelizable], obj: object, ctx: Context, /):
         (t,) = get_args(t)
         t = model(t)
+        if not t.accepts(obj):
+            return None
         stmts = []
+        follow = hasattr(ctx, "follow")
         for i, f in enumerate(t.fields):
+            ctx_expr = (
+                Code("$ctx.follow($objt, $obj, $fld)", objt=obj, fld=f.name)
+                if follow
+                else Code("$ctx")
+            )
             stmt = Code(
                 f"v_{i} = $setter",
-                setter=self.subcode("serialize", f.type, f"$obj.{f.property_name}", ctx),
+                setter=self.subcode(
+                    "serialize", f.type, f"$obj.{f.property_name}", ctx, ctx_expr=ctx_expr
+                ),
             )
             stmts.append(stmt)
         final = Code(
@@ -246,17 +273,35 @@ class BaseImplementation(Medley):
             ],
         )
         stmts.append(final)
-        return Def(stmts)
+        stmts = [
+            "try:",
+            stmts,
+            "except $ValidationError:",
+            ["raise"],
+            "except Exception as exc:",
+            ["raise $ValidationError(exc=exc, ctx=$ctx)"],
+        ]
+        return Def(stmts, ValidationError=ValidationError)
 
     @code_generator
     def deserialize(self, t: type[Modelizable], obj: dict, ctx: Context, /):
         (t,) = get_args(t)
         t = model(t)
+        follow = hasattr(ctx, "follow")
         stmts = []
         args = []
         for i, f in enumerate(t.fields):
+            ctx_expr = (
+                Code("$ctx.follow($objt, $obj, $fld)", objt=obj, fld=f.name)
+                if follow
+                else Code("$ctx")
+            )
             processed = self.subcode(
-                "deserialize", f.type, Code("$obj[$pname]", pname=f.property_name), ctx
+                "deserialize",
+                f.type,
+                Code("$obj[$pname]", pname=f.property_name),
+                ctx,
+                ctx_expr=ctx_expr,
             )
             if f.required:
                 expr = processed
@@ -289,7 +334,16 @@ class BaseImplementation(Medley):
         )
 
         stmts.append(final)
-        return Def(stmts)
+
+        stmts = [
+            "try:",
+            stmts,
+            "except $ValidationError:",
+            ["raise"],
+            "except Exception as exc:",
+            ["raise $ValidationError(exc=exc, ctx=$ctx)"],
+        ]
+        return Def(stmts, ValidationError=ValidationError)
 
     def schema(self, t: type[Modelizable], ctx: Context, /):
         t = model(t)
@@ -318,12 +372,12 @@ class BaseImplementation(Medley):
     def serialize(self, t: type[UnionAlias], obj: Any, ctx: Context, /):
         (t,) = get_args(t)
         o1, *rest = get_args(t)
-        code = self.subcode("serialize", o1, "$obj", ctx)
+        code = self.subcode("serialize", o1, "$obj", ctx, validate=False)
         for opt in rest:
             code = Code(
                 "$ocode if isinstance($obj, $sopt) else $code",
                 sopt=strip_all(opt),
-                ocode=self.subcode("serialize", opt, "$obj", ctx),
+                ocode=self.subcode("serialize", opt, "$obj", ctx, validate=False),
                 code=code,
             )
         return Lambda(code)

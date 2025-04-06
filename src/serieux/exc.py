@@ -1,8 +1,5 @@
 import sys
 
-from .proxy import Accessor, Source
-from .utils import display_context
-
 
 class ValidationExceptionGroup(ExceptionGroup):
     def derive(self, excs):
@@ -25,23 +22,7 @@ class ValidationError(Exception):
     def message(self):
         return self.args[0]
 
-    def display(self, file=sys.stderr, prefix=""):
-        print(prefix, end="", file=file)
-        display_context(
-            self.ctx,
-            show_source=True,
-            message=self.message,
-            file=file,
-            indent=2,
-        )
-
     def __str__(self):
-        acc = self.ctx.get(Accessor, "??")
-        acc_string = str(acc) or "(at root)"
-        location = self.ctx.get(Source, None)
-        if location:
-            (l1, c1), (l2, c2) = location.linecols
-            lc = f"{l1}:{c1}-{l2}:{c2}" if l1 != l2 else f"{l1}:{c1}-{c2}"
-            return f"{location.origin}:{lc} -- {self.message}"
-        else:
-            return f"At path {acc_string}: {self.message}"
+        acc = getattr(self.ctx, "access_path", [(None, "???")])
+        acc_string = "".join([f".{field}" for obj, field in acc]) if acc else "(at root)"
+        return f"At path {acc_string}: {self.message}"

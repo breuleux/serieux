@@ -22,6 +22,20 @@ def _color(code, text):
     return f"\u001b[1m\u001b[{code}m{text}\u001b[0m"
 
 
+def clsstring(cls):
+    cls = getattr(cls, "original_type", cls)
+    if args := typing.get_args(cls):
+        origin = typing.get_origin(cls) or cls
+        args = ", ".join(map(clsstring, args))
+        return f"{origin.__name__}[{args}]"
+    else:
+        r = repr(cls)
+        if r.startswith("<class "):
+            return cls.__name__
+        else:
+            return r
+
+
 def context_string(
     obj,
     message,

@@ -68,6 +68,11 @@ class Model(type):
     def __class_getitem__(cls, t):
         return model(t)
 
+    @classmethod
+    def accepts(cls, other):
+        ot = cls.original_type
+        return issubclass(other, get_origin(ot) or ot)
+
 
 _model_cache = {}
 _premade = {}
@@ -106,7 +111,7 @@ def model(dc: type[Dataclass]):
         Field(
             name=field.name,
             description=attributes.get(field.name, None),
-            type=recurse(evaluate_hint(field.type, ctx=dc, typesub=tsub)),
+            type=recurse(evaluate_hint(field.type, dc, None, tsub)),
             default=field.default,
             default_factory=field.default_factory,
             flatten=field.metadata.get("flatten", False),
