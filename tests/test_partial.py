@@ -1,5 +1,9 @@
 from dataclasses import dataclass
 
+import pytest
+
+from serieux.ctx import AccessPath
+from serieux.exc import ValidationError
 from serieux.impl import BaseImplementation
 from serieux.partial import Partial, PartialFeature, Sources
 from tests.common import Point
@@ -75,3 +79,20 @@ def test_nested():
             ),
         ),
     )
+
+
+@dataclass
+class Positive:
+    m: int
+    n: int
+
+    def __post_init__(self):
+        if self.m <= 0:
+            raise ValueError("NO")
+        if self.n <= 0:
+            raise ValueError("Get that worthless number outta here")
+
+
+def test_error_at_construction():
+    with pytest.raises(ValidationError, match="At path .1"):
+        deserialize(list[Positive], [{"m": 3, "n": 7}, Sources({"m": 1}, {"n": -3})], AccessPath())

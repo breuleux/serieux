@@ -1,23 +1,19 @@
 from dataclasses import field, fields, make_dataclass
 from functools import reduce
-from typing import TYPE_CHECKING, Annotated, TypeVar
 
 from ovld import Medley, call_next, ovld, recurse
 
 from .ctx import Context
+from .exc import ValidationError
 from .model import Modelizable, model
-from .typetags import make_tag
+from .typetags import NewTag
 
 #############
 # Constants #
 #############
 
 
-if TYPE_CHECKING:  # pragma: no cover
-    T = TypeVar("T")
-    Partial = Annotated[T, None]
-else:
-    Partial = make_tag("Partial", 1)
+Partial = NewTag["Partial"]
 
 
 class NOT_GIVEN_T:
@@ -39,10 +35,14 @@ class Sources:
 @ovld
 def partialize(t: type[Modelizable]):
     m = model(t)
+    fields = [(f.name, partialize(f.type), field(default=NOT_GIVEN)) for f in m.fields]
+    fields.append(
+        ("_serieux_ctx", Context, field(default=NOT_GIVEN, metadata={"serieux_metavar": "$ctx"}))
+    )
     dc = make_dataclass(
         cls_name=f"Partial[{t.__name__}]",
         bases=(PartialBase,),
-        fields=[(f.name, partialize(f.type), field(default=NOT_GIVEN)) for f in m.fields],
+        fields=fields,
     )
     dc._constructor = m.constructor
     return dc
@@ -91,9 +91,9 @@ def merge(x: NOT_GIVEN_T, y: NOT_GIVEN_T):
 
 @ovld
 def merge(x: PartialBase, y: PartialBase):
-    assert (dc := x._constructor) is y._constructor
+    assert x._constructor is y._constructor
     args = {}
-    for f in fields(dc):
+    for f in fields(type(x)):
         xv = getattr(x, f.name)
         yv = getattr(y, f.name)
         args[f.name] = recurse(xv, yv)
@@ -141,7 +141,10 @@ def instantiate(p: PartialBase):
         for f in fields(dc)
         if (value := getattr(p, f.name)) is not NOT_GIVEN
     }
-    return dc(**args)
+    try:
+        return dc(**args)
+    except Exception as exc:
+        raise ValidationError(exc=exc, ctx=p._serieux_ctx)
 
 
 @ovld

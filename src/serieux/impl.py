@@ -303,7 +303,9 @@ class BaseImplementation(Medley):
                 ctx,
                 ctx_expr=ctx_expr,
             )
-            if f.required:
+            if f.metavar:
+                expr = Code(f.metavar)
+            elif f.required:
                 expr = processed
             elif f.default is not MISSING:
                 expr = Code(

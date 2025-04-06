@@ -31,6 +31,9 @@ class Field:
     # Not implemented yet
     flatten: bool = False
 
+    # Meta-variable to store in this field
+    metavar: str = None
+
     def __post_init__(self):
         if self.property_name is UNDEFINED:
             self.property_name = self.name
@@ -115,6 +118,7 @@ def model(dc: type[Dataclass]):
             default=field.default,
             default_factory=field.default_factory,
             flatten=field.metadata.get("flatten", False),
+            metavar=field.metadata.get("serieux_metavar", None),
             argument_name=field.name if field.kw_only else i,
         )
         for i, field in enumerate(fields(constructor))
