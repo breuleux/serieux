@@ -1,29 +1,27 @@
 import marshmallow_dataclass
 import orjson as json
-from apischema import deserialize as apischema_deserialize
-from apischema import serialize as apischema_serialize
+from apischema import deserialize as apischema_deserialize, serialize as apischema_serialize
 from mashumaro.codecs.basic import BasicDecoder, BasicEncoder
 from mashumaro.codecs.orjson import ORJSONEncoder
 from pydantic import TypeAdapter
 
-from serieux.deserialization import default as deser_default
-from serieux.serialization import default as ser_default
+from serieux import deserialize as serieux_deserialize, serialize as serieux_serialize
+from serieux.ctx import EmptyContext, empty
 
 
 class SerieuxInterface:
     __name__ = "serieux"
 
     def serializer_for_type(self, t):
-        func = ser_default.transform.resolve_for_types(t)
-        return func.__get__(ser_default, type(ser_default))
+        func = serieux_serialize.resolve(type[t], t, EmptyContext)
+        return lambda x: func(serieux_serialize, t, x, empty)
 
     def json_for_type(self, t):
-        func = ser_default.transform.resolve_for_types(t)
-        return lambda x: json.dumps(func(ser_default, x))
+        func = serieux_serialize.resolve(type[t], t, EmptyContext)
+        return lambda x: json.dumps(func(serieux_serialize, t, x, empty))
 
     def deserializer_for_type(self, t):
-        func = deser_default.transform.resolve_for_types(type[t], t)
-        return lambda x: func(deser_default, t, x)
+        return lambda x: serieux_deserialize(t, x, empty)
 
 
 serieux = SerieuxInterface()
