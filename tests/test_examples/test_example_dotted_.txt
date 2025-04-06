@@ -1,0 +1,4 @@
+Country(name='Canada',
+        capital=City(name='Ottawa',
+                     population=800000,
+                     climate=Climate(hot=False, sunny=False)))
