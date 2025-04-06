@@ -184,7 +184,7 @@ class BaseImplementation(Medley):
     @classmethod
     def __generic_codegen_list(self, method, t, obj, ctx):
         (t,) = get_args(t)
-        (lt,) = get_args(t)
+        (lt,) = get_args(t) or (object,)
         if hasattr(ctx, "follow"):
             ctx_expr = Code("$ctx.follow($objt, $obj, IDX)", objt=obj)
             return Lambda(
@@ -213,7 +213,7 @@ class BaseImplementation(Medley):
     @classmethod
     def __generic_codegen_dict(self, method, t: type[dict], obj: dict, ctx: Context, /):
         (t,) = get_args(t)
-        kt, vt = get_args(t)
+        kt, vt = get_args(t) or (object, object)
         ctx_expr = (
             Code("$ctx.follow($objt, $obj, K)", objt=obj)
             if hasattr(ctx, "follow")
