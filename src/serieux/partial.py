@@ -4,7 +4,7 @@ from functools import reduce
 from ovld import Medley, call_next, ovld, recurse
 
 from .ctx import Context
-from .exc import ValidationError
+from .exc import ValidationError, ValidationExceptionGroup
 from .model import Modelizable, model
 from .typetags import NewTag
 
@@ -43,14 +43,14 @@ def partialize(t: type[Modelizable]):
         cls_name=f"Partial[{t.__name__}]",
         bases=(PartialBase,),
         fields=fields,
+        namespace={"_constructor": m.constructor},
     )
-    dc._constructor = m.constructor
     return dc
 
 
 @ovld
 def partialize(t: object):
-    return t
+    return Partial[t]
 
 
 ###################
@@ -59,9 +59,19 @@ def partialize(t: object):
 
 
 class PartialFeature(Medley):
+    @ovld(priority=1)
+    def deserialize(self, t: type[Partial[object]], obj: object, ctx: Context, /):
+        try:
+            return call_next(t, obj, ctx)
+        except ValidationError as exc:
+            return exc
+
     def deserialize(self, t: type[object], obj: Sources, ctx: Context, /):
         parts = [recurse(Partial[t], src, ctx) for src in obj.sources]
-        return instantiate(reduce(merge, parts))
+        rval = instantiate(reduce(merge, parts))
+        if isinstance(rval, (ValidationError, ValidationExceptionGroup)):
+            raise rval
+        return rval
 
 
 @model.register
@@ -124,27 +134,51 @@ def merge(x: object, y: object):
 
 
 @ovld
-def instantiate(xs: dict):
-    return {k: recurse(v) for k, v in xs.items()}
+def instantiate(xs: list):
+    rval = []
+    errs = []
+    for v in xs:
+        value = recurse(v)
+        if isinstance(value, ValidationError):
+            errs.append(value)
+        elif isinstance(value, ValidationExceptionGroup):
+            errs.extend(value.exceptions)
+        else:
+            rval.append(value)
+    if errs:
+        return ValidationExceptionGroup("Some errors occurred", errs)
+    return rval
 
 
 @ovld
-def instantiate(xs: list):
-    return [recurse(v) for v in xs]
+def instantiate(xs: dict):
+    rval = {}
+    errs = []
+    for k, v in xs.items():
+        if v is NOT_GIVEN:
+            continue
+        value = recurse(v)
+        if isinstance(value, ValidationError):
+            errs.append(value)
+        elif isinstance(value, ValidationExceptionGroup):
+            errs.extend(value.exceptions)
+        else:
+            rval[k] = value
+    if errs:
+        return ValidationExceptionGroup("Some errors occurred", errs)
+    return rval
 
 
 @ovld
 def instantiate(p: PartialBase):
     dc = p._constructor
-    args = {
-        f.name: recurse(value)
-        for f in fields(dc)
-        if (value := getattr(p, f.name)) is not NOT_GIVEN
-    }
+    args = recurse({f.name: getattr(p, f.name) for f in fields(dc)})
+    if isinstance(args, (ValidationError, ValidationExceptionGroup)):
+        return args
     try:
         return dc(**args)
     except Exception as exc:
-        raise ValidationError(exc=exc, ctx=p._serieux_ctx)
+        return ValidationError(exc=exc, ctx=p._serieux_ctx)
 
 
 @ovld

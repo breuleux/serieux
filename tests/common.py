@@ -1,11 +1,15 @@
 import ast
 import inspect
+import traceback
 from ast import NodeTransformer
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
 from textwrap import dedent
 
 from _pytest.assertion.rewrite import AssertionRewriter
+
+from serieux.exc import ValidationExceptionGroup
 
 
 @dataclass
@@ -69,6 +73,17 @@ class Defaults:
     name: str
     aliases: list[str] = field(default_factory=list)
     cool: bool = False
+
+
+@contextmanager
+def validation_errors(msgs):
+    try:
+        yield
+    except ValidationExceptionGroup as veg:
+        for pth, msg in msgs.items():
+            if not any((exc.access_string() == pth and msg in str(exc)) for exc in veg.exceptions):
+                traceback.print_exception(veg)
+                raise Exception(f"No exception was raised at {pth} for '{msg}'")
 
 
 class AssertTransformer(NodeTransformer):

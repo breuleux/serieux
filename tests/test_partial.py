@@ -6,7 +6,7 @@ from serieux.ctx import AccessPath
 from serieux.exc import ValidationError
 from serieux.impl import BaseImplementation
 from serieux.partial import Partial, PartialFeature, Sources
-from tests.common import Point
+from tests.common import Point, validation_errors
 
 deserialize = (BaseImplementation + PartialFeature)().deserialize
 
@@ -16,6 +16,12 @@ def test_partial():
     assert one.x == 10
     two = deserialize(Partial[Point], {"y": 30})
     assert two.y == 30
+
+
+def test_partial_error():
+    value = deserialize(Partial[Point], {"x": "oh", "y": "no"})
+    assert isinstance(value.x, ValidationError)
+    assert isinstance(value.y, ValidationError)
 
 
 def test_two_sources():
@@ -96,3 +102,11 @@ class Positive:
 def test_error_at_construction():
     with pytest.raises(ValidationError, match="At path .1"):
         deserialize(list[Positive], [{"m": 3, "n": 7}, Sources({"m": 1}, {"n": -3})], AccessPath())
+
+
+def test_multiple_errors():
+    msg = "Cannot deserialize object of type 'str' into expected type 'int'."
+    with validation_errors({".0.y": msg, ".1.x": msg, ".1.y": msg}):
+        deserialize(
+            list[Point], Sources([{"x": 23, "y": "crap"}, {"x": "oh", "y": "no"}]), AccessPath()
+        )

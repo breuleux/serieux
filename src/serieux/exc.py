@@ -22,7 +22,13 @@ class ValidationError(Exception):
     def message(self):
         return self.args[0]
 
-    def __str__(self):
+    def access_string(self):
         acc = getattr(self.ctx, "access_path", [(None, "???")])
-        acc_string = "".join([f".{field}" for obj, field in acc]) if acc else "(at root)"
-        return f"At path {acc_string}: {self.message}"
+        return "".join([f".{field}" for obj, field in acc]) if acc else "(at root)"
+
+    def display(self, file=sys.stderr, prefix=""):
+        print(prefix, end="", file=file)
+        print(str(self), file=file)
+
+    def __str__(self):
+        return f"At path {self.access_string()}: {self.message}"
