@@ -54,7 +54,10 @@ class BaseImplementation(Medley):
                         accessor,
                         cg.create_expression([None, t, accessor, "$ctx"]),
                     )
-            except (CodegenInProgress, ValueError):
+            except (CodegenInProgress, ValueError):  # pragma: no cover
+                # This is important if we are going to inline recursively
+                # a type that refers to itself down the line.
+                # We currently never do that.
                 pass
         return getattr(self, f"{method}_default_codegen")(t, accessor)
 
@@ -132,7 +135,7 @@ class BaseImplementation(Medley):
     def schema(self, t: type[object], ctx: Context, /):
         t = model(t)
         if t not in self._schema_cache:
-            self._schema_cache[t] = holder = Schema()
+            self._schema_cache[t] = holder = Schema(t)
             result = call_next(t, ctx)
             holder.update(result)
         return self._schema_cache[t]

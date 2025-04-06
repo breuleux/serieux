@@ -1,12 +1,15 @@
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+
+import pytest
 
 from serieux import schema as _schema
 
 from .common import Color, Defaults, Point
 
 
-def schema(t, root=False, use_defs=False):
-    return _schema(t).compile(root=root, use_defs=use_defs)
+def schema(t, root=False, ref_policy="norepeat"):
+    return _schema(t).compile(root=root, ref_policy=ref_policy)
 
 
 def test_schema_int():
@@ -98,4 +101,104 @@ def test_schema_recursive():
             },
         },
         "required": ["left", "right"],
+    }
+
+
+def test_schema_recursive_policy_always():
+    from .definitions_py312 import Tree
+
+    assert schema(Tree[int], root=True, ref_policy="always") == {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$ref": "#/$defs/Tree",
+        "$defs": {
+            "Tree": {
+                "type": "object",
+                "properties": {
+                    "left": {
+                        "oneOf": [
+                            {"$ref": "#/$defs/Tree"},
+                            {"type": "integer"},
+                        ]
+                    },
+                    "right": {
+                        "oneOf": [
+                            {"$ref": "#/$defs/Tree"},
+                            {"type": "integer"},
+                        ]
+                    },
+                },
+                "required": ["left", "right"],
+            }
+        },
+    }
+
+
+def test_schema_recursive_policy_never():
+    from .definitions_py312 import Tree
+
+    with pytest.raises(Exception, match="Recursive schema"):
+        schema(Tree[int], root=True, ref_policy="never")
+
+
+@dataclass
+class TwoPoints:
+    a: Point
+    b: Point
+
+
+def test_schema_policy_never_minimal():
+    never = schema(TwoPoints, ref_policy="never")
+    minimal = schema(TwoPoints, ref_policy="minimal")
+    assert (
+        never
+        == minimal
+        == {
+            "type": "object",
+            "properties": {
+                "a": {
+                    "type": "object",
+                    "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
+                    "required": ["x", "y"],
+                },
+                "b": {
+                    "type": "object",
+                    "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
+                    "required": ["x", "y"],
+                },
+            },
+            "required": ["a", "b"],
+        }
+    )
+
+
+def test_schema_policy_norepeat():
+    assert schema(TwoPoints, ref_policy="norepeat") == {
+        "type": "object",
+        "properties": {
+            "a": {
+                "type": "object",
+                "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
+                "required": ["x", "y"],
+            },
+            "b": {"$ref": "#/properties/a"},
+        },
+        "required": ["a", "b"],
+    }
+
+
+def test_schema_policy_always():
+    assert schema(TwoPoints, ref_policy="always") == {
+        "$ref": "#/$defs/TwoPoints",
+        "$defs": {
+            "Point": {
+                "type": "object",
+                "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
+                "required": ["x", "y"],
+            },
+            "TwoPoints": {
+                "type": "object",
+                "properties": {"a": {"$ref": "#/$defs/Point"}, "b": {"$ref": "#/$defs/Point"}},
+                "required": ["a", "b"],
+            },
+        },
     }
