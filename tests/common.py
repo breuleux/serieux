@@ -52,6 +52,19 @@ class Level(Enum):
 
 
 @dataclass
+class Pig:
+    # How pink the pig is
+    pinkness: float
+
+    weight: float
+    """Weight of the pig, in kilograms"""
+
+    # Is the pig...
+    # truly...
+    beautiful: bool = True  # ...beautiful?
+
+
+@dataclass
 class Defaults:
     name: str
     aliases: list[str] = field(default_factory=list)

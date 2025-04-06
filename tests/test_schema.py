@@ -5,7 +5,7 @@ import pytest
 
 from serieux import schema as _schema
 
-from .common import Color, Defaults, Point
+from .common import Color, Defaults, Pig, Point
 
 
 def schema(t, root=False, ref_policy="norepeat"):
@@ -142,7 +142,9 @@ def test_schema_recursive_policy_never():
 
 @dataclass
 class TwoPoints:
+    # First point
     a: Point
+    # Second point
     b: Point
 
 
@@ -157,11 +159,13 @@ def test_schema_policy_never_minimal():
             "properties": {
                 "a": {
                     "type": "object",
+                    "description": "First point",
                     "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
                     "required": ["x", "y"],
                 },
                 "b": {
                     "type": "object",
+                    "description": "Second point",
                     "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
                     "required": ["x", "y"],
                 },
@@ -177,10 +181,14 @@ def test_schema_policy_norepeat():
         "properties": {
             "a": {
                 "type": "object",
+                "description": "First point",
                 "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
                 "required": ["x", "y"],
             },
-            "b": {"$ref": "#/properties/a"},
+            "b": {
+                "$ref": "#/properties/a",
+                "description": "Second point",
+            },
         },
         "required": ["a", "b"],
     }
@@ -197,8 +205,27 @@ def test_schema_policy_always():
             },
             "TwoPoints": {
                 "type": "object",
-                "properties": {"a": {"$ref": "#/$defs/Point"}, "b": {"$ref": "#/$defs/Point"}},
+                "properties": {
+                    "a": {"$ref": "#/$defs/Point", "description": "First point"},
+                    "b": {"$ref": "#/$defs/Point", "description": "Second point"},
+                },
                 "required": ["a", "b"],
             },
         },
+    }
+
+
+def test_schema_descriptions():
+    assert schema(Pig) == {
+        "type": "object",
+        "properties": {
+            "pinkness": {"type": "number", "description": "How pink the pig is"},
+            "weight": {"type": "number", "description": "Weight of the pig, in kilograms"},
+            "beautiful": {
+                "type": "boolean",
+                "description": "Is the pig...\ntruly...\n...beautiful?",
+                "default": True,
+            },
+        },
+        "required": ["pinkness", "weight"],
     }

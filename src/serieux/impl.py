@@ -22,7 +22,7 @@ from ovld.types import All
 
 from .ctx import Context, empty
 from .model import Modelizable, model
-from .schema import Schema
+from .schema import AnnotatedSchema, Schema
 from .tell import tells as get_tells
 from .typetags import TaggedType, strip_all
 from .utils import UnionAlias
@@ -297,7 +297,14 @@ class BaseImplementation(Medley):
         required = []
 
         for f in t.fields:
-            properties[f.property_name] = recurse(f.type, ctx)
+            fsch = recurse(f.type, ctx)
+            extra = {}
+            if f.description:
+                extra["description"] = f.description
+            if f.default is not MISSING:
+                extra["default"] = f.default
+            fsch = fsch if not f.description else AnnotatedSchema(fsch, **extra)
+            properties[f.property_name] = fsch
             if f.required:
                 required.append(f.property_name)
 

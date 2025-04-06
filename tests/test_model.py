@@ -1,9 +1,8 @@
-from dataclasses import dataclass
 from numbers import Number
 
 from serieux.model import model
 
-from .common import Point
+from .common import Pig, Point
 from .definitions import Tree
 
 
@@ -35,19 +34,6 @@ def test_model_default():
 
 def test_model_idempotent():
     assert model(model(int)) is model(int)
-
-
-@dataclass
-class Pig:
-    # How pink the pig is
-    pinkness: float
-
-    weight: float
-    """Weight of the pig, in kilograms"""
-
-    # Is the pig...
-    # truly...
-    beautiful: bool = True  # ...beautiful?
 
 
 def test_field_descriptions():

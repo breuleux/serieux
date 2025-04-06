@@ -21,6 +21,12 @@ class Schema(dict):
         return id(self)
 
 
+class AnnotatedSchema(dict):
+    def __init__(self, parent, **annotations):
+        self.parent = parent
+        super().__init__(annotations)
+
+
 class RefPolicy(str, Enum):
     ALWAYS = "always"
     NOREPEAT = "norepeat"
@@ -89,3 +95,7 @@ class SchemaCompiler(Medley):
                 self.defs[name] = rval
                 return {"$ref": f"#/$defs/{name}"}
             return rval
+
+    def __call__(self, x: AnnotatedSchema, pth: tuple):
+        rval = recurse(x.parent, pth)
+        return {**rval, **x}
