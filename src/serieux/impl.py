@@ -42,13 +42,13 @@ class BaseImplementation(Medley):
 
     @classmethod
     def subcode(
-        self, method_name, t, accessor, ctx_t, ctx_expr=Code("$ctx"), after=None, validate=None
+        cls, method_name, t, accessor, ctx_t, ctx_expr=Code("$ctx"), after=None, validate=None
     ):
         accessor = accessor if isinstance(accessor, Code) else Code(accessor)
         if validate is None:
-            validate = getattr(self, f"validate_{method_name}")
-        method = getattr(self, method_name)
-        if ec := getattr(self, f"{method_name}_embed_condition")(t):
+            validate = getattr(cls, f"validate_{method_name}")
+        method = getattr(cls, method_name)
+        if ec := getattr(cls, f"{method_name}_embed_condition")(t):
             ec = All[ec]
         if ec is not None:
             try:
@@ -86,7 +86,7 @@ class BaseImplementation(Medley):
     ########################################
 
     @classmethod
-    def serialize_embed_condition(self, t):
+    def serialize_embed_condition(cls, t):
         if t in (int, str, bool, float, NoneType):
             return t
 
@@ -155,11 +155,11 @@ class BaseImplementation(Medley):
     for T in (int, str, bool, float, NoneType):
 
         @code_generator
-        def serialize(self, t: type[T], obj: T, ctx: Context, /):
+        def serialize(cls, t: type[T], obj: T, ctx: Context, /):
             return Lambda(Code("$obj"))
 
         @code_generator
-        def deserialize(self, t: type[T], obj: T, ctx: Context, /):
+        def deserialize(cls, t: type[T], obj: T, ctx: Context, /):
             return Lambda(Code("$obj"))
 
     def schema(self, t: type[int], ctx: Context, /):
@@ -182,25 +182,25 @@ class BaseImplementation(Medley):
     ##########################
 
     @classmethod
-    def __generic_codegen_list(self, method, t, obj, ctx):
+    def __generic_codegen_list(cls, method, t, obj, ctx):
         (t,) = get_args(t)
         (lt,) = get_args(t) or (object,)
         if hasattr(ctx, "follow"):
             ctx_expr = Code("$ctx.follow($objt, $obj, IDX)", objt=obj)
             return Lambda(
                 "[$lbody for IDX, X in enumerate($obj)]",
-                lbody=self.subcode(method, lt, "X", ctx, ctx_expr=ctx_expr),
+                lbody=cls.subcode(method, lt, "X", ctx, ctx_expr=ctx_expr),
             )
         else:
-            return Lambda("[$lbody for X in $obj]", lbody=self.subcode(method, lt, "X", ctx))
+            return Lambda("[$lbody for X in $obj]", lbody=cls.subcode(method, lt, "X", ctx))
 
     @code_generator
-    def serialize(self, t: type[list], obj: list, ctx: Context, /):
-        return self.__generic_codegen_list("serialize", t, obj, ctx)
+    def serialize(cls, t: type[list], obj: list, ctx: Context, /):
+        return cls.__generic_codegen_list("serialize", t, obj, ctx)
 
     @code_generator
-    def deserialize(self, t: type[list], obj: list, ctx: Context, /):
-        return self.__generic_codegen_list("deserialize", t, obj, ctx)
+    def deserialize(cls, t: type[list], obj: list, ctx: Context, /):
+        return cls.__generic_codegen_list("deserialize", t, obj, ctx)
 
     def schema(self, t: type[list], ctx: Context, /):
         (lt,) = get_args(t)
@@ -211,7 +211,7 @@ class BaseImplementation(Medley):
     ##########################
 
     @classmethod
-    def __generic_codegen_dict(self, method, t: type[dict], obj: dict, ctx: Context, /):
+    def __generic_codegen_dict(cls, method, t: type[dict], obj: dict, ctx: Context, /):
         (t,) = get_args(t)
         kt, vt = get_args(t) or (object, object)
         ctx_expr = (
@@ -221,17 +221,17 @@ class BaseImplementation(Medley):
         )
         return Lambda(
             "{$kbody: $vbody for K, V in $obj.items()}",
-            kbody=self.subcode(method, kt, "K", ctx, ctx_expr=ctx_expr),
-            vbody=self.subcode(method, vt, "V", ctx, ctx_expr=ctx_expr),
+            kbody=cls.subcode(method, kt, "K", ctx, ctx_expr=ctx_expr),
+            vbody=cls.subcode(method, vt, "V", ctx, ctx_expr=ctx_expr),
         )
 
     @code_generator
-    def serialize(self, t: type[dict], obj: dict, ctx: Context, /):
-        return self.__generic_codegen_dict("serialize", t, obj, ctx)
+    def serialize(cls, t: type[dict], obj: dict, ctx: Context, /):
+        return cls.__generic_codegen_dict("serialize", t, obj, ctx)
 
     @code_generator
-    def deserialize(self, t: type[dict], obj: dict, ctx: Context, /):
-        return self.__generic_codegen_dict("deserialize", t, obj, ctx)
+    def deserialize(cls, t: type[dict], obj: dict, ctx: Context, /):
+        return cls.__generic_codegen_dict("deserialize", t, obj, ctx)
 
     def schema(self, t: type[dict], ctx: Context, /):
         kt, vt = get_args(t)
@@ -242,7 +242,7 @@ class BaseImplementation(Medley):
     ################################
 
     @code_generator
-    def serialize(self, t: type[Modelizable], obj: object, ctx: Context, /):
+    def serialize(cls, t: type[Modelizable], obj: object, ctx: Context, /):
         (t,) = get_args(t)
         t = model(t)
         if not t.accepts(obj):
@@ -257,7 +257,7 @@ class BaseImplementation(Medley):
             )
             stmt = Code(
                 f"v_{i} = $setter",
-                setter=self.subcode(
+                setter=cls.subcode(
                     "serialize", f.type, f"$obj.{f.property_name}", ctx, ctx_expr=ctx_expr
                 ),
             )
@@ -284,7 +284,7 @@ class BaseImplementation(Medley):
         return Def(stmts, ValidationError=ValidationError)
 
     @code_generator
-    def deserialize(self, t: type[Modelizable], obj: dict, ctx: Context, /):
+    def deserialize(cls, t: type[Modelizable], obj: dict, ctx: Context, /):
         (t,) = get_args(t)
         t = model(t)
         follow = hasattr(ctx, "follow")
@@ -296,7 +296,7 @@ class BaseImplementation(Medley):
                 if follow
                 else Code("$ctx")
             )
-            processed = self.subcode(
+            processed = cls.subcode(
                 "deserialize",
                 f.type,
                 Code("$obj[$pname]", pname=f.property_name),
@@ -371,21 +371,21 @@ class BaseImplementation(Medley):
     ###########################
 
     @code_generator
-    def serialize(self, t: type[UnionAlias], obj: Any, ctx: Context, /):
+    def serialize(cls, t: type[UnionAlias], obj: Any, ctx: Context, /):
         (t,) = get_args(t)
         o1, *rest = get_args(t)
-        code = self.subcode("serialize", o1, "$obj", ctx, validate=False)
+        code = cls.subcode("serialize", o1, "$obj", ctx, validate=False)
         for opt in rest:
             code = Code(
                 "$ocode if isinstance($obj, $sopt) else $code",
                 sopt=strip_all(opt),
-                ocode=self.subcode("serialize", opt, "$obj", ctx, validate=False),
+                ocode=cls.subcode("serialize", opt, "$obj", ctx, validate=False),
                 code=code,
             )
         return Lambda(code)
 
     @code_generator
-    def deserialize(self, t: type[UnionAlias] | type[UnionType], obj: Any, ctx: Context, /):
+    def deserialize(cls, t: type[UnionAlias] | type[UnionType], obj: Any, ctx: Context, /):
         (t,) = get_args(t)
         options = get_args(t)
         tells = [get_tells(model(o)) for o in options]
@@ -402,13 +402,13 @@ class BaseImplementation(Medley):
 
         (_, o1), *rest = options
 
-        code = self.subcode("deserialize", o1, "$obj", ctx)
+        code = cls.subcode("deserialize", o1, "$obj", ctx)
         for tls, opt in rest:
             code = Code(
                 "($ocode if $cond else $code)",
                 cond=min(tls).gen(Code("$obj")),
                 code=code,
-                ocode=self.subcode("deserialize", opt, "$obj", ctx),
+                ocode=cls.subcode("deserialize", opt, "$obj", ctx),
             )
         return Lambda(code)
 
