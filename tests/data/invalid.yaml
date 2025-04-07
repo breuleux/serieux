@@ -1,0 +1,7 @@
+languages: ["French"]
+population: "thirteen"
+capital: "Paris"
+citizens:
+- name: Jeannot
+  birthyear: 1893
+  hometown: Lyon

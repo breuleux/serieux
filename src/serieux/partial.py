@@ -5,7 +5,7 @@ from ovld import Medley, call_next, ovld, recurse
 
 from .ctx import Context
 from .exc import ValidationError, ValidationExceptionGroup
-from .model import Modelizable, model
+from .model import Model, Modelizable, model
 from .typetags import NewTag
 
 #############
@@ -34,6 +34,10 @@ class Sources:
 
 @ovld
 def partialize(t: type[Modelizable]):
+    if issubclass(t, Model):
+        return recurse(t.original_type)
+    if issubclass(t, PartialBase):
+        return t
     m = model(t)
     fields = [(f.name, partialize(f.type), field(default=NOT_GIVEN)) for f in m.fields]
     fields.append(
@@ -46,6 +50,11 @@ def partialize(t: type[Modelizable]):
         namespace={"_constructor": m.constructor},
     )
     return dc
+
+
+@ovld(priority=1)
+def partialize(t: type[Partial]):
+    return recurse(t.pushdown())
 
 
 @ovld

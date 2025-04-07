@@ -3,9 +3,8 @@ from typing import get_origin
 
 from ovld import Code, Dataclass, ovld, recurse
 
-from .typetags import TaggedType
-
 from .model import Model
+from .typetags import TaggedType
 
 
 class Tell:

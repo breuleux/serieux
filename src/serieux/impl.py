@@ -279,7 +279,7 @@ class BaseImplementation(Medley):
             "except $ValidationError:",
             ["raise"],
             "except Exception as exc:",
-            ["raise $ValidationError(exc=exc, ctx=$ctx)"],
+            ["raise $ValidationError(exc=exc, ctx=$ctx) from None"],
         ]
         return Def(stmts, ValidationError=ValidationError)
 
@@ -343,7 +343,7 @@ class BaseImplementation(Medley):
             "except $ValidationError:",
             ["raise"],
             "except Exception as exc:",
-            ["raise $ValidationError(exc=exc, ctx=$ctx)"],
+            ["raise $ValidationError(exc=exc, ctx=$ctx) from None"],
         ]
         return Def(stmts, ValidationError=ValidationError)
 

@@ -1,5 +1,6 @@
 import json
 import tomllib
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
@@ -30,8 +31,48 @@ def parse(path: FileSuffix[".yaml", ".yml"]):
     return yaml.safe_load(path.read_text())
 
 
+@ovld
+def parse_with_source(path: FileSuffix[".yaml", ".yml"]):
+    return yaml.compose(path.read_text())
+
+
 class WorkingDirectory(Context):
+    origin: Path
     directory: Path
+
+
+@dataclass
+class Location:
+    source: str
+    start: int
+    end: int
+    linecols: tuple
+
+    def get_snippet(self):
+        return self.source[self.start : self.end]
+
+
+class YamlSourceInfo(Context):
+    location: Location
+
+    @classmethod
+    def extract(cls, node):
+        return cls(
+            location=Location(
+                source=node.start_mark.buffer,
+                start=node.start_mark.index,
+                end=node.end_mark.index,
+                linecols=(
+                    (node.start_mark.line, node.start_mark.column),
+                    (node.end_mark.line, node.end_mark.column),
+                ),
+            )
+        )
+
+
+@dependent_check
+def ScalarNode(value: yaml.ScalarNode, tag_suffix):
+    return value.tag.endswith(tag_suffix)
 
 
 class FromFileFeature(PartialFeature):
@@ -44,4 +85,26 @@ class FromFileFeature(PartialFeature):
         if isinstance(ctx, WorkingDirectory):
             obj = ctx.directory / obj
         data = parse(obj)
-        return recurse(t, data, ctx + WorkingDirectory(obj.parent))
+        ctx = ctx + WorkingDirectory(origin=obj, directory=obj.parent)
+        try:
+            return recurse(t, data, ctx)
+        except Exception:
+            if not parse_with_source.resolve_for_values(obj):
+                raise
+        data = parse_with_source(obj)
+        return recurse(t, data, ctx)
+
+    def deserialize(self, t: type[object], obj: yaml.MappingNode, ctx: Context):
+        return recurse(t, {k.value: v for k, v in obj.value}, ctx + YamlSourceInfo.extract(obj))
+
+    def deserialize(self, t: type[object], obj: yaml.SequenceNode, ctx: Context):
+        return recurse(t, obj.value, ctx + YamlSourceInfo.extract(obj))
+
+    def deserialize(self, t: type[object], obj: ScalarNode[":str"], ctx: Context):
+        return recurse(t, obj.value, ctx + YamlSourceInfo.extract(obj))
+
+    def deserialize(self, t: type[object], obj: ScalarNode[":int"], ctx: Context):
+        return recurse(t, int(obj.value), ctx + YamlSourceInfo.extract(obj))
+
+    def deserialize(self, t: type[object], obj: ScalarNode[":float"], ctx: Context):
+        return recurse(t, float(obj.value), ctx + YamlSourceInfo.extract(obj))

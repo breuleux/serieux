@@ -1,9 +1,9 @@
 def __GENERATED__(self, t, obj, ctx, /):
     try:
-        v_0 = serialize(self, int1, obj.x, ctx)
-        v_1 = serialize(self, int1, obj.y, ctx)
+        v_0 = serialize(self, int, obj.x, ctx)
+        v_1 = serialize(self, int, obj.y, ctx)
         return {'x': v_0,'y': v_1}
     except ValidationError:
         raise
     except Exception as exc:
-        raise ValidationError(exc=exc, ctx=ctx)
+        raise ValidationError(exc=exc, ctx=ctx) from None
