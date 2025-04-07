@@ -7,7 +7,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from ovld import Medley, call_next
 from ovld.dependent import Regexp
 
-from serieux import Context, NewTag, Serieux
+from serieux import Context, NewTag, Serieux, deserialize, serialize
 
 ##################
 # Implementation #
@@ -33,6 +33,7 @@ class EncryptionKey(Context):
         return json.loads(self.key.decrypt(encrypted.lstrip("~CRYPT~")))
 
 
+@Serieux.extend
 class Encrypt(Medley):
     def serialize(self, t: type[Secret], obj: object, ctx: EncryptionKey):
         result = call_next(Secret.strip(t), obj, ctx - EncryptionKey)
@@ -41,9 +42,6 @@ class Encrypt(Medley):
     def deserialize(self, t: type[Secret], obj: Regexp[r"^~CRYPT~.*"], ctx: EncryptionKey):
         obj = ctx.decrypt(obj)
         return call_next(Secret.strip(t), obj, ctx - EncryptionKey)
-
-
-sx = Serieux() + Encrypt()
 
 
 #################
@@ -74,7 +72,7 @@ def main(input=autoinput):
     olivier = User(name="olivier", passwords={"google": "tobeornottobeevil", "apple": "banana"})
     show("Original", olivier)
 
-    serial = sx.serialize(User, olivier, ctx)
+    serial = serialize(User, olivier, ctx)
     show("Serialized", serial)
 
     # Our secrets are safe!
@@ -85,7 +83,7 @@ def main(input=autoinput):
     ctx = EncryptionKey(password)
 
     try:
-        olivier2 = sx.deserialize(User, serial, ctx)
+        olivier2 = deserialize(User, serial, ctx)
     except InvalidToken:
         print("Invalid password!")
         return

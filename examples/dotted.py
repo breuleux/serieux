@@ -3,7 +3,7 @@ from pprint import pprint
 
 from ovld import Medley, call_next, ovld, recurse
 
-from serieux import Context, Serieux
+from serieux import Context, Serieux, deserialize
 from serieux.partial import Sources
 
 ##################
@@ -11,6 +11,7 @@ from serieux.partial import Sources
 ##################
 
 
+@Serieux.extend
 class Dotted(Medley):
     @ovld(priority=10)
     def deserialize(self, t: type[object], obj: dict, ctx: Context):
@@ -24,9 +25,6 @@ class Dotted(Medley):
                 parts.append(current)
             return recurse(t, Sources(*parts), ctx)
         return call_next(t, obj, ctx)
-
-
-sx = Serieux() + Dotted()
 
 
 #################
@@ -63,7 +61,7 @@ def main():
         "capital.climate.hot": False,
         "capital.climate.sunny": False,
     }
-    deser = sx.deserialize(Country, data)
+    deser = deserialize(Country, data)
     pprint(deser)
     assert deser == Country(
         name="Canada",
