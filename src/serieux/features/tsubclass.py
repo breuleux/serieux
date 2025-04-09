@@ -2,9 +2,9 @@ import importlib
 
 from ovld import Medley, call_next, ovld, recurse
 
-from .ctx import Context
-from .exc import ValidationError
-from .typetags import NewTag
+from ..ctx import Context
+from ..exc import ValidationError
+from ..typetags import NewTag
 
 #############
 # Constants #

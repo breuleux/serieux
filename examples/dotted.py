@@ -3,8 +3,7 @@ from pprint import pprint
 
 from ovld import Medley, call_next, ovld, recurse
 
-from serieux import Context, Serieux, deserialize
-from serieux.partial import Sources
+from serieux import Context, Serieux, Sources, deserialize
 
 ##################
 # Implementation #

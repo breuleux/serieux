@@ -7,8 +7,8 @@ import yaml
 from ovld import dependent_check, ovld, recurse
 from ovld.dependent import HasKey
 
-from .ctx import Context
-from .partial import PartialFeature, Sources
+from ..ctx import Context
+from .partial import PartialBuilding, Sources
 
 
 @dependent_check
@@ -72,7 +72,7 @@ def ScalarNode(value: yaml.ScalarNode, tag_suffix):
     return value.tag.endswith(tag_suffix)
 
 
-class FromFileFeature(PartialFeature):
+class FromFileFeature(PartialBuilding):
     @ovld(priority=1)
     def deserialize(self, t: type[object], obj: HasKey["$include"], ctx: Context):
         obj = dict(obj)

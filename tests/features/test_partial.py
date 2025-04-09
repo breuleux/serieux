@@ -2,13 +2,13 @@ from dataclasses import dataclass
 
 import pytest
 
+from serieux import Serieux
 from serieux.ctx import AccessPath
 from serieux.exc import ValidationError
-from serieux.impl import BaseImplementation
-from serieux.partial import Partial, PartialFeature, Sources
+from serieux.features.partial import Partial, PartialBuilding, Sources
 from tests.common import Point, validation_errors
 
-deserialize = (BaseImplementation + PartialFeature)().deserialize
+deserialize = (Serieux + PartialBuilding)().deserialize
 
 
 def test_partial():

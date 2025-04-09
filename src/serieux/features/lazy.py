@@ -2,11 +2,21 @@ from functools import cached_property
 
 from ovld import Medley, call_next, ovld
 
-from .ctx import Context
-from .typetags import NewTag
+from ..ctx import Context
+from ..typetags import NewTag
+
+#############
+# Constants #
+#############
+
 
 Lazy = NewTag["Lazy", 1, False]
 DeepLazy = NewTag["DeepLazy", 1]
+
+
+###########
+# Helpers #
+###########
 
 
 class LazyProxy:
@@ -99,6 +109,11 @@ class LazyProxy:
 
     def __abs__(self):
         return abs(self._obj)
+
+
+###################
+# Implementations #
+###################
 
 
 class LazyDeserialization(Medley):

@@ -4,7 +4,7 @@ import pytest
 
 from serieux import Serieux
 from serieux.exc import ValidationError
-from serieux.lazy import DeepLazy, Lazy, LazyDeserialization, LazyProxy
+from serieux.features.lazy import DeepLazy, Lazy, LazyDeserialization, LazyProxy
 
 deserialize = (Serieux + LazyDeserialization)().deserialize
 

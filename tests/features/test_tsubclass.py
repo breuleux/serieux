@@ -2,11 +2,11 @@ from dataclasses import dataclass
 
 import pytest
 
+from serieux import Serieux
 from serieux.exc import ValidationError
-from serieux.impl import BaseImplementation
-from serieux.tsubclass import TaggedSubclass, TaggedSubclassFeature
+from serieux.features.tsubclass import TaggedSubclass, TaggedSubclassFeature
 
-featured = (BaseImplementation + TaggedSubclassFeature)()
+featured = (Serieux + TaggedSubclassFeature)()
 serialize = featured.serialize
 deserialize = featured.deserialize
 
@@ -36,7 +36,7 @@ def test_tagged_subclass():
     orig = Wolf(name="Wolfie", size=10)
     ser = serialize(TaggedSubclass[Animal], orig)
     assert ser == {
-        "class": "tests.test_tsubclass:Wolf",
+        "class": "tests.features.test_tsubclass:Wolf",
         "name": "Wolfie",
         "size": 10,
     }
@@ -60,7 +60,7 @@ def test_serialize_wrong_class():
 
 
 def test_deserialize_wrong_class():
-    orig = {"class": "tests.test_tsubclass:Wolf", "name": "Wolfie", "size": 10}
+    orig = {"class": "tests.features.test_tsubclass:Wolf", "name": "Wolfie", "size": 10}
     with pytest.raises(ValidationError, match="Wolf.*is not a subclass of.*Cat"):
         deserialize(TaggedSubclass[Cat], orig)
 

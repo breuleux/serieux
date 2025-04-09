@@ -5,9 +5,8 @@ from functools import partial
 from ovld import Medley, call_next, ovld
 from ovld.dependent import Regexp
 
-from serieux import Serieux, deserialize
+from serieux import LazyProxy, Serieux, deserialize
 from serieux.ctx import AccessPath
-from serieux.lazy import LazyProxy
 
 ##################
 # Implementation #

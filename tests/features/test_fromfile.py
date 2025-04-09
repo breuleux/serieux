@@ -4,21 +4,22 @@ from pathlib import Path
 
 import pytest
 
+from serieux import Serieux
 from serieux.ctx import AccessPath
 from serieux.exc import ValidationError
-from serieux.fromfile import FromFileFeature
-from serieux.impl import BaseImplementation
-from serieux.partial import Sources
+from serieux.features.fromfile import FromFileFeature
+from serieux.features.partial import Sources
 
-from .common import Citizen, Country, World
+from ..common import Citizen, Country, World
 
-deserialize = (BaseImplementation + FromFileFeature)().deserialize
+deserialize = (Serieux + FromFileFeature)().deserialize
 
 here = Path(__file__).parent
+datapath = Path(__file__).parent.parent / "data"
 
 
 def test_deserialize_from_file():
-    assert deserialize(Country, here / "data" / "canada.yaml") == Country(
+    assert deserialize(Country, datapath / "canada.yaml") == Country(
         languages=["English", "French"],
         capital="Ottawa",
         population=39_000_000,
@@ -39,7 +40,7 @@ def test_deserialize_from_file():
 
 def test_deserialize_override():
     srcs = Sources(
-        here / "data" / "canada.yaml",
+        datapath / "canada.yaml",
         {"capital": "Montreal"},
     )
     assert deserialize(Country, srcs) == Country(
@@ -62,7 +63,7 @@ def test_deserialize_override():
 
 
 def test_deserialize_world():
-    world = deserialize(World, here / "data" / "world.yaml")
+    world = deserialize(World, datapath / "world.yaml")
     assert world == World(
         countries={
             "canada": Country(
@@ -107,8 +108,8 @@ def check_error_display(capsys, file_regression):
 
         exc.value.display(file=sys.stderr)
         cap = capsys.readouterr()
-        out = cap.out.replace(str(here), "REDACTED")
-        err = cap.err.replace(str(here), "REDACTED")
+        out = cap.out.replace(str(datapath.parent), "REDACTED")
+        err = cap.err.replace(str(datapath.parent), "REDACTED")
         file_regression.check("\n".join([out, "=" * 80, err]))
 
     yield check
@@ -116,14 +117,14 @@ def check_error_display(capsys, file_regression):
 
 def test_deserialize_incomplete(check_error_display):
     with check_error_display("KeyError: 'capital'"):
-        deserialize(Country, here / "data" / "france.yaml", AccessPath())
+        deserialize(Country, datapath / "france.yaml", AccessPath())
 
 
 def test_deserialize_invalid(check_error_display):
     with check_error_display("Cannot deserialize object"):
-        deserialize(Country, here / "data" / "invalid.yaml", AccessPath())
+        deserialize(Country, datapath / "invalid.yaml", AccessPath())
 
 
 def test_deserialize_oops_world(check_error_display):
     with check_error_display("Cannot deserialize object"):
-        deserialize(World, here / "data" / "oops-world.yaml", AccessPath())
+        deserialize(World, datapath / "oops-world.yaml", AccessPath())

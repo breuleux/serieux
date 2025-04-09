@@ -1,5 +1,5 @@
 import re
-from dataclasses import MISSING
+from dataclasses import MISSING, field
 from datetime import date, datetime, timedelta
 from enum import Enum
 from itertools import pairwise
@@ -20,7 +20,7 @@ from ovld import (
 )
 from ovld.types import All
 
-from .ctx import Context, empty
+from .ctx import Context, EmptyContext
 from .exc import ValidationError
 from .model import Modelizable, model
 from .schema import AnnotatedSchema, Schema
@@ -30,6 +30,7 @@ from .utils import UnionAlias, clsstring
 
 
 class BaseImplementation(Medley):
+    default_context: Context = field(default_factory=EmptyContext)
     validate_serialize: CodegenParameter[bool] = True
     validate_deserialize: CodegenParameter[bool] = True
 
@@ -103,10 +104,10 @@ class BaseImplementation(Medley):
         return recurse(t.pushdown(), obj, ctx)
 
     def serialize(self, obj: object, /):
-        return recurse(type(obj), obj, empty)
+        return recurse(type(obj), obj, self.default_context)
 
     def serialize(self, t: type[object], obj: object, /):
-        return recurse(t, obj, empty)
+        return recurse(t, obj, self.default_context)
 
     #########################################
     # deserialize: helpers and entry points #
@@ -127,10 +128,10 @@ class BaseImplementation(Medley):
         return recurse(t.pushdown(), obj, ctx)
 
     def deserialize(self, obj: object, /):
-        return recurse(object, obj, empty)
+        return recurse(object, obj, self.default_context)
 
     def deserialize(self, t: type[object], obj: object, /):
-        return recurse(t, obj, empty)
+        return recurse(t, obj, self.default_context)
 
     ####################################
     # schema: helpers and entry points #
@@ -146,7 +147,7 @@ class BaseImplementation(Medley):
         return self._schema_cache[t]
 
     def schema(self, t: type[object], /):
-        return recurse(t, empty)
+        return recurse(t, self.default_context)
 
     ################################
     # Implementations: basic types #

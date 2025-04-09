@@ -3,10 +3,10 @@ from functools import reduce
 
 from ovld import Medley, call_next, ovld, recurse
 
-from .ctx import Context
-from .exc import ValidationError, ValidationExceptionGroup
-from .model import Model, Modelizable, model
-from .typetags import NewTag
+from ..ctx import Context
+from ..exc import ValidationError, ValidationExceptionGroup
+from ..model import Model, Modelizable, model
+from ..typetags import NewTag
 
 #############
 # Constants #
@@ -67,7 +67,7 @@ def partialize(t: object):
 ###################
 
 
-class PartialFeature(Medley):
+class PartialBuilding(Medley):
     @ovld(priority=1)
     def deserialize(self, t: type[Partial[object]], obj: object, ctx: Context, /):
         try:
