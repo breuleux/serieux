@@ -21,7 +21,7 @@ from ovld import (
 from ovld.types import All
 
 from .ctx import Context, EmptyContext
-from .exc import ValidationError
+from .exc import ValidationError, ValidationExceptionGroup
 from .model import Modelizable, model
 from .schema import AnnotatedSchema, Schema
 from .tell import tells as get_tells
@@ -277,12 +277,12 @@ class BaseImplementation(Medley):
         stmts = [
             "try:",
             stmts,
-            "except $ValidationError:",
+            "except ($VE, $VEG):",
             ["raise"],
             "except Exception as exc:",
-            ["raise $ValidationError(exc=exc, ctx=$ctx) from None"],
+            ["raise $VE(exc=exc, ctx=$ctx) from None"],
         ]
-        return Def(stmts, ValidationError=ValidationError)
+        return Def(stmts, VE=ValidationError, VEG=ValidationExceptionGroup)
 
     @code_generator
     def deserialize(cls, t: type[Modelizable], obj: dict, ctx: Context, /):
@@ -341,12 +341,12 @@ class BaseImplementation(Medley):
         stmts = [
             "try:",
             stmts,
-            "except $ValidationError:",
+            "except ($VE, $VEG):",
             ["raise"],
             "except Exception as exc:",
-            ["raise $ValidationError(exc=exc, ctx=$ctx) from None"],
+            ["raise $VE(exc=exc, ctx=$ctx)"],
         ]
-        return Def(stmts, ValidationError=ValidationError)
+        return Def(stmts, VE=ValidationError, VEG=ValidationExceptionGroup)
 
     def schema(self, t: type[Modelizable], ctx: Context, /):
         t = model(t)

@@ -76,7 +76,8 @@ class FromFileFeature(PartialBuilding):
     @ovld(priority=1)
     def deserialize(self, t: type[object], obj: HasKey["$include"], ctx: Context):
         obj = dict(obj)
-        return recurse(t, Sources(Path(obj.pop("$include")), obj), ctx)
+        incl = recurse(str, obj.pop("$include"), ctx)
+        return recurse(t, Sources(Path(incl), obj), ctx)
 
     def deserialize(self, t: type[object], obj: Path, ctx: Context):
         if isinstance(ctx, WorkingDirectory):

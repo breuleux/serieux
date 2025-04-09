@@ -104,17 +104,17 @@ def _(p: type[Partial[object]]):
 ######################
 
 
-@ovld
+@ovld(priority=1)
 def merge(x: object, y: NOT_GIVEN_T):
     return x
 
 
-@ovld
+@ovld(priority=1)
 def merge(x: NOT_GIVEN_T, y: object):
     return y
 
 
-@ovld
+@ovld(priority=1)
 def merge(x: NOT_GIVEN_T, y: NOT_GIVEN_T):
     return NOT_GIVEN
 
