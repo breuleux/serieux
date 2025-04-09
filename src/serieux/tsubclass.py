@@ -1,20 +1,16 @@
 import importlib
-from typing import TYPE_CHECKING, Annotated, TypeVar
 
 from ovld import Medley, call_next, ovld, recurse
 
 from .ctx import Context
-from .typetags import make_tag
+from .exc import ValidationError
+from .typetags import NewTag
 
 #############
 # Constants #
 #############
 
-if TYPE_CHECKING:  # pragma: no cover
-    T = TypeVar("T")
-    TaggedSubclass = Annotated[T, None]
-else:
-    TaggedSubclass = make_tag("TaggedSubclass", 1)
+TaggedSubclass = NewTag["TaggedSubclass"]
 
 
 ###################
@@ -22,7 +18,7 @@ else:
 ###################
 
 
-def _resolve(ref, base):
+def _resolve(ref, base, ctx):
     if ref is None:
         return base
 
@@ -32,12 +28,12 @@ def _resolve(ref, base):
     elif ncolon == 1:
         mod_name, symbol = ref.split(":")
     else:
-        raise Exception(f"Bad format for class reference: {ref}")
+        raise ValidationError(f"Bad format for class reference: '{ref}'", ctx=ctx)
     try:
         mod = importlib.import_module(mod_name)
         return getattr(mod, symbol)
     except (ModuleNotFoundError, AttributeError) as exc:
-        raise Exception(str(exc))
+        raise ValidationError(exc=exc, ctx=ctx)
 
 
 class TaggedSubclassFeature(Medley):
@@ -45,10 +41,11 @@ class TaggedSubclassFeature(Medley):
     def serialize(self, t: type[TaggedSubclass], obj: object, ctx: Context, /):
         base = t.pushdown()
         if not isinstance(obj, base):
-            raise TypeError(f"'{obj}' is not a subclass of '{base}'")
+            raise ValidationError(f"'{obj}' is not a subclass of '{base}'", ctx=ctx)
         objt = type(obj)
         qn = objt.__qualname__
-        assert "." not in qn, "Only top-level symbols can be serialized"
+        if "." in qn:
+            raise ValidationError("Only top-level symbols can be serialized", ctx=ctx)
         mod = objt.__module__
         rval = call_next(objt, obj, ctx)
         rval["class"] = f"{mod}:{qn}"
@@ -58,5 +55,7 @@ class TaggedSubclassFeature(Medley):
         base = t.pushdown()
         obj = dict(obj)
         cls_name = obj.pop("class", None)
-        actual_class = _resolve(cls_name, base)
+        actual_class = _resolve(cls_name, base, ctx)
+        if not issubclass(actual_class, base):
+            raise ValidationError(f"'{obj}' is not a subclass of '{base}'", ctx=ctx)
         return recurse(actual_class, obj, ctx)

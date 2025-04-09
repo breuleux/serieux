@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from serieux.exc import ValidationError
 from serieux.impl import BaseImplementation
 from serieux.tsubclass import TaggedSubclass, TaggedSubclassFeature
 
@@ -43,10 +44,25 @@ def test_tagged_subclass():
     assert deser == orig
 
 
-def test_wrong_class():
+def test_serialize_not_top_level():
+    class Lynx(Cat):
+        pass
+
+    orig = Lynx(name="Lina", selfishness=9)
+    with pytest.raises(ValidationError, match="Only top-level symbols"):
+        serialize(TaggedSubclass[Lynx], orig)
+
+
+def test_serialize_wrong_class():
     orig = Wolf(name="Wolfie", size=10)
-    with pytest.raises(TypeError, match="Wolf.*is not a subclass of.*Cat"):
+    with pytest.raises(ValidationError, match="Wolf.*is not a subclass of.*Cat"):
         serialize(TaggedSubclass[Cat], orig)
+
+
+def test_deserialize_wrong_class():
+    orig = {"class": "tests.test_tsubclass:Wolf", "name": "Wolfie", "size": 10}
+    with pytest.raises(ValidationError, match="Wolf.*is not a subclass of.*Cat"):
+        deserialize(TaggedSubclass[Cat], orig)
 
 
 def test_resolve_default():
@@ -60,12 +76,12 @@ def test_resolve_same_file():
 
 
 def test_not_found():
-    with pytest.raises(Exception, match="no attribute 'Bloop'"):
+    with pytest.raises(ValidationError, match="no attribute 'Bloop'"):
         ser = {"class": "Bloop", "name": "Quack"}
         deserialize(TaggedSubclass[Animal], ser)
 
 
 def test_bad_resolve():
-    with pytest.raises(Exception, match="Bad format for class reference"):
+    with pytest.raises(ValidationError, match="Bad format for class reference"):
         ser = {"class": "x:y:z", "name": "Quack"}
         deserialize(TaggedSubclass[Animal], ser)
