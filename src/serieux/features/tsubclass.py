@@ -59,3 +59,7 @@ class TaggedSubclassFeature(Medley):
         if not issubclass(actual_class, base):
             raise ValidationError(f"'{obj}' is not a subclass of '{base}'", ctx=ctx)
         return recurse(actual_class, obj, ctx)
+
+
+# Add as a default feature in serieux.Serieux
+__default_features__ = TaggedSubclassFeature

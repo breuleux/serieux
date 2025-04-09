@@ -104,3 +104,7 @@ class FromFileFeature(PartialBuilding):
 
     def deserialize(self, t: type[object], obj: ScalarNode[":float"], ctx: Context):
         return recurse(t, float(obj.value), ctx + YamlSourceInfo.extract(obj))
+
+
+# Currently not a default feature
+__default_features__ = None

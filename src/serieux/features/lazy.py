@@ -130,3 +130,7 @@ class LazyDeserialization(Medley):
             return call_next(typ, value, ctx)
 
         return LazyProxy(evaluate)
+
+
+# Add as a default feature in serieux.Serieux
+__default_features__ = LazyDeserialization
