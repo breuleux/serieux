@@ -1,0 +1,6 @@
+Debug mode: True
+Port: 8080
+Pi: 3.14159
+Names: ['alice', 'bob', 'charlie']
+Numbers: [1, 2, 3, 4, 5]
+Floats: [1.1, 2.2, 3.3]
