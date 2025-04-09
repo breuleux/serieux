@@ -39,7 +39,14 @@ def partialize(t: type[Modelizable]):
     if issubclass(t, PartialBase):
         return t
     m = model(t)
-    fields = [(f.name, partialize(f.type), field(default=NOT_GIVEN)) for f in m.fields]
+    fields = [
+        (
+            f.name,
+            partialize(f.type),
+            field(default=NOT_GIVEN, metadata={"description": f.description}),
+        )
+        for f in m.fields
+    ]
     fields.append(
         ("_serieux_ctx", Context, field(default=NOT_GIVEN, metadata={"serieux_metavar": "$ctx"}))
     )
@@ -82,6 +89,10 @@ class PartialBuilding(Medley):
             raise rval
         return rval
 
+    def deserialize(self, t: type[PartialBase], obj: object, ctx: Context, /):
+        # Fallback for alternative ways to deserialize the original object
+        return recurse(t._constructor, obj, ctx)
+
 
 @model.register
 def _(p: type[Partial[object]]):
@@ -117,6 +128,20 @@ def merge(x: PartialBase, y: PartialBase):
         yv = getattr(y, f.name)
         args[f.name] = recurse(xv, yv)
     return type(x)(**args)
+
+
+@ovld
+def merge(x: PartialBase, y: object):
+    if x._constructor is not type(y):
+        raise ValidationError("Incompatible constructors.")
+    return recurse(x, type(x)(**vars(y)))
+
+
+@ovld
+def merge(x: object, y: PartialBase):
+    if y._constructor is not type(x):
+        raise ValidationError("Incompatible constructors.")
+    return recurse(type(y)(**vars(x)), y)
 
 
 @ovld

@@ -16,7 +16,7 @@ def test_model_recursive():
     tm = model(Tree)
     fleft = tm.fields[0]
     assert fleft.name == "left"
-    assert fleft.type == tm | Number
+    assert model(fleft.type) == tm | Number
 
 
 @has_312_features
@@ -26,7 +26,7 @@ def test_model_recursive_parametric():
     tm = model(Tree[int])
     fleft = tm.fields[0]
     assert fleft.name == "left"
-    assert fleft.type == tm | int
+    assert model(fleft.type) == tm | int
 
 
 def test_model_default():

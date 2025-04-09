@@ -113,12 +113,15 @@ def model(dc: type[Dataclass]):
     rval.fields = [
         Field(
             name=field.name,
-            description=attributes.get(field.name, None),
-            type=recurse(evaluate_hint(field.type, dc, None, tsub)),
+            description=(
+                (meta := field.metadata).get("description", None)
+                or attributes.get(field.name, None)
+            ),
+            type=evaluate_hint(field.type, dc, None, tsub),
             default=field.default,
             default_factory=field.default_factory,
-            flatten=field.metadata.get("flatten", False),
-            metavar=field.metadata.get("serieux_metavar", None),
+            flatten=meta.get("flatten", False),
+            metavar=meta.get("serieux_metavar", None),
             argument_name=field.name if field.kw_only else i,
         )
         for i, field in enumerate(fields(constructor))
