@@ -1,4 +1,5 @@
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -97,28 +98,32 @@ def test_deserialize_world():
     )
 
 
-def test_deserialize_incomplete(capsys, file_regression):
-    with pytest.raises(ValidationError, match="KeyError: 'capital'") as exc:
+@pytest.fixture
+def check_error_display(capsys, file_regression):
+    @contextmanager
+    def check(message="", exc_type=ValidationError):
+        with pytest.raises(exc_type, match=message) as exc:
+            yield
+
+        exc.value.display(file=sys.stderr)
+        cap = capsys.readouterr()
+        out = cap.out.replace(str(here), "REDACTED")
+        err = cap.err.replace(str(here), "REDACTED")
+        file_regression.check("\n".join([out, "=" * 80, err]))
+
+    yield check
+
+
+def test_deserialize_incomplete(check_error_display):
+    with check_error_display("KeyError: 'capital'"):
         deserialize(Country, here / "data" / "france.yaml", AccessPath())
 
-    exc.value.display(file=sys.stderr)
-    cap = capsys.readouterr()
-    file_regression.check("\n".join([cap.out, "=" * 80, cap.err]))
 
-
-def test_deserialize_invalid(capsys, file_regression):
-    with pytest.raises(ValidationError, match="Cannot deserialize object") as exc:
+def test_deserialize_invalid(check_error_display):
+    with check_error_display("Cannot deserialize object"):
         deserialize(Country, here / "data" / "invalid.yaml", AccessPath())
 
-    exc.value.display(file=sys.stderr)
-    cap = capsys.readouterr()
-    file_regression.check("\n".join([cap.out, "=" * 80, cap.err]))
 
-
-def test_deserialize_oops_world(capsys, file_regression):
-    with pytest.raises(ValidationError, match="Cannot deserialize object") as exc:
+def test_deserialize_oops_world(check_error_display):
+    with check_error_display("Cannot deserialize object"):
         deserialize(World, here / "data" / "oops-world.yaml", AccessPath())
-
-    exc.value.display(file=sys.stderr)
-    cap = capsys.readouterr()
-    file_regression.check("\n".join([cap.out, "=" * 80, cap.err]))
