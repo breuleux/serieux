@@ -8,6 +8,10 @@ from ovld.dependent import Regexp
 from serieux import Context, Serieux, deserialize
 from serieux.exc import ValidationError
 
+##################
+# Implementation #
+##################
+
 
 @dataclass
 class EnvValue:
@@ -60,6 +64,11 @@ class EnvInterpolator(Medley):
         return [
             recurse(element_type, EnvValue(item.strip()), ctx) for item in obj.value.split(",")
         ]
+
+
+#################
+# Demonstration #
+#################
 
 
 def main():

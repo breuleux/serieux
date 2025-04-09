@@ -35,6 +35,6 @@ def test_example(file, file_regression, capsys, fresh_serieux):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     module.main()
-    if getattr(module.main, "do_not_capture_output", False):
+    if not getattr(module.main, "do_not_test_output", False):
         captured = capsys.readouterr()
         file_regression.check(captured.out)

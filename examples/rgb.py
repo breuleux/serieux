@@ -5,6 +5,10 @@ from ovld.dependent import Regexp
 
 from serieux import Context, Serieux, deserialize, serialize
 
+##################
+# Implementation #
+##################
+
 
 @dataclass
 class RGB:
@@ -28,6 +32,11 @@ class RGBSerializer(Medley):
         green = int(hex_str[2:4], 16)
         blue = int(hex_str[4:6], 16)
         return RGB(red=red, green=green, blue=blue)
+
+
+#################
+# Demonstration #
+#################
 
 
 def main():
