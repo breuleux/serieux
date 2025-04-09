@@ -8,7 +8,7 @@ from serieux import Serieux, serialize
 from serieux.ctx import AccessPath, Context
 from serieux.exc import ValidationError
 
-from .common import Color, Level, Point, one_test_per_assert
+from .common import Color, Level, Point, has_312_features, one_test_per_assert
 
 
 @one_test_per_assert
@@ -59,6 +59,7 @@ def test_serialize_dict_of_points():
     }
 
 
+@has_312_features
 def test_serialize_tree():
     from .definitions_py312 import Tree
 
@@ -197,6 +198,7 @@ def test_error_dataclass():
         serialize(Point, Point(x=1, y="oops"), AccessPath())
 
 
+@has_312_features
 def test_error_serialize_tree():
     from .definitions_py312 import Tree
 

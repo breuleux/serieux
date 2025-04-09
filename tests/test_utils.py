@@ -4,7 +4,7 @@ from typing import TypeVar, Union
 
 from serieux.utils import evaluate_hint as eh
 
-from .common import Point, one_test_per_assert
+from .common import Point, has_312_features, one_test_per_assert
 
 T1 = TypeVar("T1")
 T2 = TypeVar("T2")
@@ -34,6 +34,7 @@ def test_evaluate_hint_tree():
         assert eh(field.type, Tree) == Number | Tree
 
 
+@has_312_features
 def test_evaluate_hint_tree_parametric():
     from .definitions_py312 import Tree
 

@@ -5,7 +5,7 @@ import pytest
 
 from serieux import schema as _schema
 
-from .common import Color, Defaults, Pig, Point
+from .common import Color, Defaults, Pig, Point, has_312_features
 
 
 def schema(t, root=False, ref_policy="norepeat"):
@@ -81,6 +81,7 @@ def test_schema_dataclass_2():
     }
 
 
+@has_312_features
 def test_schema_recursive():
     from .definitions_py312 import Tree
 
@@ -104,6 +105,7 @@ def test_schema_recursive():
     }
 
 
+@has_312_features
 def test_schema_recursive_policy_always():
     from .definitions_py312 import Tree
 
@@ -133,6 +135,7 @@ def test_schema_recursive_policy_always():
     }
 
 
+@has_312_features
 def test_schema_recursive_policy_never():
     from .definitions_py312 import Tree
 

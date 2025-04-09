@@ -7,7 +7,7 @@ from serieux import deserialize
 from serieux.ctx import AccessPath
 from serieux.exc import ValidationError
 
-from .common import Color, Defaults, Level, Point, Point3D, one_test_per_assert
+from .common import Color, Defaults, Level, Point, Point3D, has_312_features, one_test_per_assert
 
 here = Path(__file__).parent
 
@@ -57,6 +57,7 @@ def test_deserialize_union():
     assert deserialize(Point | int, 3) == 3
 
 
+@has_312_features
 def test_deserialize_tree():
     from .definitions_py312 import Tree
 

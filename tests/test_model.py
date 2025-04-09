@@ -2,7 +2,7 @@ from numbers import Number
 
 from serieux.model import model
 
-from .common import Pig, Point
+from .common import Pig, Point, has_312_features
 from .definitions import Tree
 
 
@@ -19,6 +19,7 @@ def test_model_recursive():
     assert fleft.type == tm | Number
 
 
+@has_312_features
 def test_model_recursive_parametric():
     from .definitions_py312 import Tree
 

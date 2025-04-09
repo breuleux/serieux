@@ -1,5 +1,6 @@
 import ast
 import inspect
+import sys
 import traceback
 from ast import NodeTransformer
 from contextlib import contextmanager
@@ -7,6 +8,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from textwrap import dedent
 
+import pytest
 from _pytest.assertion.rewrite import AssertionRewriter
 
 from serieux.exc import ValidationExceptionGroup
@@ -122,3 +124,8 @@ def one_test_per_assert(fn):
     glb = fn.__globals__
     exec(new_fn, glb, glb)
     return None
+
+
+has_312_features = pytest.mark.skipif(
+    sys.version_info < (3, 12), reason="This test relies on Python 3.12+ syntax"
+)
