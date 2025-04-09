@@ -4,6 +4,7 @@ from .impl import BaseImplementation
 from .lazy import DeepLazy, Lazy, LazyDeserialization, LazyProxy
 from .partial import PartialFeature
 from .typetags import NewTag, TaggedType
+from .version import version as __version__
 
 Serieux = BaseImplementation + PartialFeature + LazyDeserialization
 serieux = Serieux()
@@ -27,4 +28,5 @@ __all__ = [
     "Lazy",
     "DeepLazy",
     "LazyProxy",
+    "__version__",
 ]

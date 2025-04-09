@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 import pytest
@@ -96,11 +97,28 @@ def test_deserialize_world():
     )
 
 
-def test_deserialize_incomplete():
-    with pytest.raises(ValidationError, match="KeyError: 'capital'"):
+def test_deserialize_incomplete(capsys, file_regression):
+    with pytest.raises(ValidationError, match="KeyError: 'capital'") as exc:
         deserialize(Country, here / "data" / "france.yaml", AccessPath())
 
+    exc.value.display(file=sys.stderr)
+    cap = capsys.readouterr()
+    file_regression.check("\n".join([cap.out, "=" * 80, cap.err]))
 
-def test_deserialize_invalid():
-    with pytest.raises(ValidationError, match="Cannot deserialize object"):
+
+def test_deserialize_invalid(capsys, file_regression):
+    with pytest.raises(ValidationError, match="Cannot deserialize object") as exc:
         deserialize(Country, here / "data" / "invalid.yaml", AccessPath())
+
+    exc.value.display(file=sys.stderr)
+    cap = capsys.readouterr()
+    file_regression.check("\n".join([cap.out, "=" * 80, cap.err]))
+
+
+def test_deserialize_oops_world(capsys, file_regression):
+    with pytest.raises(ValidationError, match="Cannot deserialize object") as exc:
+        deserialize(World, here / "data" / "oops-world.yaml", AccessPath())
+
+    exc.value.display(file=sys.stderr)
+    cap = capsys.readouterr()
+    file_regression.check("\n".join([cap.out, "=" * 80, cap.err]))

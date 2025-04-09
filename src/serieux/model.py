@@ -37,7 +37,7 @@ class Field:
     def __post_init__(self):
         if self.property_name is UNDEFINED:
             self.property_name = self.name
-        if self.argument_name is UNDEFINED:
+        if self.argument_name is UNDEFINED:  # pragma: no cover
             self.argument_name = self.name
         if self.serialized_name is UNDEFINED:
             self.serialized_name = self.name

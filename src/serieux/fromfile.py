@@ -48,9 +48,6 @@ class Location:
     end: int
     linecols: tuple
 
-    def get_snippet(self):
-        return self.source[self.start : self.end]
-
 
 class YamlSourceInfo(Context):
     location: Location
@@ -89,8 +86,7 @@ class FromFileFeature(PartialFeature):
         try:
             return recurse(t, data, ctx)
         except Exception:
-            if not parse_with_source.resolve_for_values(obj):
-                raise
+            pass
         data = parse_with_source(obj)
         return recurse(t, data, ctx)
 

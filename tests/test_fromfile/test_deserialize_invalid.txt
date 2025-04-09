@@ -1,0 +1,7 @@
+
+================================================================================
+[1m[33m.population[0m: Cannot deserialize object of type 'str' into expected type 'int'.
+  @ /Users/olivier/code/serieux/tests/data/invalid.yaml:2
+    1: languages: ["French"]
+    2: population: [1m[31m"thirteen"[0m
+    3: capital: "Paris"

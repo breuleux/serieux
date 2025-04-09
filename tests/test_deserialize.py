@@ -1,3 +1,4 @@
+import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -169,3 +170,16 @@ def test_deserialize_missing_field():
     ]
     with pytest.raises(ValidationError, match=r"At path .1: KeyError: 'y'"):
         deserialize(list[Point], pts, AccessPath())
+
+
+def test_error_display(capsys, file_regression):
+    pts = [
+        {"x": 1, "y": 2},
+        {"x": 3},
+    ]
+    with pytest.raises(ValidationError, match=r"At path .1: KeyError: 'y'") as exc:
+        deserialize(list[Point], pts, AccessPath())
+
+    exc.value.display(file=sys.stderr)
+    cap = capsys.readouterr()
+    file_regression.check("\n".join([cap.out, "=" * 80, cap.err]))

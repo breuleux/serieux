@@ -40,7 +40,8 @@ def tells(typ: type[int] | type[str] | type[bool] | type[float] | type[list] | t
 
 
 @ovld
-def tells(dc: type[Dataclass]):
+def tells(dc: type[Dataclass]):  # pragma: no cover
+    # Usually goes through Model
     dc = get_origin(dc) or dc
     return {TypeTell(dict)} | {KeyTell(f.name) for f in fields(dc)}
 

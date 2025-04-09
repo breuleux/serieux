@@ -1,0 +1,7 @@
+
+================================================================================
+[1m[33m.countries.canada.citizens.0.birthyear[0m: Cannot deserialize object of type 'str' into expected type 'int'.
+  @ /Users/olivier/code/serieux/tests/data/oops-world.yaml:8
+    7:     - name: Olivier
+    8:       birthyear: [1m[31m"OOPS!"[0m
+    9:       hometown: Montreal
