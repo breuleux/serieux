@@ -18,7 +18,7 @@ class Variables(AccessPath):
 
 
 def evaluate(expr, ctx):
-    current = tuple(k for _, k in ctx.access_path[:-1])
+    current = ctx.access_path[:-1]
     while True:
         lcl = vars(ctx.refs[current])
         try:
@@ -35,8 +35,7 @@ class VarInterpolation(Medley):
     @ovld(priority=1)
     def deserialize(self, typ: type[object], value: object, ctx: Variables):
         rval = call_next(typ, value, ctx)
-        pth = tuple(k for _, k in ctx.access_path)
-        ctx.refs[pth] = rval
+        ctx.refs[ctx.access_path] = rval
         return rval
 
     @ovld(priority=3)

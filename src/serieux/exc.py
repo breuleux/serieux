@@ -6,8 +6,8 @@ def _color(code, text):
 
 
 def access_string(ctx):
-    acc = getattr(ctx, "access_path", [(None, "???")])
-    return "".join([f".{field}" for obj, field in acc]) if acc else "(at root)"
+    acc = getattr(ctx, "access_path", ["???"])
+    return "".join([f".{field}" for field in acc]) if acc else "(at root)"
 
 
 def context_string(
