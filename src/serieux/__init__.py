@@ -1,10 +1,11 @@
 from .ctx import Context
 from .exc import ValidationError, ValidationExceptionGroup
 from .impl import BaseImplementation
+from .lazy import DeepLazy, Lazy, LazyDeserialization, LazyProxy
 from .partial import PartialFeature
 from .typetags import NewTag, TaggedType
 
-Serieux = BaseImplementation + PartialFeature
+Serieux = BaseImplementation + PartialFeature + LazyDeserialization
 serieux = Serieux()
 serialize = serieux.serialize
 deserialize = serieux.deserialize
@@ -23,4 +24,7 @@ __all__ = [
     "serieux",
     "ValidationError",
     "ValidationExceptionGroup",
+    "Lazy",
+    "DeepLazy",
+    "LazyProxy",
 ]

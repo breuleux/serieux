@@ -1,0 +1,89 @@
+from dataclasses import dataclass
+
+import pytest
+
+from serieux import Serieux
+from serieux.exc import ValidationError
+from serieux.lazy import DeepLazy, Lazy, LazyDeserialization, LazyProxy
+
+deserialize = (Serieux + LazyDeserialization)().deserialize
+
+
+@dataclass(frozen=True)
+class Person:
+    name: str
+    age: int
+
+    def __post_init__(self):
+        if self.age < 0:
+            raise ValueError("Age cannot be negative!")
+
+
+def test_lazy_proxy():
+    lazy_value = LazyProxy(lambda: 42)
+
+    assert lazy_value
+    assert lazy_value == 42
+    assert str(lazy_value) == "42"
+    assert repr(lazy_value) == "42"
+
+
+def test_lazy_arithmetic():
+    lazy_a = LazyProxy(lambda: 10)
+    lazy_b = LazyProxy(lambda: 5)
+    lazy_c = LazyProxy(lambda: -3)
+
+    assert lazy_a + lazy_b == 15
+    assert lazy_a - lazy_b == 5
+    assert lazy_a * lazy_b == 50
+    assert lazy_a / lazy_b == 2.0
+    assert lazy_a // lazy_b == 2
+    assert lazy_a % lazy_b == 0
+    assert lazy_a**lazy_b == 100000
+    assert abs(lazy_c) == 3
+    assert -lazy_c == 3
+    assert +lazy_c == -3
+
+
+def test_lazy_list():
+    lazy_list = LazyProxy(lambda: [1, 2, 3])
+
+    assert len(lazy_list) == 3
+    assert lazy_list[0] == 1
+    assert list(lazy_list) == [1, 2, 3]
+    assert 2 in lazy_list
+
+
+def test_lazy_object():
+    person = Person(name="Bob", age=78)
+    lazy_person = LazyProxy(lambda: person)
+
+    assert person == lazy_person
+    assert lazy_person.name == "Bob"
+    assert lazy_person.age == 78
+    assert hash(person) == hash(lazy_person)
+
+
+def test_laziness():
+    data = {"name": "Clara", "age": -10}
+    lazy = deserialize(Lazy[Person], data)
+    with pytest.raises(ValidationError, match="Age cannot be negative"):
+        lazy.age
+
+
+def test_deep_laziness():
+    data = [
+        {"name": "Alice", "age": 18},
+        {"name": "Bob", "age": -78},
+        {"name": "Clara", "age": 10},
+    ]
+    lazy = deserialize(Lazy[list[Person]], data)
+    with pytest.raises(ValidationError, match="Age cannot be negative"):
+        lazy[0].name
+
+    deep_lazy = deserialize(DeepLazy[list[Person]], data)
+    assert deep_lazy[0].name == "Alice"
+    deep_lazy[1]  # No attributes fetched, so nothing happens
+    with pytest.raises(ValidationError, match="Age cannot be negative"):
+        deep_lazy[1].name
+    assert deep_lazy[2].name == "Clara"
