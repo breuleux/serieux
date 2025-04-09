@@ -9,7 +9,7 @@ from serieux import Serieux
 examples = Path(__file__).parent / "../examples"
 
 
-example_files = [f for f in examples.glob("**.py") if not f.name.startswith("_")]
+example_files = [f for f in examples.glob("**/*.py") if not f.name.startswith("_")]
 
 
 @pytest.fixture
