@@ -9,7 +9,7 @@ from random import (
     uniform,  # noqa: F401
 )
 
-from ovld import Medley, recurse
+from ovld import Medley, ovld, recurse
 from ovld.dependent import Regexp
 
 from serieux import Serieux, deserialize
@@ -53,9 +53,11 @@ class Sampler(Medley):
     def deserialize(self, typ: type[object], obj: Regexp["^~"], ctx: Context):
         return eval(obj.lstrip("~"), globals())
 
+    @ovld(priority=-1)
     def deserialize(self, typ: type[object], obj: list, ctx: Context):
         return recurse(typ, choice(obj), ctx)
 
+    @ovld(priority=-1)
     def deserialize(self, typ: type[object], obj: list, ctx: Grid):
         return recurse(typ, ctx.get_choice(obj), ctx)
 
@@ -75,7 +77,7 @@ class Config:
 def main():
     seed(1234)
     cfg = {
-        "lr": "~exp()",
+        "lr": "~exp(1)",
         "model": ["ConvNet", "AutoEncoder", "LLM"],
         "dataset": ["MNIST", "ImageNet", "CIFAR-10"],
     }
