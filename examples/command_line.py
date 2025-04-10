@@ -1,6 +1,7 @@
 import argparse
 import sys
 from dataclasses import dataclass
+from functools import cache
 
 from ovld import Medley, recurse
 from ovld.dependent import Regexp
@@ -20,23 +21,28 @@ class CommandLineArguments:
     arguments: list[str]
 
 
+@cache
+def parser_for(t: type):
+    m = model(t)
+    parser = argparse.ArgumentParser(description=f"Arguments for {m.original_type.__name__}")
+    for field in m.fields:
+        if not field.name.startswith("_"):
+            typ = strip_all(field.type)
+            if typ not in (int, float, str, bool):
+                typ = str
+            parser.add_argument(
+                f"--{field.name}",
+                type=typ,
+                help=field.description or field.name,
+                required=field.required,
+            )
+    return parser
+
+
 @Serieux.extend
 class FromArguments(Medley):
     def deserialize(self, t: type[Modelizable], obj: CommandLineArguments, ctx: Context):
-        m = model(t)
-
-        parser = argparse.ArgumentParser(description=f"Arguments for {m.original_type.__name__}")
-        for field in m.fields:
-            if not field.name.startswith("_"):
-                typ = strip_all(field.type)
-                if typ not in (int, float, str, bool):
-                    typ = str
-                parser.add_argument(
-                    f"--{field.name}",
-                    type=typ,
-                    help=field.description or field.name,
-                    required=field.required,
-                )
+        parser = parser_for(t)
         ns = parser.parse_args(obj.arguments)
         values = {k: v for k, v in vars(ns).items() if v is not None}
         return recurse(t, values, ctx)
