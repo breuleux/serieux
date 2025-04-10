@@ -1,9 +1,60 @@
+
+== Iteration 0 ==
+{}
 Config(lr=3.3948238068746592, model='ConvNet', dataset='MNIST')
+
+== Iteration 1 ==
+{
+│   ('model',): Tracker(length=3, current=1),
+│   ('dataset',): Tracker(length=3, current=0)
+}
 Config(lr=0.581127564523488, model='AutoEncoder', dataset='MNIST')
+
+== Iteration 2 ==
+{
+│   ('model',): Tracker(length=3, current=2),
+│   ('dataset',): Tracker(length=3, current=0)
+}
 Config(lr=0.007519672058314841, model='LLM', dataset='MNIST')
+
+== Iteration 3 ==
+{
+│   ('model',): Tracker(length=3, current=0),
+│   ('dataset',): Tracker(length=3, current=1)
+}
 Config(lr=2.4188488608750407, model='ConvNet', dataset='ImageNet')
+
+== Iteration 4 ==
+{
+│   ('model',): Tracker(length=3, current=1),
+│   ('dataset',): Tracker(length=3, current=1)
+}
 Config(lr=2.8013009594734526, model='AutoEncoder', dataset='ImageNet')
+
+== Iteration 5 ==
+{
+│   ('model',): Tracker(length=3, current=2),
+│   ('dataset',): Tracker(length=3, current=1)
+}
 Config(lr=0.8728184278703051, model='LLM', dataset='ImageNet')
+
+== Iteration 6 ==
+{
+│   ('model',): Tracker(length=3, current=0),
+│   ('dataset',): Tracker(length=3, current=2)
+}
 Config(lr=1.1134117062707574, model='ConvNet', dataset='CIFAR-10')
+
+== Iteration 7 ==
+{
+│   ('model',): Tracker(length=3, current=1),
+│   ('dataset',): Tracker(length=3, current=2)
+}
 Config(lr=0.08767147863106146, model='AutoEncoder', dataset='CIFAR-10')
+
+== Iteration 8 ==
+{
+│   ('model',): Tracker(length=3, current=2),
+│   ('dataset',): Tracker(length=3, current=2)
+}
 Config(lr=1.454491546927796, model='LLM', dataset='CIFAR-10')

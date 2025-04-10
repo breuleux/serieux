@@ -1,1 +1,34 @@
-Deserialized: DebatingSociety(founder=Philosopher(name='Plato', school_of_thought='Platonism', birth_year=-428), rival_philosopher=Philosopher(name='Aristotle', school_of_thought='Team Aristotle', birth_year=-384), meeting_place='Athens', year_established=-428)
+
+== Serialized ==
+
+{
+│   'founder': {
+│   │   'name': 'Plato',
+│   │   'school_of_thought': 'Platonism',
+│   │   'birth_year': -428
+│   },
+│   'rival_philosopher': {
+│   │   'name': 'Aristotle',
+│   │   'school_of_thought': 'Team ${name}',
+│   │   'birth_year': -384
+│   },
+│   'meeting_place': 'Athens',
+│   'year_established': '${founder.birth_year}'
+}
+
+== Deserialized ==
+
+DebatingSociety(
+│   founder=Philosopher(
+│   │   name='Plato',
+│   │   school_of_thought='Platonism',
+│   │   birth_year=-428
+│   ),
+│   rival_philosopher=Philosopher(
+│   │   name='Aristotle',
+│   │   school_of_thought='Team Aristotle',
+│   │   birth_year=-384
+│   ),
+│   meeting_place='Athens',
+│   year_established=-428
+)

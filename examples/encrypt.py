@@ -3,11 +3,13 @@ import json
 from dataclasses import dataclass
 from hashlib import sha256
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet
 from ovld import Medley, call_next
 from ovld.dependent import Regexp
+from rich.pretty import pprint
 
 from serieux import Context, NewTag, Serieux, deserialize, serialize
+from serieux.exc import ValidationError
 
 ##################
 # Implementation #
@@ -55,10 +57,6 @@ class User:
     passwords: Secret[dict[str, str]]
 
 
-def show(title, value):
-    print(f"\033[1;33m{title:15}\033[0m{value}")
-
-
 autoinput = {
     "Password: ": "bonjour",
     "Enter password again: ": "bonjour",
@@ -66,14 +64,18 @@ autoinput = {
 
 
 def main(input=autoinput):
+    olivier = User(name="olivier", passwords={"google": "tobeornottobeevil", "apple": "banana"})
+
+    print("\n== Original ==\n")
+    pprint(olivier)
+
     password = input("Password: ")
     ctx = EncryptionKey(password)
 
-    olivier = User(name="olivier", passwords={"google": "tobeornottobeevil", "apple": "banana"})
-    show("Original", olivier)
-
     serial = serialize(User, olivier, ctx)
-    show("Serialized", serial)
+
+    print("\n== Serialized ==\n")
+    pprint(serial)
 
     # Our secrets are safe!
     assert "tobeornottobeevil" not in json.dumps(serial)
@@ -84,11 +86,12 @@ def main(input=autoinput):
 
     try:
         olivier2 = deserialize(User, serial, ctx)
-    except InvalidToken:
+    except ValidationError:
         print("Invalid password!")
         return
 
-    show("Deserialized", olivier2)
+    print("\n== Deserialized ==\n")
+    pprint(olivier2)
 
     assert olivier == olivier2
 

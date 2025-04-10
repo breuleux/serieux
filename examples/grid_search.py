@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from itertools import count
 from random import (
     choice,
     expovariate as exp,  # noqa: F401
@@ -11,6 +12,7 @@ from random import (
 
 from ovld import Medley, ovld, recurse
 from ovld.dependent import Regexp
+from rich.pretty import pprint
 
 from serieux import Serieux, deserialize
 from serieux.ctx import AccessPath, Context
@@ -82,8 +84,10 @@ def main():
         "dataset": ["MNIST", "ImageNet", "CIFAR-10"],
     }
     g = Grid()
-    while True:
-        print(deserialize(Config, cfg, g))
+    for i in count():
+        print(f"\n== Iteration {i} ==")
+        pprint(g.trackers)
+        pprint(deserialize(Config, cfg, g))
         if not g.advance():
             break
 

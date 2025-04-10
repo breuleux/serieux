@@ -5,6 +5,7 @@ from functools import cache
 
 from ovld import Medley, recurse
 from ovld.dependent import Regexp
+from rich.pretty import pprint
 
 from serieux import Serieux, Sources, deserialize
 from serieux.ctx import Context
@@ -83,7 +84,8 @@ class Person:
 def main(argv=["--name", "Travis", "--shirt", "#ff0010"]):
     defaults = {"name": "Guy", "age": 0, "shirt": "#ffffff"}
     overrides = {"shirt": {"blue": 128}}
-    print(deserialize(Person, Sources(defaults, CommandLineArguments(argv), overrides)))
+    person = deserialize(Person, Sources(defaults, CommandLineArguments(argv), overrides))
+    pprint(person, expand_all=True)
 
 
 if __name__ == "__main__":

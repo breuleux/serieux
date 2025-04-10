@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from ovld import Medley
 from ovld.dependent import Regexp
+from rich.pretty import pprint
 
 from serieux import Context, Serieux, deserialize, serialize
 
@@ -42,23 +43,23 @@ class RGBSerializer(Medley):
 def main():
     color = RGB(red=255, green=128, blue=0)
     serialized = serialize(RGB, color)
-    print(f"Serialized color: {serialized}")  # Should print: #ff8000
+    pprint({"original": color, "serialized": serialized}, expand_all=True)
     assert serialized == "#ff8000"
 
-    deserialized = deserialize(RGB, "#ff8000")
-    print(f"Deserialized color: {deserialized}")  # Should print: RGB(red=255, green=128, blue=0)
+    scolor = "#ff8000"
+    deserialized = deserialize(RGB, scolor)
+    pprint({"serialized": scolor, "deserialized": deserialized}, expand_all=True)
     assert deserialized == color
 
     colors = [RGB(255, 0, 0), RGB(0, 255, 0), RGB(0, 0, 255)]
     serialized_list = serialize(list[RGB], colors)
-    print(f"Serialized list: {serialized_list}")  # Should print: ["#ff0000", "#00ff00", "#0000ff"]
+    pprint({"colors": colors, "serialized": serialized_list})
     assert serialized_list == ["#ff0000", "#00ff00", "#0000ff"]
 
-    deserialized_list = deserialize(list[RGB], ["#ff0000", "#00ff00", "#0000ff"])
-    print(
-        f"Deserialized list: {deserialized_list}"
-    )  # Should print: [RGB(255,0,0), RGB(0,255,0), RGB(0,0,255)]
-    assert deserialized_list == colors, f"Expected {colors}, got {deserialized_list}"
+    scolors = ["#ff0000", "#00ff00", "#0000ff"]
+    deserialized_list = deserialize(list[RGB], scolors)
+    pprint({"serialized": scolors, "deserialized": deserialized_list})
+    assert deserialized_list == colors
 
 
 if __name__ == "__main__":

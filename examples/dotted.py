@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from pprint import pprint
 
 from ovld import Medley, call_next, ovld, recurse
+from rich.pretty import pprint
 
 from serieux import Context, Serieux, Sources, deserialize
 
@@ -60,7 +60,10 @@ def main():
         "capital.climate.hot": False,
         "capital.climate.sunny": False,
     }
+    print("\n== Serialized ==\n")
+    pprint(data)
     deser = deserialize(Country, data)
+    print("\n== Deserialized ==\n")
     pprint(deser)
     assert deser == Country(
         name="Canada",
