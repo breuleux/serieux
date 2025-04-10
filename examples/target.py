@@ -1,7 +1,7 @@
 import importlib
 from json import JSONEncoder
 
-from ovld import Medley, ovld, recurse
+from ovld import Medley, recurse
 from ovld.dependent import HasKey
 
 from serieux import Context, Serieux, deserialize
@@ -13,7 +13,6 @@ from serieux import Context, Serieux, deserialize
 
 @Serieux.extend
 class Target(Medley):
-    @ovld
     def deserialize(self, t: type[object], obj: HasKey["_target_"], ctx: Context):  # noqa
         obj = dict(obj)
         symbol = obj.pop("_target_")
