@@ -1,5 +1,7 @@
+import hashlib
 import json
 import tomllib
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -37,8 +39,38 @@ def parse_with_source(path: FileSuffix[".yaml", ".yml"]):
 
 
 class WorkingDirectory(Context):
-    origin: Path
-    directory: Path
+    directory: Path = None
+    origin: Path = None
+
+    def __post_init__(self):
+        if self.directory is None:
+            self.directory = self.origin.parent
+
+    def make_path_for(self, *, name=None, suffix=None, data=None):
+        if name is None and data is not None:
+            name = hashlib.md5(str(data).encode() if isinstance(data, str) else data).hexdigest()
+        if name is None:
+            name = str(uuid.uuid4())
+        pth = self.directory / name
+        if suffix is not None:
+            pth = pth.with_suffix(suffix)
+        return pth
+
+    def save_to_file(self, data: str | bytes, suffix=None, *, name=None, method=None):
+        dest = self.make_path_for(data=data, suffix=suffix, name=name)
+        if isinstance(data, str):
+            mode = "w"
+            encoding = "utf-8"
+        else:
+            mode = "wb"
+            encoding = None
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if method:
+            method(dest)
+        else:
+            with open(dest, mode=mode, encoding=encoding) as f:
+                f.write(data)
+        return str(dest.relative_to(self.directory))
 
 
 @dataclass
