@@ -6,10 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
-from ovld import dependent_check, ovld, recurse
+from ovld import call_next, dependent_check, ovld, recurse
 from ovld.dependent import HasKey
 
 from ..ctx import Context
+from ..exc import ValidationError
 from .partial import PartialBuilding, Sources
 
 
@@ -19,23 +20,23 @@ def FileSuffix(value: Path, *suffixes):
 
 
 @ovld
-def parse(path: FileSuffix[".toml"]):
+def parse(path: FileSuffix[".toml"]):  # type: ignore
     return tomllib.loads(path.read_text())
 
 
 @ovld
-def parse(path: FileSuffix[".json"]):
+def parse(path: FileSuffix[".json"]):  # type: ignore
     return json.loads(path.read_text())
 
 
 @ovld
-def parse(path: FileSuffix[".yaml", ".yml"]):
-    return yaml.safe_load(path.read_text())
+def parse(path: FileSuffix[".yaml", ".yml"]):  # type: ignore
+    return yaml.compose(path.read_text())
 
 
 @ovld
-def parse_with_source(path: FileSuffix[".yaml", ".yml"]):
-    return yaml.compose(path.read_text())
+def parse(path: Path):
+    raise ValidationError(f"Could not read data from file '{path}'")
 
 
 class WorkingDirectory(Context):
@@ -104,23 +105,12 @@ def ScalarNode(value: yaml.ScalarNode, tag_suffix):
     return value.tag.endswith(tag_suffix)
 
 
-class FromFileFeature(PartialBuilding):
-    @ovld(priority=1)
-    def deserialize(self, t: type[object], obj: HasKey["$include"], ctx: Context):
-        obj = dict(obj)
-        incl = recurse(str, obj.pop("$include"), ctx)
-        return recurse(t, Sources(Path(incl), obj), ctx)
-
+class FromFile(PartialBuilding):
     def deserialize(self, t: type[object], obj: Path, ctx: Context):
         if isinstance(ctx, WorkingDirectory):
             obj = ctx.directory / obj
         data = parse(obj)
         ctx = ctx + WorkingDirectory(origin=obj, directory=obj.parent)
-        try:
-            return recurse(t, data, ctx)
-        except Exception:
-            pass
-        data = parse_with_source(obj)
         return recurse(t, data, ctx)
 
     def deserialize(self, t: type[object], obj: yaml.MappingNode, ctx: Context):
@@ -129,15 +119,32 @@ class FromFileFeature(PartialBuilding):
     def deserialize(self, t: type[object], obj: yaml.SequenceNode, ctx: Context):
         return recurse(t, obj.value, ctx + YamlSourceInfo.extract(obj))
 
-    def deserialize(self, t: type[object], obj: ScalarNode[":str"], ctx: Context):
+    def deserialize(self, t: type[object], obj: ScalarNode[":str"], ctx: Context):  # type: ignore
         return recurse(t, obj.value, ctx + YamlSourceInfo.extract(obj))
 
-    def deserialize(self, t: type[object], obj: ScalarNode[":int"], ctx: Context):
+    def deserialize(self, t: type[object], obj: ScalarNode[":int"], ctx: Context):  # type: ignore
         return recurse(t, int(obj.value), ctx + YamlSourceInfo.extract(obj))
 
-    def deserialize(self, t: type[object], obj: ScalarNode[":float"], ctx: Context):
+    def deserialize(self, t: type[object], obj: ScalarNode[":float"], ctx: Context):  # type: ignore
         return recurse(t, float(obj.value), ctx + YamlSourceInfo.extract(obj))
 
 
-# Currently not a default feature
-__default_features__ = None
+class FromFileExtra(FromFile):
+    @ovld(priority=1)
+    def deserialize(self, t: type[object], obj: HasKey["$include"], ctx: Context):
+        obj = dict(obj)
+        incl = recurse(str, obj.pop("$include"), ctx)
+        return recurse(t, Sources(Path(incl), obj), ctx)
+
+    @ovld(priority=-50)
+    def deserialize(self, t: type[object], obj: str, ctx: WorkingDirectory):
+        path = Path(obj)
+        if path.exists():
+            return recurse(t, path, ctx)
+        else:
+            return call_next(t, obj, ctx)
+
+
+# Add as a default feature in serieux.Serieux
+# But we do not have FromFileExtra by default
+__default_features__ = FromFile
