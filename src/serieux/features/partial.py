@@ -104,6 +104,16 @@ def _(p: type[Partial[object]]):
 ######################
 
 
+@ovld(priority=2)
+def merge(x: object, y: ValidationError):
+    return y
+
+
+@ovld(priority=2)
+def merge(x: ValidationError, y: object):
+    return x
+
+
 @ovld(priority=1)
 def merge(x: object, y: NOT_GIVEN_T):
     return x

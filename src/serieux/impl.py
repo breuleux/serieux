@@ -2,6 +2,7 @@ import re
 from dataclasses import MISSING, field
 from datetime import date, datetime, timedelta
 from enum import Enum
+from functools import wraps
 from itertools import pairwise
 from types import NoneType, UnionType
 from typing import Any, get_args, get_origin
@@ -20,7 +21,7 @@ from ovld import (
 )
 from ovld.types import All
 
-from .ctx import Context, EmptyContext
+from .ctx import AccessPath, Context
 from .exc import ValidationError, ValidationExceptionGroup
 from .model import Modelizable, model
 from .schema import AnnotatedSchema, Schema
@@ -29,8 +30,28 @@ from .typetags import TaggedType, strip_all
 from .utils import UnionAlias, clsstring
 
 
+def code_generator_wrap_error(fn):
+    @wraps(fn)
+    def f(cls, *args, **kwargs):
+        result = fn(cls, *args, **kwargs)
+        if not result:
+            return None
+        body = result.create_body(("t", "obj", "ctx"))
+        stmts = [
+            "try:",
+            [body],
+            "except ($VE, $VEG):",
+            ["raise"],
+            "except Exception as exc:",
+            ["raise $VE(exc=exc, ctx=$ctx) from None"],
+        ]
+        return Def(stmts, VE=ValidationError, VEG=ValidationExceptionGroup)
+
+    return code_generator(f)
+
+
 class BaseImplementation(Medley):
-    default_context: Context = field(default_factory=EmptyContext)
+    default_context: Context = field(default_factory=AccessPath)
     validate_serialize: CodegenParameter[bool] = True
     validate_deserialize: CodegenParameter[bool] = True
 
@@ -242,7 +263,7 @@ class BaseImplementation(Medley):
     # Implementations: Modelizable #
     ################################
 
-    @code_generator
+    @code_generator_wrap_error
     def serialize(cls, t: type[Modelizable], obj: object, ctx: Context, /):
         (t,) = get_args(t)
         t = model(t)
@@ -274,17 +295,9 @@ class BaseImplementation(Medley):
             ],
         )
         stmts.append(final)
-        stmts = [
-            "try:",
-            stmts,
-            "except ($VE, $VEG):",
-            ["raise"],
-            "except Exception as exc:",
-            ["raise $VE(exc=exc, ctx=$ctx) from None"],
-        ]
         return Def(stmts, VE=ValidationError, VEG=ValidationExceptionGroup)
 
-    @code_generator
+    @code_generator_wrap_error
     def deserialize(cls, t: type[Modelizable], obj: dict, ctx: Context, /):
         (t,) = get_args(t)
         t = model(t)
@@ -335,17 +348,7 @@ class BaseImplementation(Medley):
             constructor=t.constructor,
             parts=[Code(a) for a in args],
         )
-
         stmts.append(final)
-
-        stmts = [
-            "try:",
-            stmts,
-            "except ($VE, $VEG):",
-            ["raise"],
-            "except Exception as exc:",
-            ["raise $VE(exc=exc, ctx=$ctx)"],
-        ]
         return Def(stmts, VE=ValidationError, VEG=ValidationExceptionGroup)
 
     def schema(self, t: type[Modelizable], ctx: Context, /):
@@ -421,11 +424,11 @@ class BaseImplementation(Medley):
     # Implementations: Enums #
     ##########################
 
-    @code_generator
+    @code_generator_wrap_error
     def serialize(self, t: type[Enum], obj: Enum, ctx: Context, /):
         return Lambda(Code("$obj.value"))
 
-    @code_generator
+    @code_generator_wrap_error
     def deserialize(self, t: type[Enum], obj: Any, ctx: Context, /):
         (t,) = get_args(t)
         return Lambda(Code("$t($obj)", t=t))
@@ -437,11 +440,11 @@ class BaseImplementation(Medley):
     # Implementations: Dates #
     ##########################
 
-    @code_generator
+    @code_generator_wrap_error
     def serialize(self, t: type[date] | type[datetime], obj: date | datetime, ctx: Context, /):
         return Lambda(Code("$obj.isoformat()"))
 
-    @code_generator
+    @code_generator_wrap_error
     def deserialize(self, t: type[date] | type[datetime], obj: str, ctx: Context, /):
         (t,) = get_args(t)
         return Lambda(Code("$t.fromisoformat($obj)", t=t))
