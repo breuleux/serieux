@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from types import NoneType
 
 import pytest
 
@@ -31,6 +32,10 @@ def test_schema_bool():
 
 def test_schema_str():
     assert schema(str) == {"type": "string"}
+
+
+def test_schema_None():
+    assert schema(NoneType) == {"type": "null"}
 
 
 def test_schema_enum():

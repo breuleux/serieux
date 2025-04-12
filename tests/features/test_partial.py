@@ -110,3 +110,10 @@ def test_multiple_errors():
         deserialize(
             list[Point], Sources([{"x": 23, "y": "crap"}, {"x": "oh", "y": "no"}]), AccessPath()
         )
+
+
+def test_multiple_errors_display(check_error_display):
+    with check_error_display():
+        deserialize(
+            list[Point], Sources([{"x": 23, "y": "crap"}, {"x": "oh", "y": "no"}]), AccessPath()
+        )

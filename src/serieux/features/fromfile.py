@@ -8,6 +8,7 @@ from pathlib import Path
 import yaml
 from ovld import call_next, dependent_check, ovld, recurse
 from ovld.dependent import HasKey
+from ovld.medley import KeepLast, use_combiner
 
 from ..ctx import Context
 from ..exc import ValidationError
@@ -47,9 +48,12 @@ class WorkingDirectory(Context):
         if self.directory is None:
             self.directory = self.origin.parent
 
-    def make_path_for(self, *, name=None, suffix=None, data=None):
-        if name is None and data is not None:
-            name = hashlib.md5(str(data).encode() if isinstance(data, str) else data).hexdigest()
+    @use_combiner(KeepLast)
+    def make_path_for(self, *, name=None, suffix=None, entropy=None):
+        if name is None and entropy is not None:
+            name = hashlib.md5(
+                str(entropy).encode() if isinstance(entropy, str) else entropy
+            ).hexdigest()
         if name is None:
             name = str(uuid.uuid4())
         pth = self.directory / name
@@ -57,18 +61,21 @@ class WorkingDirectory(Context):
             pth = pth.with_suffix(suffix)
         return pth
 
-    def save_to_file(self, data: str | bytes, suffix=None, *, name=None, method=None):
-        dest = self.make_path_for(data=data, suffix=suffix, name=name)
-        if isinstance(data, str):
-            mode = "w"
-            encoding = "utf-8"
-        else:
-            mode = "wb"
-            encoding = None
+    @use_combiner(KeepLast)
+    def save_to_file(
+        self, data: str | bytes = None, suffix=None, *, name=None, callback=None, entropy=None
+    ):
+        dest = self.make_path_for(entropy=entropy or data, suffix=suffix, name=name)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        if method:
-            method(dest)
+        if callback:
+            callback(dest)
         else:
+            if isinstance(data, str):
+                mode = "w"
+                encoding = "utf-8"
+            else:
+                mode = "wb"
+                encoding = None
             with open(dest, mode=mode, encoding=encoding) as f:
                 f.write(data)
         return str(dest.relative_to(self.directory))
@@ -138,7 +145,7 @@ class FromFileExtra(FromFile):
 
     @ovld(priority=-50)
     def deserialize(self, t: type[object], obj: str, ctx: WorkingDirectory):
-        path = Path(obj)
+        path = ctx.directory / obj
         if path.exists():
             return recurse(t, path, ctx)
         else:

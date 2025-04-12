@@ -74,7 +74,7 @@ class Pig:
 class Defaults:
     name: str
     aliases: list[str] = field(default_factory=list)
-    cool: bool = False
+    cool: bool = field(default=False, kw_only=True)
 
 
 @contextmanager

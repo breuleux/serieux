@@ -31,13 +31,13 @@ def context_string(
         while start < 0 or not lines[start].strip():
             start += 1
         end = l2 + source_context
-        while end >= len(lines) or not lines[end].strip():
+        while end >= len(lines) or not lines[end].strip():  # pragma: no cover
             end -= 1
 
         return_lines.append(f"{'':{indent}}@ {ctx.origin}:{l1 + 1}")
         for li in range(start, end + 1):
             line = lines[li]
-            if li == l2 and not line.strip():
+            if li == l2 and not line.strip():  # pragma: no cover
                 break
             if li == l1 + ellipsis_cutoff and li < l2:
                 return_lines.append(f"{'':{n}}  ...")
@@ -66,7 +66,7 @@ def display_context(*args, file=sys.stdout, **kwargs):
 
 
 class ValidationExceptionGroup(ExceptionGroup):
-    def derive(self, excs):
+    def derive(self, excs):  # pragma: no cover
         return ValidationExceptionGroup(self.message, excs)
 
     def display(self, file=sys.stderr):

@@ -1,0 +1,13 @@
+[countries.canada]
+languages = ["English", "French"]
+capital = "Ottawa"
+population = 39000000
+citizens = [
+  { name = "Olivier", birthyear = 1985, hometown = "Montreal" },
+  { name = "Abraham", birthyear = 2018, hometown = "Shawinigan" }
+] 
+
+[countries.france]
+"$include" = "france.yaml"
+population = 68000000
+capital = "Paris" 

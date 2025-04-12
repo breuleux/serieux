@@ -1,15 +1,18 @@
+import json
 from typing import get_args
 
 from ovld import ovld, recurse, subclasscheck
 
+from serieux import deserialize, schema, serialize
 from serieux.model import Model
-from serieux.typetags import TaggedType, make_tag, pushdown
+from serieux.typetags import NewTag, TaggedType, pushdown
 from tests.common import Point, one_test_per_assert
 
-Apple = make_tag(name="Apple", priority=1)
-Banana = make_tag(name="Banana", priority=2)
-Carrot = make_tag(name="Carrot", priority=3)
-Dog = make_tag(name="Dog", priority=4, inherit=False)
+Apple = NewTag["Apple", 1]
+Banana = NewTag["Banana", 2]
+Carrot = NewTag["Carrot", 3]
+Dog = NewTag["Dog", 4, False]
+Useless = NewTag["Useless", 1, True]
 
 
 def test_typetag_idempotent():
@@ -109,3 +112,11 @@ def test_with_ovld():
     assert pie(Apple[Banana[list[int]]], [1, 2, 3]) == [2, 4, 6]
 
     assert pie(Carrot[list[int]], [1, 2, 3]) == "carrot"
+
+
+def test_ser_deser_ignores_them():
+    assert serialize(Useless[list[Point]], [Point(1, 2)]) == [{"x": 1, "y": 2}]
+    assert deserialize(Useless[list[Point]], [{"x": 1, "y": 2}]) == [Point(1, 2)]
+    s1 = json.dumps(schema(Useless[list[Point]]))
+    s2 = json.dumps(schema(list[Point]))
+    assert s1 == s2

@@ -1,6 +1,6 @@
 from functools import cached_property
 
-from ovld import Medley, call_next, ovld
+from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
 from ..typetags import NewTag
@@ -22,13 +22,23 @@ DeepLazy = NewTag["DeepLazy", 1]
 class LazyProxy:
     def __init__(self, evaluate):
         self._evaluate = evaluate
+        self._computing = False
 
     @cached_property
     def _obj(self):
-        return self._evaluate()
+        if self._computing:
+            raise Exception("Deadlock: asked for a value during its computation.")
+        self._computing = True
+        try:
+            rval = self._evaluate()
+            if isinstance(rval, LazyProxy):  # pragma: no cover
+                return rval._obj
+        finally:
+            self._computing = False
+        return rval
 
     def __getattribute__(self, name):
-        if name in ("_obj", "_evaluate", "__dict__"):
+        if name in ("_obj", "_computing", "_evaluate", "__dict__"):
             return object.__getattribute__(self, name)
         return getattr(self._obj, name)
 
@@ -130,6 +140,10 @@ class LazyDeserialization(Medley):
             return call_next(typ, value, ctx)
 
         return LazyProxy(evaluate)
+
+    @ovld
+    def deserialize(self, typ: type[object], value: LazyProxy, ctx: Context):
+        return recurse(typ, value._obj, ctx)
 
 
 # Add as a default feature in serieux.Serieux

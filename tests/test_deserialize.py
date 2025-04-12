@@ -1,4 +1,5 @@
 import sys
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -56,6 +57,17 @@ def test_deserialize_union():
     assert deserialize(str | int, 3) == 3
     assert deserialize(str | int, "wow") == "wow"
     assert deserialize(Point | int, 3) == 3
+
+
+@dataclass
+class Poink:
+    x: int
+    y: int
+
+
+def test_cannot_deserialize_undistinguishable():
+    with pytest.raises(Exception, match="Cannot differentiate"):
+        deserialize(Point | Poink, {"x": 1, "y": 2})
 
 
 @has_312_features
@@ -151,6 +163,12 @@ def test_deserialize_timedelta():
         timedelta(seconds=30),
         timedelta(days=5),
     ]
+    with pytest.raises(ValidationError, match="must end with a unit"):
+        deserialize(timedelta, "1d3")
+    with pytest.raises(ValidationError, match="is not a valid timedelta unit"):
+        deserialize(timedelta, "1d3x")
+    with pytest.raises(ValidationError, match="Could not convert"):
+        deserialize(timedelta, "1.5.4d")
 
 
 ###############

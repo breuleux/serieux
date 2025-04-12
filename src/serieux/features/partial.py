@@ -143,14 +143,14 @@ def merge(x: PartialBase, y: PartialBase):
 @ovld
 def merge(x: PartialBase, y: object):
     if x._constructor is not type(y):
-        raise ValidationError("Incompatible constructors.")
+        raise ValidationError("Cannot merge sources because of incompatible constructors.")
     return recurse(x, type(x)(**vars(y)))
 
 
 @ovld
 def merge(x: object, y: PartialBase):
     if y._constructor is not type(x):
-        raise ValidationError("Incompatible constructors.")
+        raise ValidationError("Cannot merge sources because of incompatible constructors.")
     return recurse(type(y)(**vars(x)), y)
 
 

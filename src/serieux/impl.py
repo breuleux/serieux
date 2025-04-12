@@ -138,6 +138,12 @@ class BaseImplementation(Medley):
 
     @ovld(priority=-100)
     def deserialize(self, t: type[object], obj: object, ctx: Context, /):
+        try:
+            # Pass through if the object happens to already be the right type
+            if isinstance(obj, t):
+                return obj
+        except TypeError:  # pragma: no cover
+            pass
         raise ValidationError(
             f"Cannot deserialize object of type '{clsstring(type(obj))}'"
             f" into expected type '{clsstring(t)}'.",
@@ -147,9 +153,6 @@ class BaseImplementation(Medley):
     @ovld(priority=-1)
     def deserialize(self, t: type[TaggedType], obj: object, ctx: Context, /):
         return recurse(t.pushdown(), obj, ctx)
-
-    def deserialize(self, obj: object, /):
-        return recurse(object, obj, self.default_context)
 
     def deserialize(self, t: type[object], obj: object, /):
         return recurse(t, obj, self.default_context)
@@ -169,6 +172,10 @@ class BaseImplementation(Medley):
 
     def schema(self, t: type[object], /):
         return recurse(t, self.default_context)
+
+    @ovld(priority=-1)
+    def schema(self, t: type[TaggedType], ctx: Context, /):
+        return recurse(t.pushdown(), ctx)
 
     ################################
     # Implementations: basic types #
@@ -399,7 +406,7 @@ class BaseImplementation(Medley):
             tl2 -= inter
 
         if sum(not tl for tl in tells) > 1:
-            raise Exception("Cannot differentiate the possible union members.")
+            raise Exception(f"Cannot differentiate the possible union members in type '{t}'")
 
         options = list(zip(tells, options))
         options.sort(key=lambda x: len(x[0]))
@@ -484,16 +491,16 @@ class BaseImplementation(Medley):
         kw = {}
         parts = re.split(string=obj, pattern="([a-z ]+)")
         if parts[-1] != "":
-            raise TypeError("timedelta representation must end with a unit")
+            raise ValidationError("timedelta representation must end with a unit", ctx=ctx)
         for i in range(len(parts) // 2):
             n = parts[i * 2]
             unit = parts[i * 2 + 1].strip()
             if unit not in units:
-                raise TypeError(f"'{unit}' is not a valid timedelta unit")
+                raise ValidationError(f"'{unit}' is not a valid timedelta unit", ctx=ctx)
             try:
                 kw[units[unit]] = float(n)
-            except ValueError as err:
-                raise TypeError(f"Could not convert '{n}' ({units[unit]}) to float") from err
+            except ValueError:
+                raise ValidationError(f"Could not convert '{n}' ({units[unit]}) to float", ctx=ctx)
         return sign * timedelta(**kw)
 
     def schema(self, t: type[timedelta], ctx: Context, /):
