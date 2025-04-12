@@ -4,12 +4,21 @@ from datetime import date, datetime, timedelta
 import pytest
 
 from serieux import schema as _schema
+from serieux.schema import Schema
 
 from .common import Color, Defaults, Pig, Point, has_312_features
 
 
 def schema(t, root=False, ref_policy="norepeat"):
     return _schema(t).compile(root=root, ref_policy=ref_policy)
+
+
+def test_schema_hashable():
+    sch1 = Schema(int)
+    sch2 = Schema(int)
+    assert sch1 == sch1
+    assert not (sch1 == sch2)
+    assert {sch1: 1, sch2: 2} == {sch1: 1, sch2: 2}
 
 
 def test_schema_int():
@@ -131,6 +140,67 @@ def test_schema_recursive_policy_always():
                 },
                 "required": ["left", "right"],
             }
+        },
+    }
+
+
+@has_312_features
+def test_schema_recursive_policy_two_trees():
+    from .definitions_py312 import Tree
+
+    @dataclass
+    class DoubleTree:
+        it: Tree[int]
+        st: Tree[str]
+
+    assert schema(DoubleTree, root=True, ref_policy="always") == {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$ref": "#/$defs/DoubleTree",
+        "$defs": {
+            "DoubleTree": {
+                "type": "object",
+                "properties": {
+                    "it": {"$ref": "#/$defs/Tree"},
+                    "st": {"$ref": "#/$defs/Tree2"},
+                },
+                "required": ["it", "st"],
+            },
+            "Tree": {
+                "type": "object",
+                "properties": {
+                    "left": {
+                        "oneOf": [
+                            {"$ref": "#/$defs/Tree"},
+                            {"type": "integer"},
+                        ]
+                    },
+                    "right": {
+                        "oneOf": [
+                            {"$ref": "#/$defs/Tree"},
+                            {"type": "integer"},
+                        ]
+                    },
+                },
+                "required": ["left", "right"],
+            },
+            "Tree2": {
+                "type": "object",
+                "properties": {
+                    "left": {
+                        "oneOf": [
+                            {"$ref": "#/$defs/Tree2"},
+                            {"type": "string"},
+                        ]
+                    },
+                    "right": {
+                        "oneOf": [
+                            {"$ref": "#/$defs/Tree2"},
+                            {"type": "string"},
+                        ]
+                    },
+                },
+                "required": ["left", "right"],
+            },
         },
     }
 

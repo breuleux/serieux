@@ -8,8 +8,7 @@ class Context(Medley):
 
 
 class EmptyContext(Context):
-    def __add__(self, other):
-        return other
+    pass
 
 
 class AccessPath(Context):

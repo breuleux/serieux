@@ -26,7 +26,7 @@ def clsstring(cls):
         r = repr(cls)
         if r.startswith("<class "):
             return cls.__name__
-        else:
+        else:  # pragma: no cover
             return r
 
 
@@ -69,13 +69,13 @@ def evaluate_hint(typ, ctx=None, lcl=None, typesub=None):
     elif isinstance(typ, type):
         return typ
 
-    else:
+    else:  # pragma: no cover
         raise TypeError("Cannot evaluate hint:", typ, type(typ))
 
 
 def _json_type_check(t, bound=object):
     origin = get_origin(t)
-    if t is typing.Union:
+    if origin is typing.Union or origin is UnionType:
         return all(_json_type_check(t2) for t2 in get_args(t))
     if not isinstance(origin or t, type) or not issubclass(origin or t, bound):
         return False

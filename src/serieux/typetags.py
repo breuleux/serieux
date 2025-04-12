@@ -74,10 +74,6 @@ class TaggedType(type):
     def pushdown(self):
         return pushdown(self)
 
-    @classmethod
-    def transfer(self, t):
-        return self[t]
-
 
 def pushdown(cls):
     if not isinstance(cls, type) or not issubclass(cls, TaggedType):

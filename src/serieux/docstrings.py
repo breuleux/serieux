@@ -63,7 +63,7 @@ class AttributeVisitor(ast.NodeVisitor):
             self.add_data(node, "VARIABLE", f"{self.prefix}{node.name}")
         self.visit_body(node.name, node.body)
 
-    def visit_Assign(self, node):
+    def visit_Assign(self, node):  # pragma: no cover
         self.generic_visit(node, may_assign=True)
 
     def visit_AnnAssign(self, node):
