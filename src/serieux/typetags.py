@@ -3,10 +3,10 @@ from functools import cache
 from types import UnionType
 from typing import Union, get_args, get_origin
 
-from ovld import recurse, subclasscheck
+from ovld import subclasscheck
 from ovld.mro import Order
 
-from .model import Model, model
+from .model import Model
 
 
 @dataclass(frozen=True)
@@ -101,8 +101,3 @@ def strip_all(cls):
     if isinstance(cls, type) and issubclass(cls, TaggedType):
         return cls.strip(cls)
     return cls
-
-
-@model.register
-def model(t: type[TaggedType]):
-    return t[recurse(t._cls)]

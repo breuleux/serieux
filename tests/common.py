@@ -4,77 +4,12 @@ import sys
 import traceback
 from ast import NodeTransformer
 from contextlib import contextmanager
-from dataclasses import dataclass, field
-from enum import Enum
 from textwrap import dedent
 
 import pytest
 from _pytest.assertion.rewrite import AssertionRewriter
 
 from serieux.exc import ValidationExceptionGroup
-
-
-@dataclass
-class Citizen:
-    name: str
-    birthyear: int
-    hometown: str
-
-
-@dataclass
-class Country:
-    languages: list[str]
-    capital: str
-    population: int
-    citizens: list[Citizen]
-
-
-@dataclass
-class World:
-    countries: dict[str, Country]
-
-
-@dataclass
-class Point:
-    x: int
-    y: int
-
-
-@dataclass
-class Point3D(Point):
-    z: int
-
-
-class Color(Enum):
-    RED = "red"
-    GREEN = "green"
-    BLUE = "blue"
-
-
-class Level(Enum):
-    HI = 2
-    MED = 1
-    LO = 0
-
-
-@dataclass
-class Pig:
-    # How pink the pig is
-    pinkness: float
-
-    weight: float
-    """Weight of the pig, in kilograms"""
-
-    # Is the pig...
-    # truly...
-    beautiful: bool = True  # ...beautiful?
-
-
-@dataclass
-class Defaults:
-    name: str
-    aliases: list[str] = field(default_factory=list)
-    cool: bool = field(default=False, kw_only=True)
 
 
 @contextmanager

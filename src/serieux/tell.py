@@ -1,9 +1,8 @@
-from dataclasses import dataclass, fields
-from typing import get_origin
+from dataclasses import dataclass
 
-from ovld import Code, Dataclass, ovld, recurse
+from ovld import Code, ovld, recurse
 
-from .model import Model
+from .model import Modelizable, model
 from .typetags import TaggedType
 
 
@@ -40,17 +39,11 @@ def tells(typ: type[int] | type[str] | type[bool] | type[float] | type[list] | t
 
 
 @ovld
-def tells(dc: type[Dataclass]):  # pragma: no cover
-    # Usually goes through Model
-    dc = get_origin(dc) or dc
-    return {TypeTell(dict)} | {KeyTell(f.name) for f in fields(dc)}
-
-
-@ovld
-def tells(m: type[Model]):
+def tells(typ: type[Modelizable]):
+    m = model(typ)
     return {TypeTell(dict)} | {KeyTell(f.serialized_name) for f in m.fields}
 
 
-@ovld
+@ovld(priority=-1)
 def tells(m: type[TaggedType]):
     return recurse(m.pushdown())

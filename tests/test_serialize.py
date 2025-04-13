@@ -8,7 +8,8 @@ from serieux import Serieux, serialize
 from serieux.ctx import AccessPath, Context
 from serieux.exc import ValidationError
 
-from .common import Color, Level, Point, has_312_features, one_test_per_assert
+from .common import has_312_features, one_test_per_assert
+from .definitions import Color, Level, Point
 
 
 @one_test_per_assert

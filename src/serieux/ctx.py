@@ -1,9 +1,9 @@
 from dataclasses import replace
 
-from ovld.medley import ChainAll, Medley
+from ovld.medley import ChainAll, KeepLast, Medley
 
 
-class Context(Medley):
+class Context(Medley, default_combiner=KeepLast):
     follow = ChainAll()
 
 

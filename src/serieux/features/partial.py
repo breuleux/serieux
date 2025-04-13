@@ -82,6 +82,7 @@ class PartialBuilding(Medley):
         except ValidationError as exc:
             return exc
 
+    @ovld(priority=1)
     def deserialize(self, t: type[object], obj: Sources, ctx: Context, /):
         parts = [recurse(Partial[t], src, ctx) for src in obj.sources]
         rval = instantiate(reduce(merge, parts))
@@ -131,7 +132,10 @@ def merge(x: NOT_GIVEN_T, y: NOT_GIVEN_T):
 
 @ovld
 def merge(x: PartialBase, y: PartialBase):
-    assert x._constructor is y._constructor
+    if (xc := x._constructor) is not (yc := y._constructor):
+        raise ValidationError(
+            f"Cannot merge sources because of incompatible constructors: '{xc}', '{yc}'"
+        )
     args = {}
     for f in fields(type(x)):
         xv = getattr(x, f.name)
@@ -142,15 +146,19 @@ def merge(x: PartialBase, y: PartialBase):
 
 @ovld
 def merge(x: PartialBase, y: object):
-    if x._constructor is not type(y):
-        raise ValidationError("Cannot merge sources because of incompatible constructors.")
+    if (xc := x._constructor) is not type(y):
+        raise ValidationError(
+            f"Cannot merge sources because of incompatible constructors: '{xc}', '{type(y)}'."
+        )
     return recurse(x, type(x)(**vars(y)))
 
 
 @ovld
 def merge(x: object, y: PartialBase):
-    if y._constructor is not type(x):
-        raise ValidationError("Cannot merge sources because of incompatible constructors.")
+    if (yc := y._constructor) is not type(x):
+        raise ValidationError(
+            f"Cannot merge sources because of incompatible constructors: '{type(x)}', '{yc}'."
+        )
     return recurse(type(y)(**vars(x)), y)
 
 

@@ -7,7 +7,8 @@ import pytest
 from serieux import schema as _schema
 from serieux.schema import Schema
 
-from .common import Color, Defaults, Pig, Point, has_312_features
+from .common import has_312_features
+from .definitions import Color, Defaults, Pig, Point
 
 
 def schema(t, root=False, ref_policy="norepeat"):

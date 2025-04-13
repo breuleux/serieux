@@ -6,7 +6,9 @@ from serieux import Serieux
 from serieux.ctx import AccessPath
 from serieux.exc import ValidationError
 from serieux.features.partial import Partial, PartialBuilding, Sources
-from tests.common import Point, validation_errors
+
+from ..common import validation_errors
+from ..definitions import Player, Point
 
 deserialize = (Serieux + PartialBuilding)().deserialize
 
@@ -42,6 +44,24 @@ def test_complicated_partial():
         ),
     )
     assert d == {"a": Point(3, 2), "b": "wow"}
+
+
+def test_partial_incompatibility():
+    with pytest.raises(ValidationError, match="incompatible constructors"):
+        deserialize(
+            Point | Player,
+            Sources({"x": 1, "y": 2}, {"first": "Joan", "last": "Ark", "batting": 0.7}),
+        )
+
+
+def test_partial_incompatibility_2():
+    with pytest.raises(ValidationError, match="incompatible constructors"):
+        deserialize(Point | str, Sources({"x": 1, "y": 2}, "waa"))
+
+
+def test_partial_incompatibility_3():
+    with pytest.raises(ValidationError, match="incompatible constructors"):
+        deserialize(Point | str, Sources("waa", {"x": 1, "y": 2}))
 
 
 @dataclass

@@ -163,7 +163,6 @@ class BaseImplementation(Medley):
 
     @ovld(priority=1000)
     def schema(self, t: type[object], ctx: Context, /):
-        t = model(t)
         if t not in self._schema_cache:
             self._schema_cache[t] = holder = Schema(t)
             result = call_next(t, ctx)
@@ -399,7 +398,7 @@ class BaseImplementation(Medley):
     def deserialize(cls, t: type[UnionAlias] | type[UnionType], obj: Any, ctx: Context, /):
         (t,) = get_args(t)
         options = get_args(t)
-        tells = [get_tells(model(o)) for o in options]
+        tells = [get_tells(o) for o in options]
         for tl1, tl2 in pairwise(tells):
             inter = tl1 & tl2
             tl1 -= inter

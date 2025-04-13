@@ -4,7 +4,8 @@ from typing import TypeVar, Union
 
 from serieux.utils import JSONType, evaluate_hint as eh
 
-from .common import Point, has_312_features, one_test_per_assert
+from .common import has_312_features, one_test_per_assert
+from .definitions import Point
 
 T1 = TypeVar("T1")
 T2 = TypeVar("T2")

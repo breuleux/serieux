@@ -1,11 +1,10 @@
 from dataclasses import MISSING, dataclass, fields
-from types import UnionType
-from typing import Callable, Union, get_args, get_origin
+from typing import Callable, get_args, get_origin
 
-from ovld import Dataclass, call_next, class_check, ovld, recurse
+from ovld import Dataclass, call_next, class_check, ovld
 
 from .docstrings import get_attribute_docstrings
-from .utils import UnionAlias, evaluate_hint
+from .utils import evaluate_hint
 
 UNDEFINED = object()
 
@@ -131,12 +130,5 @@ def model(dc: type[Dataclass]):
 
 
 @ovld
-def model(u: type[UnionAlias] | type[UnionType]):
-    return Union[tuple(recurse(evaluate_hint(t)) for t in get_args(u))]
-
-
-@ovld
-def model(t: type[object]):
-    if (origin := get_origin(t)) is not None:
-        return origin[tuple(recurse(evaluate_hint(a)) for a in get_args(t))]
-    return t
+def model(t: object):
+    return None

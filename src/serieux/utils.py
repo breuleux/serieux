@@ -13,7 +13,13 @@ from typing import (
 
 from ovld import parametrized_class_check
 
-UnionAlias = type(Union[int, str])
+
+@parametrized_class_check
+def _UnionAlias(cls, whatever):
+    return get_origin(cls) in (Union, UnionType)
+
+
+UnionAlias = _UnionAlias[None]
 
 
 def clsstring(cls):

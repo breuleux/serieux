@@ -8,7 +8,7 @@ from pathlib import Path
 import yaml
 from ovld import call_next, dependent_check, ovld, recurse
 from ovld.dependent import HasKey
-from ovld.medley import KeepLast, use_combiner
+from ovld.medley import KeepLast
 
 from ..ctx import Context
 from ..exc import ValidationError
@@ -48,7 +48,6 @@ class WorkingDirectory(Context):
         if self.directory is None:
             self.directory = self.origin.parent
 
-    @use_combiner(KeepLast)
     def make_path_for(self, *, name=None, suffix=None, entropy=None):
         if name is None and entropy is not None:
             name = hashlib.md5(
@@ -61,7 +60,6 @@ class WorkingDirectory(Context):
             pth = pth.with_suffix(suffix)
         return pth
 
-    @use_combiner(KeepLast)
     def save_to_file(
         self, data: str | bytes = None, suffix=None, *, name=None, callback=None, entropy=None
     ):

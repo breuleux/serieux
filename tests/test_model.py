@@ -2,8 +2,8 @@ from numbers import Number
 
 from serieux.model import model
 
-from .common import Pig, Point, has_312_features
-from .definitions import Tree
+from .common import has_312_features
+from .definitions import Pig, Point, Tree
 
 
 def test_model_cached():
@@ -16,7 +16,7 @@ def test_model_recursive():
     tm = model(Tree)
     fleft = tm.fields[0]
     assert fleft.name == "left"
-    assert model(fleft.type) == tm | Number
+    assert fleft.type == Tree | Number
 
 
 @has_312_features
@@ -26,15 +26,11 @@ def test_model_recursive_parametric():
     tm = model(Tree[int])
     fleft = tm.fields[0]
     assert fleft.name == "left"
-    assert model(fleft.type) == tm | int
+    assert fleft.type == Tree[int] | int
 
 
 def test_model_default():
-    assert model(int) is int
-
-
-def test_model_idempotent():
-    assert model(model(int)) is model(int)
+    assert model(int) is None
 
 
 def test_field_descriptions():

@@ -6,7 +6,9 @@ from ovld import ovld, recurse, subclasscheck
 from serieux import deserialize, schema, serialize
 from serieux.model import Model
 from serieux.typetags import NewTag, TaggedType, pushdown
-from tests.common import Point, one_test_per_assert
+from tests.common import one_test_per_assert
+
+from .definitions import Point
 
 Apple = NewTag["Apple", 1]
 Banana = NewTag["Banana", 2]
@@ -63,11 +65,6 @@ def test_pushdown_model():
     tp = t.pushdown()
     assert tp.fields[0].type is Apple[int]
     assert tp.fields[1].type is Apple[int]
-
-
-def test_on_model():
-    t = Model[Apple[Point]]
-    assert t._cls is Model[Point]
 
 
 @ovld

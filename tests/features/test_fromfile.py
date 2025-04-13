@@ -1,7 +1,6 @@
 import json
 import os
 import tomllib
-from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -12,7 +11,7 @@ from serieux.exc import ValidationError
 from serieux.features.fromfile import FromFileExtra, WorkingDirectory
 from serieux.features.partial import Sources
 
-from ..common import Citizen, Country, World
+from ..definitions import Citizen, Country, Player, Team, World
 
 deserialize = (Serieux + FromFileExtra)().deserialize
 
@@ -122,19 +121,6 @@ def test_deserialize_toml():
 def test_deserialize_missing_file():
     with pytest.raises(ValidationError, match="Could not read data"):
         deserialize(World, datapath / "missing.yaml")
-
-
-@dataclass
-class Player:
-    first: str
-    last: str
-    batting: float
-
-
-@dataclass
-class Team:
-    name: str
-    players: list[Player]
 
 
 def test_deserialize_read_direct():
