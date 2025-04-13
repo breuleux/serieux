@@ -5,15 +5,15 @@ from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
 from ..exc import ValidationError, ValidationExceptionGroup
+from ..instructions import NewInstruction
 from ..model import Model, Modelizable, model
-from ..typetags import NewTag
 
 #############
 # Constants #
 #############
 
 
-Partial = NewTag["Partial"]
+Partial = NewInstruction["Partial"]
 
 
 class NOT_GIVEN_T:

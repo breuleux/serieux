@@ -3,15 +3,15 @@ from functools import cached_property
 from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
-from ..typetags import NewTag
+from ..instructions import NewInstruction
 
 #############
 # Constants #
 #############
 
 
-Lazy = NewTag["Lazy", 1, False]
-DeepLazy = NewTag["DeepLazy", 1]
+Lazy = NewInstruction["Lazy", 1, False]
+DeepLazy = NewInstruction["DeepLazy", 1]
 
 
 ###########

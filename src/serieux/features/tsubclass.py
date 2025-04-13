@@ -4,13 +4,13 @@ from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
 from ..exc import ValidationError
-from ..typetags import NewTag
+from ..instructions import NewInstruction
 
 #############
 # Constants #
 #############
 
-TaggedSubclass = NewTag["TaggedSubclass"]
+TaggedSubclass = NewInstruction["TaggedSubclass"]
 
 
 ###################

@@ -9,8 +9,8 @@ from rich.pretty import pprint
 
 from serieux import Serieux, Sources, deserialize
 from serieux.ctx import Context
+from serieux.instructions import strip_all
 from serieux.model import Modelizable, model
-from serieux.typetags import strip_all
 
 ##################
 # Implementation #

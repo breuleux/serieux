@@ -7,7 +7,7 @@ from .exc import ValidationError, ValidationExceptionGroup
 from .features.lazy import DeepLazy, Lazy, LazyProxy
 from .features.partial import Sources
 from .impl import BaseImplementation
-from .typetags import NewTag, TaggedType
+from .instructions import InstructionType, NewInstruction
 from .version import version as __version__
 
 
@@ -59,12 +59,14 @@ serieux = Serieux()
 serialize = serieux.serialize
 deserialize = serieux.deserialize
 schema = serieux.schema
+load = serieux.load
+dump = serieux.dump
 
 
 __all__ = [
     "Context",
-    "NewTag",
-    "TaggedType",
+    "NewInstruction",
+    "InstructionType",
     "BaseImplementation",
     "serialize",
     "deserialize",

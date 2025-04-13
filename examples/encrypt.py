@@ -8,7 +8,7 @@ from ovld import Medley, call_next
 from ovld.dependent import Regexp
 from rich.pretty import pprint
 
-from serieux import Context, NewTag, Serieux, deserialize, serialize
+from serieux import Context, NewInstruction, Serieux, deserialize, serialize
 from serieux.exc import ValidationError
 
 ##################
@@ -16,7 +16,7 @@ from serieux.exc import ValidationError
 ##################
 
 
-Secret = NewTag["Secret"]
+Secret = NewInstruction["Secret"]
 
 
 class EncryptionKey(Context):

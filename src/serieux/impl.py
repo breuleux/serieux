@@ -23,10 +23,10 @@ from ovld.types import All
 
 from .ctx import AccessPath, Context
 from .exc import ValidationError, ValidationExceptionGroup
+from .instructions import InstructionType, strip_all
 from .model import Modelizable, model
 from .schema import AnnotatedSchema, Schema
 from .tell import tells as get_tells
-from .typetags import TaggedType, strip_all
 from .utils import UnionAlias, clsstring
 
 
@@ -121,7 +121,7 @@ class BaseImplementation(Medley):
         )
 
     @ovld(priority=-1)
-    def serialize(self, t: type[TaggedType], obj: object, ctx: Context, /):
+    def serialize(self, t: type[InstructionType], obj: object, ctx: Context, /):
         return recurse(t.pushdown(), obj, ctx)
 
     def serialize(self, obj: object, /):
@@ -151,7 +151,7 @@ class BaseImplementation(Medley):
         )
 
     @ovld(priority=-1)
-    def deserialize(self, t: type[TaggedType], obj: object, ctx: Context, /):
+    def deserialize(self, t: type[InstructionType], obj: object, ctx: Context, /):
         return recurse(t.pushdown(), obj, ctx)
 
     def deserialize(self, t: type[object], obj: object, /):
@@ -173,7 +173,7 @@ class BaseImplementation(Medley):
         return recurse(t, self.default_context)
 
     @ovld(priority=-1)
-    def schema(self, t: type[TaggedType], ctx: Context, /):
+    def schema(self, t: type[InstructionType], ctx: Context, /):
         return recurse(t.pushdown(), ctx)
 
     ################################

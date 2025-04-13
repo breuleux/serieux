@@ -4,17 +4,17 @@ from typing import get_args
 from ovld import ovld, recurse, subclasscheck
 
 from serieux import deserialize, schema, serialize
+from serieux.instructions import InstructionType, NewInstruction, pushdown
 from serieux.model import Model
-from serieux.typetags import NewTag, TaggedType, pushdown
 from tests.common import one_test_per_assert
 
 from .definitions import Point
 
-Apple = NewTag["Apple", 1]
-Banana = NewTag["Banana", 2]
-Carrot = NewTag["Carrot", 3]
-Dog = NewTag["Dog", 4, False]
-Useless = NewTag["Useless", 1, True]
+Apple = NewInstruction["Apple", 1]
+Banana = NewInstruction["Banana", 2]
+Carrot = NewInstruction["Carrot", 3]
+Dog = NewInstruction["Dog", 4, False]
+Useless = NewInstruction["Useless", 1, True]
 
 
 def test_typetag_idempotent():
@@ -68,7 +68,7 @@ def test_pushdown_model():
 
 
 @ovld
-def pie(typ: type[TaggedType], xs):
+def pie(typ: type[InstructionType], xs):
     return recurse(typ.pushdown(), xs)
 
 

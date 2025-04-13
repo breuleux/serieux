@@ -2,8 +2,8 @@ from dataclasses import dataclass
 
 from ovld import Code, ovld, recurse
 
+from .instructions import InstructionType
 from .model import Modelizable, model
-from .typetags import TaggedType
 
 
 class Tell:
@@ -45,5 +45,5 @@ def tells(typ: type[Modelizable]):
 
 
 @ovld(priority=-1)
-def tells(m: type[TaggedType]):
+def tells(m: type[InstructionType]):
     return recurse(m.pushdown())
