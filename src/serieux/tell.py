@@ -33,6 +33,23 @@ class KeyTell(Tell):
         return 2
 
 
+@dataclass(frozen=True)
+class KeyValueTell(Tell):
+    key: str
+    value: object
+
+    def gen(self, arg):
+        return Code(
+            "(isinstance($arg, dict) and $k in $arg and $arg[$k] == $v)",
+            arg=arg,
+            k=self.key,
+            v=self.value,
+        )
+
+    def cost(self):
+        return 3
+
+
 @ovld
 def tells(typ: type[int] | type[str] | type[bool] | type[float] | type[list] | type[dict]):
     return {TypeTell(typ)}
