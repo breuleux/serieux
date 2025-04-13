@@ -1,5 +1,6 @@
 import importlib
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .ctx import Context
 from .exc import ValidationError, ValidationExceptionGroup
@@ -27,8 +28,31 @@ def _default_features():
 default_features = _default_features()
 
 
-class Serieux(BaseImplementation, *default_features):
-    pass
+if TYPE_CHECKING:
+    from typing import TypeVar
+
+    from .schema import Schema
+
+    T = TypeVar("T")
+
+    JSON = list["JSON"] | dict[str, "JSON"] | int | str | float | bool | None
+
+    class _MC:
+        def __add__(self, other) -> type["Serieux"]: ...
+
+    class Serieux(metaclass=_MC):
+        def serialize(self, t: type[T], obj: object, ctx: Context = None) -> JSON: ...
+
+        def deserialize(self, t: type[T], obj: object, ctx: Context = None) -> T: ...
+
+        def schema(self, t: type[T], ctx: Context = None) -> Schema[str, "JSON"]: ...
+
+        def __add__(self, other) -> "Serieux": ...
+
+else:
+
+    class Serieux(BaseImplementation, *default_features):
+        pass
 
 
 serieux = Serieux()
