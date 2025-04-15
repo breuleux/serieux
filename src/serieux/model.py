@@ -1,4 +1,4 @@
-from dataclasses import MISSING, dataclass, fields, replace
+from dataclasses import MISSING, dataclass, field, fields, replace
 from typing import Callable, get_args, get_origin
 
 from ovld import Dataclass, call_next, class_check, ovld
@@ -22,6 +22,7 @@ class Field:
     name: str
     type: type
     description: str = None
+    metadata: dict[str, object] = field(default_factory=dict)
     default: object = UNDEFINED
     default_factory: Callable = UNDEFINED
 
@@ -127,6 +128,7 @@ def model(dc: type[Dataclass]):
             default_factory=field.default_factory,
             flatten=meta.get("flatten", False),
             metavar=meta.get("serieux_metavar", None),
+            metadata=dict(meta),
             argument_name=field.name if field.kw_only else i,
         )
         for i, field in enumerate(fields(constructor))

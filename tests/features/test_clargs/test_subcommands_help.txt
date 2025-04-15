@@ -1,0 +1,15 @@
+usage: pytest [-h] [--fast | --no-fast | -f] {eat,sleep} ...
+
+Do stuff!
+
+positional arguments:
+  {eat,sleep}
+    eat                 Stuffing your mouth.
+    sleep               Stuffing your brain with dreams.
+
+options:
+  -h, --help            show this help message and exit
+  --fast, --no-fast, -f
+                        Do we do it fast?
+
+=====

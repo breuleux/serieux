@@ -1,0 +1,7 @@
+usage: pytest eat [-h] --food FOOD
+
+options:
+  -h, --help   show this help message and exit
+  --food FOOD  food
+
+=====

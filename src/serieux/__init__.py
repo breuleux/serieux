@@ -4,8 +4,10 @@ from typing import TYPE_CHECKING
 
 from .ctx import Context
 from .exc import ValidationError, ValidationExceptionGroup
+from .features.clargs import CommandLineArguments
 from .features.lazy import DeepLazy, Lazy, LazyProxy
 from .features.partial import Sources
+from .features.tagged import Tagged
 from .impl import BaseImplementation
 from .instructions import InstructionType, NewInstruction
 from .version import version as __version__
@@ -64,20 +66,22 @@ dump = serieux.dump
 
 
 __all__ = [
-    "Context",
-    "NewInstruction",
-    "InstructionType",
+    "__version__",
     "BaseImplementation",
-    "serialize",
+    "CommandLineArguments",
+    "Context",
+    "DeepLazy",
     "deserialize",
+    "InstructionType",
+    "Lazy",
+    "LazyProxy",
+    "NewInstruction",
     "schema",
-    "Serieux",
+    "serialize",
     "serieux",
+    "Serieux",
     "Sources",
+    "Tagged",
     "ValidationError",
     "ValidationExceptionGroup",
-    "Lazy",
-    "DeepLazy",
-    "LazyProxy",
-    "__version__",
 ]

@@ -1,0 +1,10 @@
+usage: pytest [-h] --name NAME --age AGE
+
+Person(name: str, age: int)
+
+options:
+  -h, --help   show this help message and exit
+  --name NAME  Name of the person
+  --age AGE    Age of the person
+
+=====
