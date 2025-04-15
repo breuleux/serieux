@@ -65,7 +65,21 @@ def display_context(*args, file=sys.stdout, **kwargs):
     print(cs, file=file)
 
 
-class ValidationExceptionGroup(ExceptionGroup):
+def merge_errors(*errors):
+    collected = []
+    for err in errors:
+        if isinstance(err, ExceptionGroup):
+            collected.extend(err.exceptions)
+        elif isinstance(err, Exception):
+            collected.append(err)
+    return ValidationExceptionGroup("Some errors occurred", collected) if collected else None
+
+
+class SerieuxError(Exception):
+    pass
+
+
+class ValidationExceptionGroup(SerieuxError, ExceptionGroup):
     def derive(self, excs):  # pragma: no cover
         return ValidationExceptionGroup(self.message, excs)
 
@@ -74,7 +88,7 @@ class ValidationExceptionGroup(ExceptionGroup):
             exc.display(file=file, prefix=f"[#{i}] ")
 
 
-class ValidationError(Exception):
+class ValidationError(SerieuxError):
     def __init__(self, message=None, *, exc=None, ctx=None):
         if message is None:
             message = f"{type(exc).__name__}: {exc}"

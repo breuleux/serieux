@@ -23,7 +23,7 @@ from ovld import (
 from ovld.types import All
 
 from .ctx import AccessPath, Context
-from .exc import ValidationError, ValidationExceptionGroup
+from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
 from .instructions import InstructionType, strip_all
 from .model import Modelizable, model
 from .schema import AnnotatedSchema, Schema
@@ -49,12 +49,12 @@ def code_generator_wrap_error(fn, priority=0):
         stmts = [
             "try:",
             [body],
-            "except ($VE, $VEG):",
+            "except $SXE:",
             ["raise"],
             "except Exception as exc:",
-            ["raise $VE(exc=exc, ctx=$ctx) from None"],
+            ["raise $VE(exc=exc, ctx=$ctx)"],
         ]
-        return Def(stmts, VE=ValidationError, VEG=ValidationExceptionGroup)
+        return Def(stmts, SXE=SerieuxError, VE=ValidationError)
 
     return code_generator(f, priority=priority)
 

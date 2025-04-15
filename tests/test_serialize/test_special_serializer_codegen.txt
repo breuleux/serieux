@@ -3,7 +3,7 @@ def __GENERATED__(self, t, obj, ctx, /):
         v_0 = serialize(self, int, obj.x, ctx)
         v_1 = serialize(self, int, obj.y, ctx)
         return {'x': v_0,'y': v_1}
-    except (ValidationError, ValidationExceptionGroup):
+    except SerieuxError:
         raise
     except Exception as exc:
-        raise ValidationError(exc=exc, ctx=ctx) from None
+        raise ValidationError(exc=exc, ctx=ctx)

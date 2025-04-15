@@ -61,8 +61,6 @@ serieux = Serieux()
 serialize = serieux.serialize
 deserialize = serieux.deserialize
 schema = serieux.schema
-load = serieux.load
-dump = serieux.dump
 
 
 __all__ = [
