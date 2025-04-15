@@ -5,7 +5,6 @@ from ovld import ovld, recurse, subclasscheck
 
 from serieux import deserialize, schema, serialize
 from serieux.instructions import InstructionType, NewInstruction, pushdown
-from serieux.model import Model
 from tests.common import one_test_per_assert
 
 from .definitions import Point
@@ -58,13 +57,6 @@ def test_pushdown_no_inherit():
     # Dog is a tag that is not inherited when pushing down
     assert pushdown(Dog[list[int]]) == list[int]
     assert pushdown(Dog[Apple[list[int]]]) == list[Apple[int]]
-
-
-def test_pushdown_model():
-    t = Apple[Model[Point]]
-    tp = t.pushdown()
-    assert tp.fields[0].type is Apple[int]
-    assert tp.fields[1].type is Apple[int]
 
 
 @ovld

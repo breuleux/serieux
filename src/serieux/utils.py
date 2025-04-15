@@ -11,15 +11,18 @@ from typing import (
     get_origin,
 )
 
-from ovld import parametrized_class_check
+from ovld import class_check, parametrized_class_check
+
+PRIO_LAST = -100
+PRIO_LOW = -2
+PRIO_DEFAULT = -1
+PRIO_HIGH = 1
+PRIO_TOP = 1000
 
 
-@parametrized_class_check
-def _UnionAlias(cls, whatever):
+@class_check
+def UnionAlias(cls):
     return get_origin(cls) in (Union, UnionType)
-
-
-UnionAlias = _UnionAlias[None]
 
 
 def clsstring(cls):

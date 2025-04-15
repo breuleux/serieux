@@ -3,8 +3,6 @@ from typing import Counter
 
 from ovld import Medley, call_next, recurse
 
-from .model import Model
-
 
 class Schema(dict):
     def __init__(self, t):
@@ -43,9 +41,6 @@ class SchemaCompiler(Medley):
         self.defs = {}
         self.done = set()
         self.name_indexes = Counter()
-
-    def unique_name(self, t: type[Model]):
-        return recurse(t.original_type)
 
     def unique_name(self, t: type):
         name = t.__name__

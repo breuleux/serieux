@@ -16,6 +16,7 @@ from ovld import (
     Medley,
     call_next,
     code_generator,
+    keyword_decorator,
     ovld,
     recurse,
 )
@@ -27,10 +28,18 @@ from .instructions import InstructionType, strip_all
 from .model import Modelizable, model
 from .schema import AnnotatedSchema, Schema
 from .tell import tells as get_tells
-from .utils import UnionAlias, clsstring
+from .utils import (
+    PRIO_DEFAULT,
+    PRIO_LAST,
+    PRIO_LOW,
+    PRIO_TOP,
+    UnionAlias,
+    clsstring,
+)
 
 
-def code_generator_wrap_error(fn):
+@keyword_decorator
+def code_generator_wrap_error(fn, priority=0):
     @wraps(fn)
     def f(cls, *args, **kwargs):
         result = fn(cls, *args, **kwargs)
@@ -47,7 +56,7 @@ def code_generator_wrap_error(fn):
         ]
         return Def(stmts, VE=ValidationError, VEG=ValidationExceptionGroup)
 
-    return code_generator(f)
+    return code_generator(f, priority=priority)
 
 
 class BaseImplementation(Medley):
@@ -112,7 +121,7 @@ class BaseImplementation(Medley):
         if t in (int, str, bool, float, NoneType):
             return t
 
-    @ovld(priority=-100)
+    @ovld(priority=PRIO_LAST)
     def serialize(self, t: type[object], obj: object, ctx: Context, /):
         raise ValidationError(
             f"Cannot serialize object of type '{clsstring(type(obj))}'"
@@ -120,7 +129,7 @@ class BaseImplementation(Medley):
             ctx=ctx,
         )
 
-    @ovld(priority=-1)
+    @ovld(priority=PRIO_LOW)
     def serialize(self, t: type[InstructionType], obj: object, ctx: Context, /):
         return recurse(t.pushdown(), obj, ctx)
 
@@ -136,7 +145,7 @@ class BaseImplementation(Medley):
 
     deserialize_embed_condition = serialize_embed_condition
 
-    @ovld(priority=-100)
+    @ovld(priority=PRIO_LAST)
     def deserialize(self, t: type[object], obj: object, ctx: Context, /):
         try:
             # Pass through if the object happens to already be the right type
@@ -150,7 +159,7 @@ class BaseImplementation(Medley):
             ctx=ctx,
         )
 
-    @ovld(priority=-1)
+    @ovld(priority=PRIO_LOW)
     def deserialize(self, t: type[InstructionType], obj: object, ctx: Context, /):
         return recurse(t.pushdown(), obj, ctx)
 
@@ -161,7 +170,7 @@ class BaseImplementation(Medley):
     # schema: helpers and entry points #
     ####################################
 
-    @ovld(priority=1000)
+    @ovld(priority=PRIO_TOP)
     def schema(self, t: type[object], ctx: Context, /):
         if t not in self._schema_cache:
             self._schema_cache[t] = holder = Schema(t)
@@ -172,7 +181,7 @@ class BaseImplementation(Medley):
     def schema(self, t: type[object], /):
         return recurse(t, self.default_context)
 
-    @ovld(priority=-1)
+    @ovld(priority=PRIO_LOW)
     def schema(self, t: type[InstructionType], ctx: Context, /):
         return recurse(t.pushdown(), ctx)
 
@@ -182,26 +191,31 @@ class BaseImplementation(Medley):
 
     for T in (int, str, bool, float, NoneType):
 
-        @code_generator
+        @code_generator(priority=PRIO_DEFAULT)
         def serialize(cls, t: type[T], obj: T, ctx: Context, /):
             return Lambda(Code("$obj"))
 
-        @code_generator
+        @code_generator(priority=PRIO_DEFAULT)
         def deserialize(cls, t: type[T], obj: T, ctx: Context, /):
             return Lambda(Code("$obj"))
 
+    @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[int], ctx: Context, /):
         return {"type": "integer"}
 
+    @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[float], ctx: Context, /):
         return {"type": "number"}
 
+    @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[str], ctx: Context, /):
         return {"type": "string"}
 
+    @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[bool], ctx: Context, /):
         return {"type": "boolean"}
 
+    @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[NoneType], ctx: Context, /):
         return {"type": "null"}
 
@@ -222,11 +236,11 @@ class BaseImplementation(Medley):
         else:
             return Lambda("[$lbody for X in $obj]", lbody=cls.subcode(method, lt, "X", ctx))
 
-    @code_generator
+    @code_generator(priority=PRIO_DEFAULT)
     def serialize(cls, t: type[list], obj: list, ctx: Context, /):
         return cls.__generic_codegen_list("serialize", t, obj, ctx)
 
-    @code_generator
+    @code_generator(priority=PRIO_DEFAULT)
     def deserialize(cls, t: type[list], obj: list, ctx: Context, /):
         return cls.__generic_codegen_list("deserialize", t, obj, ctx)
 
@@ -253,11 +267,11 @@ class BaseImplementation(Medley):
             vbody=cls.subcode(method, vt, "V", ctx, ctx_expr=ctx_expr),
         )
 
-    @code_generator
+    @code_generator(priority=PRIO_DEFAULT)
     def serialize(cls, t: type[dict], obj: dict, ctx: Context, /):
         return cls.__generic_codegen_dict("serialize", t, obj, ctx)
 
-    @code_generator
+    @code_generator(priority=PRIO_DEFAULT)
     def deserialize(cls, t: type[dict], obj: dict, ctx: Context, /):
         return cls.__generic_codegen_dict("deserialize", t, obj, ctx)
 
@@ -269,7 +283,7 @@ class BaseImplementation(Medley):
     # Implementations: Modelizable #
     ################################
 
-    @code_generator_wrap_error
+    @code_generator_wrap_error(priority=PRIO_DEFAULT)
     def serialize(cls, t: type[Modelizable], obj: object, ctx: Context, /):
         (t,) = get_args(t)
         t = model(t)
@@ -278,6 +292,10 @@ class BaseImplementation(Medley):
         stmts = []
         follow = hasattr(ctx, "follow")
         for i, f in enumerate(t.fields):
+            if f.property_name is None:
+                raise ValidationError(
+                    f"Cannot serialize '{clsstring(t)}' because its model does not specify how to serialize property '{f.name}'"
+                )
             ctx_expr = (
                 Code("$ctx.follow($objt, $obj, $fld)", objt=obj, fld=f.name)
                 if follow
@@ -303,7 +321,7 @@ class BaseImplementation(Medley):
         stmts.append(final)
         return Def(stmts, VE=ValidationError, VEG=ValidationExceptionGroup)
 
-    @code_generator_wrap_error
+    @code_generator_wrap_error(priority=PRIO_DEFAULT)
     def deserialize(cls, t: type[Modelizable], obj: dict, ctx: Context, /):
         (t,) = get_args(t)
         t = model(t)
@@ -319,7 +337,7 @@ class BaseImplementation(Medley):
             processed = cls.subcode(
                 "deserialize",
                 f.type,
-                Code("$obj[$pname]", pname=f.property_name),
+                Code("$obj[$pname]", pname=f.serialized_name),
                 ctx,
                 ctx_expr=ctx_expr,
             )
@@ -331,14 +349,14 @@ class BaseImplementation(Medley):
                 expr = Code(
                     "($processed) if $pname in $obj else $dflt",
                     dflt=f.default,
-                    pname=f.property_name,
+                    pname=f.serialized_name,
                     processed=processed,
                 )
             elif f.default_factory is not MISSING:
                 expr = Code(
                     "($processed) if $pname in $obj else $dflt()",
                     dflt=f.default_factory,
-                    pname=f.property_name,
+                    pname=f.serialized_name,
                     processed=processed,
                 )
             stmt = Code(f"v_{i} = $expr", expr=expr)
@@ -357,6 +375,7 @@ class BaseImplementation(Medley):
         stmts.append(final)
         return Def(stmts, VE=ValidationError, VEG=ValidationExceptionGroup)
 
+    @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[Modelizable], ctx: Context, /):
         t = model(t)
         properties = {}
@@ -380,7 +399,7 @@ class BaseImplementation(Medley):
     # Implementations: Unions #
     ###########################
 
-    @code_generator
+    @code_generator(priority=PRIO_DEFAULT)
     def serialize(cls, t: type[UnionAlias], obj: Any, ctx: Context, /):
         (t,) = get_args(t)
         o1, *rest = get_args(t)
@@ -394,7 +413,7 @@ class BaseImplementation(Medley):
             )
         return Lambda(code)
 
-    @code_generator
+    @code_generator(priority=PRIO_DEFAULT)
     def deserialize(cls, t: type[UnionAlias] | type[UnionType], obj: Any, ctx: Context, /):
         (t,) = get_args(t)
         options = get_args(t)
@@ -422,6 +441,7 @@ class BaseImplementation(Medley):
             )
         return Lambda(code)
 
+    @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[UnionAlias], ctx: Context, /):
         options = get_args(t)
         return {"oneOf": [recurse(opt, ctx) for opt in options]}
@@ -430,15 +450,16 @@ class BaseImplementation(Medley):
     # Implementations: Enums #
     ##########################
 
-    @code_generator_wrap_error
+    @code_generator_wrap_error(priority=PRIO_DEFAULT)
     def serialize(self, t: type[Enum], obj: Enum, ctx: Context, /):
         return Lambda(Code("$obj.value"))
 
-    @code_generator_wrap_error
+    @code_generator_wrap_error(priority=PRIO_DEFAULT)
     def deserialize(self, t: type[Enum], obj: Any, ctx: Context, /):
         (t,) = get_args(t)
         return Lambda(Code("$t($obj)", t=t))
 
+    @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[Enum], ctx: Context, /):
         return {"enum": [e.value for e in t]}
 
@@ -446,18 +467,20 @@ class BaseImplementation(Medley):
     # Implementations: Dates #
     ##########################
 
-    @code_generator_wrap_error
+    @code_generator_wrap_error(priority=PRIO_DEFAULT)
     def serialize(self, t: type[date] | type[datetime], obj: date | datetime, ctx: Context, /):
         return Lambda(Code("$obj.isoformat()"))
 
-    @code_generator_wrap_error
+    @code_generator_wrap_error(priority=PRIO_DEFAULT)
     def deserialize(self, t: type[date] | type[datetime], obj: str, ctx: Context, /):
         (t,) = get_args(t)
         return Lambda(Code("$t.fromisoformat($obj)", t=t))
 
+    @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[date], ctx: Context, /):
         return {"type": "string", "format": "date"}
 
+    @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[datetime], ctx: Context, /):
         return {"type": "string", "format": "date-time"}
 
@@ -465,6 +488,7 @@ class BaseImplementation(Medley):
     # Implementations: timedelta #
     ##############################
 
+    @ovld(priority=PRIO_DEFAULT)
     def serialize(self, t: type[timedelta], obj: timedelta, ctx: Context):
         """Serialize timedelta as Xs (seconds) or Xus (microseconds)."""
         seconds = int(obj.total_seconds())
@@ -473,6 +497,7 @@ class BaseImplementation(Medley):
         else:
             return f"{seconds}s"
 
+    @ovld(priority=PRIO_DEFAULT)
     def deserialize(self, t: type[timedelta], obj: str, ctx: Context):
         """Deserialize a combination of days, hours, etc. as a timedelta."""
         units = {
@@ -502,6 +527,7 @@ class BaseImplementation(Medley):
                 raise ValidationError(f"Could not convert '{n}' ({units[unit]}) to float", ctx=ctx)
         return sign * timedelta(**kw)
 
+    @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[timedelta], ctx: Context, /):
         return {
             "type": "string",

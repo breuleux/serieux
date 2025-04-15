@@ -20,8 +20,8 @@ class Field:
     name: str
     type: type
     description: str = None
-    default: object = MISSING
-    default_factory: Callable = MISSING
+    default: object = UNDEFINED
+    default_factory: Callable = UNDEFINED
 
     argument_name: str | int = UNDEFINED
     property_name: str = UNDEFINED
@@ -40,6 +40,10 @@ class Field:
             self.argument_name = self.name
         if self.serialized_name is UNDEFINED:
             self.serialized_name = self.name
+        if self.default is UNDEFINED:
+            self.default = MISSING
+        if self.default_factory is UNDEFINED:
+            self.default_factory = MISSING
 
     @property
     def required(self):

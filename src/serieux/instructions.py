@@ -1,12 +1,10 @@
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from functools import cache
 from types import UnionType
 from typing import Union, get_args, get_origin
 
 from ovld import subclasscheck
 from ovld.mro import Order
-
-from .model import Model
 
 
 @dataclass(frozen=True)
@@ -52,7 +50,7 @@ class InstructionType(type):
             isinstance(other, type)
             and issubclass(other, InstructionType)
             and other._instructions.issuperset(self._instructions)
-            and subclasscheck(other._cls, self._cls)
+            and (self._cls is object or subclasscheck(other._cls, self._cls))
         )
 
     @classmethod
@@ -86,13 +84,7 @@ def pushdown(cls):
     )
     if not isinstance(cls, type) or not issubclass(cls, InstructionType):
         return cls
-    if isinstance(typ, type) and issubclass(typ, Model):
-        return Model.make(
-            original_type=typ.original_type,
-            fields=[replace(field, type=cls[field.type]) for field in typ.fields],
-            constructor=typ.constructor,
-        )
-    elif orig := get_origin(typ):
+    if orig := get_origin(typ):
         args = get_args(typ)
         if orig is UnionType:
             orig = Union

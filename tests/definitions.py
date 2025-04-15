@@ -85,3 +85,15 @@ class Player:
 class Team:
     name: str
     players: list[Player]
+
+
+@dataclass
+class Job:
+    title: str
+    yearly_pay: float
+
+
+@dataclass
+class Worker:
+    name: str
+    job: Job

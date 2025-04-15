@@ -28,7 +28,7 @@ def _default_features():
 default_features = _default_features()
 
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from typing import TypeVar
 
     from .schema import Schema

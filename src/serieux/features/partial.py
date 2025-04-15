@@ -7,6 +7,7 @@ from ..ctx import Context
 from ..exc import ValidationError, ValidationExceptionGroup
 from ..instructions import NewInstruction
 from ..model import Model, Modelizable, model
+from ..utils import PRIO_HIGH, PRIO_LOW
 
 #############
 # Constants #
@@ -75,14 +76,14 @@ def partialize(t: object):
 
 
 class PartialBuilding(Medley):
-    @ovld(priority=1)
+    @ovld(priority=PRIO_HIGH)
     def deserialize(self, t: type[Partial[object]], obj: object, ctx: Context, /):
         try:
             return call_next(t, obj, ctx)
         except ValidationError as exc:
             return exc
 
-    @ovld(priority=1)
+    @ovld(priority=PRIO_HIGH)
     def deserialize(self, t: type[object], obj: Sources, ctx: Context, /):
         parts = [recurse(Partial[t], src, ctx) for src in obj.sources]
         rval = instantiate(reduce(merge, parts))
@@ -90,6 +91,7 @@ class PartialBuilding(Medley):
             raise rval
         return rval
 
+    @ovld(priority=PRIO_LOW)
     def deserialize(self, t: type[PartialBase], obj: object, ctx: Context, /):
         # Fallback for alternative ways to deserialize the original object
         return recurse(t._constructor, obj, ctx)
@@ -113,6 +115,11 @@ def merge(x: object, y: ValidationError):
 @ovld(priority=2)
 def merge(x: ValidationError, y: object):
     return x
+
+
+@ovld(priority=2)
+def merge(x: ValidationError, y: ValidationError):
+    return ValidationExceptionGroup("Some errors occurred", [x, y])
 
 
 @ovld(priority=1)
