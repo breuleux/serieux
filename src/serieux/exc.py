@@ -1,5 +1,7 @@
 import sys
 
+from .ctx import Context
+
 
 def _color(code, text):
     return f"\u001b[1m\u001b[{code}m{text}\u001b[0m"
@@ -95,6 +97,14 @@ class ValidationError(SerieuxError):
         super().__init__(message)
         self.exc = exc
         self.ctx = ctx
+        if self.ctx is None:
+            frame = sys._getframe(1)
+            while frame:
+                if "ctx" in frame.f_locals:
+                    if isinstance(ctx_val := frame.f_locals["ctx"], Context):
+                        self.ctx = ctx_val
+                        break
+                frame = frame.f_back
 
     @property
     def message(self):
