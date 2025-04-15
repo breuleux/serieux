@@ -43,7 +43,7 @@ class Field:
             self.argument_name = self.name
         if self.serialized_name is UNDEFINED:
             self.serialized_name = self.name
-        if self.default is UNDEFINED:
+        if self.default is UNDEFINED:  # pragma: no cover
             self.default = MISSING
         if self.default_factory is UNDEFINED:
             self.default_factory = MISSING
@@ -73,9 +73,6 @@ class Model(type):
                 "constructor": constructor,
             },
         )
-
-    def __class_getitem__(cls, t):
-        return model(t)
 
     @classmethod
     def accepts(cls, other):

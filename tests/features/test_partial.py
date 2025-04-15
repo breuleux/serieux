@@ -8,7 +8,7 @@ from serieux.exc import ValidationError
 from serieux.features.partial import Partial, PartialBuilding, Sources
 
 from ..common import validation_errors
-from ..definitions import Player, Point
+from ..definitions import Defaults, Player, Point
 
 deserialize = (Serieux + PartialBuilding)().deserialize
 
@@ -137,3 +137,8 @@ def test_multiple_errors_display(check_error_display):
         deserialize(
             list[Point], Sources([{"x": 23, "y": "crap"}, {"x": "oh", "y": "no"}]), AccessPath()
         )
+
+
+def test_partial_defaults():
+    result = deserialize(Defaults, Sources({"name": "Nicolas"}, {"cool": True}))
+    assert result == Defaults(name="Nicolas", aliases=[], cool=True)

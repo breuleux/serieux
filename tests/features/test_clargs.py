@@ -183,3 +183,13 @@ class Word:
 def test_positional():
     result = deserialize(Word, CommandLineArguments(["amazing"]), Context())
     assert result == Word(word="amazing")
+
+
+@dataclass
+class Duck:
+    quacks: int = field(metadata={"argparse": {"option": "-q"}})
+
+
+def test_replace_option():
+    result = deserialize(Duck, CommandLineArguments(["-q", "7"]), Context())
+    assert result == Duck(quacks=7)

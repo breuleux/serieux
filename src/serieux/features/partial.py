@@ -6,7 +6,7 @@ from ovld import Medley, call_next, ovld, recurse
 from ..ctx import Context
 from ..exc import ValidationError, ValidationExceptionGroup
 from ..instructions import NewInstruction
-from ..model import Model, Modelizable, model
+from ..model import Modelizable, model
 from ..utils import PRIO_HIGH, PRIO_LOW
 
 #############
@@ -35,10 +35,6 @@ class Sources:
 
 @ovld
 def partialize(t: type[Modelizable]):
-    if issubclass(t, Model):
-        return recurse(t.original_type)
-    if issubclass(t, PartialBase):
-        return t
     m = model(t)
     fields = [
         (
@@ -60,9 +56,9 @@ def partialize(t: type[Modelizable]):
     return dc
 
 
-@ovld(priority=1)
-def partialize(t: type[Partial]):
-    return recurse(t.pushdown())
+@ovld
+def partialize(t: type[PartialBase]):
+    return t
 
 
 @ovld

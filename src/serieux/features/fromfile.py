@@ -8,7 +8,6 @@ from pathlib import Path
 import yaml
 from ovld import call_next, dependent_check, ovld, recurse
 from ovld.dependent import HasKey
-from ovld.medley import KeepLast
 
 from ..ctx import Context
 from ..exc import ValidationError

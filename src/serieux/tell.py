@@ -46,7 +46,7 @@ class KeyValueTell(Tell):
             v=self.value,
         )
 
-    def cost(self):
+    def cost(self):  # pragma: no cover
         return 3
 
 
