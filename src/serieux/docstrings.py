@@ -61,6 +61,8 @@ class AttributeVisitor(ast.NodeVisitor):
     def visit_FunctionDef(self, node):
         if self.prefix is not None:
             self.add_data(node, "VARIABLE", f"{self.prefix}{node.name}")
+        for arg in node.args.args:
+            self.add_data(arg, "VARIABLE", f"{self.prefix}{arg.arg}" if self.prefix else arg.arg)
         self.visit_body(node.name, node.body)
 
     def visit_Assign(self, node):  # pragma: no cover

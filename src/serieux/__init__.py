@@ -2,6 +2,7 @@ import importlib
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .auto import Auto
 from .ctx import Context
 from .exc import ValidationError, ValidationExceptionGroup
 from .features.clargs import CommandLineArguments
@@ -61,10 +62,13 @@ serieux = Serieux()
 serialize = serieux.serialize
 deserialize = serieux.deserialize
 schema = serieux.schema
+load = serieux.load
+dump = serieux.dump
 
 
 __all__ = [
     "__version__",
+    "Auto",
     "BaseImplementation",
     "CommandLineArguments",
     "Context",

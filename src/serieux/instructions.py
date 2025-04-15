@@ -71,8 +71,8 @@ class InstructionType(type):
         return t
 
     @classmethod
-    def pushdown(self):
-        return pushdown(self)
+    def pushdown(cls):
+        return pushdown(cls)
 
 
 def pushdown(cls):

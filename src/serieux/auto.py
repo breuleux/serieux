@@ -3,6 +3,7 @@ from dataclasses import MISSING
 
 from ovld import call_next
 
+from .docstrings import _get_attribute_docstrings
 from .instructions import NewInstruction
 from .model import Field, Model, model
 from .utils import evaluate_hint
@@ -13,12 +14,13 @@ Auto = NewInstruction["Auto", -1, True]
 def model_from_callable(t):
     sig = inspect.signature(t)
     fields = []
+    docs = _get_attribute_docstrings(t)
     for param in sig.parameters.values():
         if param.annotation is inspect._empty:
             raise Exception(f"Missing type annotation for argument '{param.name}'.")
         field = Field(
             name=param.name,
-            description="[TODO]",
+            description=docs.get(param.name, param.name),
             type=Auto[evaluate_hint(param.annotation, None, None, None)],
             default=MISSING if param.default is inspect._empty else param.default,
             argument_name=param.name,

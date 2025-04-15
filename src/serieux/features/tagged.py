@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 from ovld import Medley, call_next, ovld, recurse
 
@@ -7,7 +7,9 @@ from ..tell import KeyValueTell, TypeTell, tells
 from ..utils import clsstring
 
 if TYPE_CHECKING:  # pragma: no cover
-    from typing import Annotated as Tagged
+    from typing import Annotated
+
+    Tagged: TypeAlias = Annotated
 
 else:
 
@@ -20,7 +22,12 @@ else:
 
         def __class_getitem__(cls, args):
             cls, tag = args
-            return Tagged(f"{tag}::{clsstring(cls)}", (Tagged,), {"cls": cls, "tag": tag})
+            return Tagged(
+                f"{tag}::{clsstring(cls)}",
+                (Tagged,),
+                # Set module to None for better display
+                {"cls": cls, "tag": tag, "__module__": None},
+            )
 
 
 @tells.register
