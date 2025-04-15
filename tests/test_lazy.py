@@ -45,6 +45,16 @@ def test_lazy_arithmetic():
     assert +lazy_c == -3
 
 
+def test_lazy_comparisons():
+    lazy_value = LazyProxy(lambda: 42)
+    assert lazy_value == 42
+    assert lazy_value != 43
+    assert lazy_value < 100
+    assert lazy_value <= 42
+    assert lazy_value > 0
+    assert lazy_value >= 42
+
+
 def test_lazy_list():
     lazy_list = LazyProxy(lambda: [1, 2, 3])
 

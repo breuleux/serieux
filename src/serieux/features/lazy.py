@@ -51,6 +51,21 @@ class LazyProxy:
     def __eq__(self, other):
         return self._obj == other
 
+    def __ne__(self, other):
+        return self._obj != other
+
+    def __lt__(self, other):
+        return self._obj < other
+
+    def __le__(self, other):
+        return self._obj <= other
+
+    def __gt__(self, other):
+        return self._obj > other
+
+    def __ge__(self, other):
+        return self._obj >= other
+
     def __hash__(self):
         return hash(self._obj)
 

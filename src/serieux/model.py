@@ -1,7 +1,9 @@
-from dataclasses import MISSING, dataclass, fields
+from dataclasses import MISSING, dataclass, fields, replace
 from typing import Callable, get_args, get_origin
 
 from ovld import Dataclass, call_next, class_check, ovld
+
+from serieux.instructions import InstructionType
 
 from .docstrings import get_attribute_docstrings
 from .utils import evaluate_hint
@@ -133,6 +135,17 @@ def model(dc: type[Dataclass]):
     return rval
 
 
-@ovld
+@ovld(priority=-1)
+def model(t: type[InstructionType]):
+    m = call_next(t.strip(t))
+    if m:
+        return Model.make(
+            original_type=m.original_type,
+            fields=[replace(field, type=t[field.type]) for field in m.fields],
+            constructor=m.constructor,
+        )
+
+
+@ovld(priority=-1)
 def model(t: object):
     return None
