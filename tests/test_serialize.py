@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 import pytest
 from ovld import Medley
 
-from serieux import Serieux, serialize
+from serieux import Serieux, dump, load, serialize
 from serieux.ctx import AccessPath, Context
 from serieux.exc import ValidationError
 
@@ -221,3 +221,15 @@ def test_error_serialize_list_of_lists():
 
     with pytest.raises(ValidationError, match=r"At path .1.2"):
         serialize(list[list[int]], li, AccessPath())
+
+
+def test_dump_no_dest():
+    pt = Point(1, 2)
+    assert serialize(Point, pt) == dump(Point, pt)
+
+
+def test_dump(tmp_path):
+    dest = tmp_path / "point.yaml"
+    pt = Point(1, 2)
+    dump(Point, pt, dest=dest)
+    assert load(Point, dest) == pt

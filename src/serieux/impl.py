@@ -4,9 +4,11 @@ from datetime import date, datetime, timedelta
 from enum import Enum
 from functools import wraps
 from itertools import pairwise
+from pathlib import Path
 from types import NoneType, UnionType
 from typing import Any, get_args, get_origin
 
+import yaml
 from ovld import (
     Code,
     CodegenInProgress,
@@ -20,10 +22,12 @@ from ovld import (
     ovld,
     recurse,
 )
+from ovld.medley import KeepLast, use_combiner
 from ovld.types import All
 
 from .ctx import AccessPath, Context
 from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
+from .features.fromfile import WorkingDirectory
 from .instructions import InstructionType, strip_all
 from .model import Modelizable, model
 from .schema import AnnotatedSchema, Schema
@@ -66,6 +70,29 @@ class BaseImplementation(Medley):
 
     def __post_init__(self):
         self._schema_cache = {}
+
+    #######################
+    # User-facing methods #
+    #######################
+
+    @use_combiner(KeepLast)
+    def load(self, t, obj, ctx=None):
+        ctx = ctx or self.default_context
+        return self.deserialize(t, obj, ctx)
+
+    @use_combiner(KeepLast)
+    def dump(self, t, obj, ctx=None, *, dest=None):
+        ctx = ctx or self.default_context
+        if dest:
+            dest = Path(dest)
+            ctx = ctx + WorkingDirectory(origin=dest)
+        serialized = self.serialize(t, obj, ctx)
+        if dest:
+            assert dest.suffix == ".yaml"  # TODO: support other formats
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(yaml.safe_dump(serialized))
+        else:
+            return serialized
 
     ##################
     # Global helpers #
