@@ -8,7 +8,8 @@ from ..ctx import Context
 from ..exc import SerieuxError, ValidationError, ValidationExceptionGroup, merge_errors
 from ..instructions import NewInstruction
 from ..model import Modelizable, model
-from ..utils import PRIO_HIGH, PRIO_LOW
+from ..utils import PRIO_HIGH
+from .lazy import LazyProxy
 
 #############
 # Constants #
@@ -40,7 +41,7 @@ def partialize(t: type[Modelizable]):
     fields = [
         (
             f.name,
-            partialize(f.type),
+            Partial[f.type],
             field(default=NOT_GIVEN, metadata={"description": f.description}),
         )
         for f in m.fields
@@ -91,11 +92,6 @@ class PartialBuilding(Medley):
         if isinstance(rval, SerieuxError):
             raise rval
         return rval
-
-    @ovld(priority=PRIO_LOW)
-    def deserialize(self, t: type[PartialBase], obj: object, ctx: Context, /):
-        # Fallback for alternative ways to deserialize the original object
-        return recurse(t._constructor, obj, ctx)
 
 
 @model.register
@@ -184,6 +180,11 @@ def merge(x: list, y: list):
 
 
 @ovld
+def merge(x: LazyProxy, y: LazyProxy):
+    return LazyProxy(lambda: recurse(x._obj, y._obj), x._type)
+
+
+@ovld
 def merge(x: object, y: object):
     return y
 
@@ -231,6 +232,17 @@ def instantiate(p: PartialBase):
         return dc(**args)
     except Exception as exc:
         return ValidationError(exc=exc, ctx=p._serieux_ctx)
+
+
+@ovld
+def instantiate(x: LazyProxy):
+    def do():
+        rval = recurse(x._obj)
+        if isinstance(rval, SerieuxError):
+            raise rval
+        return rval
+
+    return LazyProxy(do, x._type)
 
 
 @ovld

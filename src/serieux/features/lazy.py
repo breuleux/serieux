@@ -5,7 +5,6 @@ from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
 from ..instructions import NewInstruction
-from ..model import Model, model
 
 #############
 # Constants #
@@ -150,7 +149,7 @@ class LazyDeserialization(Medley):
     @ovld(priority=10)
     def deserialize(self, t: type[Lazy], value: object, ctx: Context):
         def evaluate():
-            return call_next(t.pushdown(), value, ctx)
+            return recurse(Lazy.strip(t), value, ctx)
 
         return LazyProxy(evaluate, type=t)
 
@@ -164,20 +163,6 @@ class LazyDeserialization(Medley):
     @ovld
     def deserialize(self, t: Any, value: LazyProxy, ctx: Context):
         return recurse(t, value._obj, ctx)
-
-
-@model.register
-def _(t: type[Lazy]):
-    def construct(*args, **kwargs):
-        return LazyProxy(lambda: m.constructor(*args, **kwargs), type=t)
-
-    m = call_next(Lazy.strip(t))
-    if m:
-        return Model.make(
-            constructor=construct,
-            fields=m.fields,
-            original_type=t,
-        )
 
 
 # Add as a default feature in serieux.Serieux

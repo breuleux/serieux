@@ -4,6 +4,7 @@ import pytest
 
 from serieux import Serieux
 from serieux.exc import ValidationError
+from serieux.features.partial import Sources
 from serieux.features.tsubclass import TaggedSubclass, TaggedSubclassFeature
 
 featured = (Serieux + TaggedSubclassFeature)()
@@ -85,3 +86,46 @@ def test_bad_resolve():
     with pytest.raises(ValidationError, match="Bad format for class reference"):
         ser = {"class": "x:y:z", "name": "Quack"}
         deserialize(TaggedSubclass[Animal], ser)
+
+
+@dataclass
+class Animals:
+    alpha: TaggedSubclass[Animal]
+    betas: list[TaggedSubclass[Animal]]
+
+
+def test_tsubclass_partial():
+    animals = deserialize(
+        Animals,
+        Sources(
+            {
+                "alpha": {
+                    "class": "tests.features.test_tsubclass:Wolf",
+                    "name": "Wolfie",
+                    "size": 10,
+                },
+                "betas": [],
+            },
+        ),
+    )
+    assert isinstance(animals.alpha, Wolf)
+
+
+def test_tsubclass_partial_merge():
+    animals = deserialize(
+        Animals,
+        Sources(
+            {
+                "alpha": {
+                    "class": "tests.features.test_tsubclass:Wolf",
+                    "name": "Wolfie",
+                    "size": 10,
+                },
+                "betas": [],
+            },
+            {"alpha": {"class": "tests.features.test_tsubclass:Wolf", "size": 13}},
+        ),
+    )
+    assert isinstance(animals.alpha, Wolf)
+    assert animals.alpha.name == "Wolfie"
+    assert animals.alpha.size == 13

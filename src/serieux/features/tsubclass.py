@@ -55,10 +55,12 @@ class TaggedSubclassFeature(Medley):
         base = t.pushdown()
         obj = dict(obj)
         cls_name = obj.pop("class", None)
+        if cls_name is not None:
+            cls_name = recurse(str, cls_name, ctx)
         actual_class = _resolve(cls_name, base, ctx)
         if not issubclass(actual_class, base):
-            raise ValidationError(f"'{obj}' is not a subclass of '{base}'", ctx=ctx)
-        return recurse(actual_class, obj, ctx)
+            raise ValidationError(f"'{actual_class}' is not a subclass of '{base}'", ctx=ctx)
+        return recurse(TaggedSubclass.strip(t[actual_class]), obj, ctx)
 
 
 # Add as a default feature in serieux.Serieux

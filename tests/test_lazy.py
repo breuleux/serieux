@@ -111,7 +111,7 @@ class ContainsLazy:
 def test_lazy_partial_invalid():
     result = deserialize(ContainsLazy, Sources({"normal": "hello", "pt": {"x": 1}}))
     assert result.normal == "hello"
-    with pytest.raises(TypeError):
+    with pytest.raises(ValidationError):
         result.pt.x
 
 
@@ -126,3 +126,4 @@ def test_lazy_partial():
     assert result.normal == "hello"
     assert result.pt.x == 1
     assert result.pt.y == 18
+    assert type(result.pt.y) is int
