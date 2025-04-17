@@ -5,6 +5,7 @@ from types import NoneType
 import pytest
 
 from serieux import schema as _schema
+from serieux.model import Extensible
 from serieux.schema import Schema
 
 from .common import has_312_features
@@ -82,6 +83,15 @@ def test_schema_dataclass():
         "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
         "required": ["x", "y"],
         "additionalProperties": False,
+    }
+
+
+def test_schema_extensible_dataclass():
+    assert schema(Extensible[Point]) == {
+        "type": "object",
+        "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
+        "required": ["x", "y"],
+        "additionalProperties": True,
     }
 
 

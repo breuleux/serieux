@@ -4,10 +4,13 @@ from typing import Callable, get_args, get_origin
 from ovld import Dataclass, call_next, class_check, ovld
 
 from .docstrings import get_attribute_docstrings
-from .instructions import InstructionType
+from .instructions import InstructionType, NewInstruction
 from .utils import clsstring, evaluate_hint
 
 UNDEFINED = object()
+
+
+Extensible = NewInstruction["Extensible"]
 
 
 @class_check
@@ -124,6 +127,12 @@ def model(dc: type[Dataclass]):
     ]
     rval.constructor = constructor
     return rval
+
+
+@ovld
+def model(t: type[Extensible]):
+    m = call_next(t.strip(t))
+    return replace(m, extensible=True)
 
 
 @ovld(priority=-1)
