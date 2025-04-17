@@ -1,7 +1,7 @@
 import argparse
 from dataclasses import MISSING, dataclass
 from enum import Enum
-from typing import get_args
+from typing import Any, get_args
 
 from ovld import Medley, ovld, recurse
 
@@ -116,7 +116,7 @@ def add_arguments(t: type[UnionAlias], parser: argparse.ArgumentParser, dest: st
 
 class FromArguments(Medley):
     @ovld(priority=1)
-    def deserialize(self, t: type[object], obj: CommandLineArguments, ctx: Context):
+    def deserialize(self, t: Any, obj: CommandLineArguments, ctx: Context):
         parser = argparse.ArgumentParser(description=t.__doc__ or f"Arguments for {clsstring(t)}")
         add_arguments(t, parser, "")
         ns = parser.parse_args(obj.arguments)

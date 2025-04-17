@@ -4,6 +4,7 @@ import tomllib
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import yaml
 from ovld import call_next, dependent_check, ovld, recurse
@@ -110,27 +111,40 @@ def ScalarNode(value: yaml.ScalarNode, tag_suffix):
 
 
 class FromFile(PartialBuilding):
-    def deserialize(self, t: type[object], obj: Path, ctx: Context):
+    def deserialize(self, t: Any, obj: Path, ctx: Context):
         if isinstance(ctx, WorkingDirectory):
             obj = ctx.directory / obj
         data = parse(obj)
         ctx = ctx + WorkingDirectory(origin=obj, directory=obj.parent)
         return recurse(t, data, ctx)
 
-    def deserialize(self, t: type[object], obj: yaml.MappingNode, ctx: Context):
+    def deserialize(self, t: Any, obj: yaml.MappingNode, ctx: Context):
         return recurse(t, {k.value: v for k, v in obj.value}, ctx + YamlSourceInfo.extract(obj))
 
-    def deserialize(self, t: type[object], obj: yaml.SequenceNode, ctx: Context):
+    def deserialize(self, t: Any, obj: yaml.SequenceNode, ctx: Context):
         return recurse(t, obj.value, ctx + YamlSourceInfo.extract(obj))
 
-    def deserialize(self, t: type[object], obj: ScalarNode[":str"], ctx: Context):  # type: ignore
+    def deserialize(self, t: Any, obj: ScalarNode[":str"], ctx: Context):  # type: ignore
         return recurse(t, obj.value, ctx + YamlSourceInfo.extract(obj))
 
-    def deserialize(self, t: type[object], obj: ScalarNode[":int"], ctx: Context):  # type: ignore
+    def deserialize(self, t: Any, obj: ScalarNode[":int"], ctx: Context):  # type: ignore
         return recurse(t, int(obj.value), ctx + YamlSourceInfo.extract(obj))
 
-    def deserialize(self, t: type[object], obj: ScalarNode[":float"], ctx: Context):  # type: ignore
+    def deserialize(self, t: Any, obj: ScalarNode[":float"], ctx: Context):  # type: ignore
         return recurse(t, float(obj.value), ctx + YamlSourceInfo.extract(obj))
+
+    def deserialize(self, t: Any, obj: ScalarNode[":bool"], ctx: Context):  # type: ignore
+        value = obj.value.lower() in ("yes", "on", "true")
+        return recurse(t, value, ctx + YamlSourceInfo.extract(obj))
+
+    def deserialize(self, t: Any, obj: ScalarNode[":null"], ctx: Context):  # type: ignore
+        return recurse(t, None, ctx + YamlSourceInfo.extract(obj))
+
+    def deserialize(self, t: Any, obj: ScalarNode[":timestamp"], ctx: Context):  # type: ignore
+        return recurse(t, obj.value, ctx + YamlSourceInfo.extract(obj))
+
+    def deserialize(self, t: Any, obj: yaml.ScalarNode, ctx: Context):  # pragma: no cover
+        raise ValidationError(f"Cannot deserialize YAML node of type `{obj.tag}`")
 
 
 class FromFileExtra(FromFile):

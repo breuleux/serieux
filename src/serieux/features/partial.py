@@ -1,5 +1,6 @@
 from dataclasses import field, fields, make_dataclass
 from functools import reduce
+from typing import Any
 
 from ovld import Medley, call_next, ovld, recurse
 
@@ -77,14 +78,14 @@ def partialize(t: object):
 
 class PartialBuilding(Medley):
     @ovld(priority=PRIO_HIGH)
-    def deserialize(self, t: type[Partial[object]], obj: object, ctx: Context, /):
+    def deserialize(self, t: type[Partial], obj: object, ctx: Context, /):
         try:
             return call_next(t, obj, ctx)
         except SerieuxError as exc:
             return exc
 
     @ovld(priority=PRIO_HIGH)
-    def deserialize(self, t: type[object], obj: Sources, ctx: Context, /):
+    def deserialize(self, t: Any, obj: Sources, ctx: Context, /):
         parts = [recurse(Partial[t], src, ctx) for src in obj.sources]
         rval = instantiate(reduce(merge, parts))
         if isinstance(rval, SerieuxError):

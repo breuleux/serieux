@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Counter
+from typing import Any, Counter
 
 from ovld import Medley, call_next, recurse
 
@@ -42,7 +42,7 @@ class SchemaCompiler(Medley):
         self.done = set()
         self.name_indexes = Counter()
 
-    def unique_name(self, t: type):
+    def unique_name(self, t: Any):
         name = t.__name__
         idx = self.name_indexes[name]
         self.name_indexes[name] += 1
@@ -69,7 +69,7 @@ class SchemaCompiler(Medley):
 
     def __call__(self, x: Schema, pth: tuple):
         is_always = self.ref_policy == RefPolicy.ALWAYS
-        if x.get("type", "object") != "object":
+        if x.get("type", "object") != "object" or "oneOf" in x:
             return call_next(x, pth)
         elif x in self.refs:
             if x not in self.done and self.ref_policy == RefPolicy.NEVER:

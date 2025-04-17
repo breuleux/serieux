@@ -1,4 +1,5 @@
 from functools import cached_property
+from typing import Any
 
 from ovld import Medley, call_next, ovld, recurse
 
@@ -161,7 +162,7 @@ class LazyDeserialization(Medley):
         return LazyProxy(evaluate, type=t)
 
     @ovld
-    def deserialize(self, t: type[object], value: LazyProxy, ctx: Context):
+    def deserialize(self, t: Any, value: LazyProxy, ctx: Context):
         return recurse(t, value._obj, ctx)
 
 

@@ -149,7 +149,7 @@ class BaseImplementation(Medley):
             return t
 
     @ovld(priority=PRIO_LAST)
-    def serialize(self, t: type[object], obj: object, ctx: Context, /):
+    def serialize(self, t: Any, obj: Any, ctx: Context, /):
         raise ValidationError(
             f"Cannot serialize object of type '{clsstring(type(obj))}'"
             f" into expected type '{clsstring(t)}'.",
@@ -157,13 +157,13 @@ class BaseImplementation(Medley):
         )
 
     @ovld(priority=PRIO_LOW)
-    def serialize(self, t: type[InstructionType], obj: object, ctx: Context, /):
+    def serialize(self, t: type[InstructionType], obj: Any, ctx: Context, /):
         return recurse(t.pushdown(), obj, ctx)
 
-    def serialize(self, obj: object, /):
+    def serialize(self, obj: Any, /):
         return recurse(type(obj), obj, self.default_context)
 
-    def serialize(self, t: type[object], obj: object, /):
+    def serialize(self, t: Any, obj: Any, /):
         return recurse(t, obj, self.default_context)
 
     #########################################
@@ -173,7 +173,7 @@ class BaseImplementation(Medley):
     deserialize_embed_condition = serialize_embed_condition
 
     @ovld(priority=PRIO_LAST)
-    def deserialize(self, t: type[object], obj: object, ctx: Context, /):
+    def deserialize(self, t: Any, obj: Any, ctx: Context, /):
         try:
             # Pass through if the object happens to already be the right type
             if isinstance(obj, t):
@@ -187,10 +187,10 @@ class BaseImplementation(Medley):
         )
 
     @ovld(priority=PRIO_LOW)
-    def deserialize(self, t: type[InstructionType], obj: object, ctx: Context, /):
+    def deserialize(self, t: type[InstructionType], obj: Any, ctx: Context, /):
         return recurse(t.pushdown(), obj, ctx)
 
-    def deserialize(self, t: type[object], obj: object, /):
+    def deserialize(self, t: Any, obj: Any, /):
         return recurse(t, obj, self.default_context)
 
     ####################################
@@ -198,14 +198,14 @@ class BaseImplementation(Medley):
     ####################################
 
     @ovld(priority=PRIO_TOP)
-    def schema(self, t: type[object], ctx: Context, /):
+    def schema(self, t: Any, ctx: Context, /):
         if t not in self._schema_cache:
             self._schema_cache[t] = holder = Schema(t)
             result = call_next(t, ctx)
             holder.update(result)
         return self._schema_cache[t]
 
-    def schema(self, t: type[object], /):
+    def schema(self, t: Any, /):
         return recurse(t, self.default_context)
 
     @ovld(priority=PRIO_LOW)
@@ -311,7 +311,7 @@ class BaseImplementation(Medley):
     ################################
 
     @code_generator_wrap_error(priority=PRIO_DEFAULT)
-    def serialize(cls, t: type[Modelizable], obj: object, ctx: Context, /):
+    def serialize(cls, t: type[Modelizable], obj: Any, ctx: Context, /):
         (t,) = get_args(t)
         t = model(t)
         if not t.accepts(obj):

@@ -1,7 +1,10 @@
 import json
 import os
 import tomllib
+from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
+from types import NoneType
 
 import pytest
 
@@ -182,3 +185,20 @@ def test_wd_origin(tmp_path):
     wd = WorkingDirectory(origin=origin)
     assert wd.origin == origin
     assert wd.directory == tmp_path
+
+
+@dataclass
+class Datatypes:
+    strong: str
+    integger: int
+    flowhat: float
+    boule: bool
+    nuttin: NoneType
+    date: date | None
+
+
+def test_deserialize_types():
+    data = deserialize(Datatypes, datapath / "all.yaml")
+    assert data == Datatypes(
+        strong="hello", integger=5, flowhat=4.4, boule=True, nuttin=None, date=date(2025, 1, 3)
+    )

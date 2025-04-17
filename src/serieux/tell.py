@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from types import NoneType
 
 from ovld import Code, ovld, recurse
 
@@ -51,8 +53,21 @@ class KeyValueTell(Tell):
 
 
 @ovld
-def tells(typ: type[int] | type[str] | type[bool] | type[float] | type[list] | type[dict]):
+def tells(
+    typ: type[int]
+    | type[str]
+    | type[bool]
+    | type[float]
+    | type[NoneType]
+    | type[list]
+    | type[dict],
+):
     return {TypeTell(typ)}
+
+
+@ovld
+def tells(typ: type[date] | type[datetime] | type[timedelta]):
+    return {TypeTell(str)}
 
 
 @ovld

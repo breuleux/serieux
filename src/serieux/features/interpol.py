@@ -1,5 +1,6 @@
 import re
 from dataclasses import field
+from typing import Any
 
 from ovld import Medley, call_next, ovld, recurse
 from ovld.dependent import Regexp
@@ -27,13 +28,13 @@ class Variables(AccessPath):
 
 class VariableInterpolation(Medley):
     @ovld(priority=3)
-    def deserialize(self, typ: type[object], value: object, ctx: Variables):
+    def deserialize(self, typ: Any, value: object, ctx: Variables):
         rval = call_next(typ, value, ctx)
         ctx.refs[ctx.access_path] = rval
         return rval
 
     @ovld(priority=2)
-    def deserialize(self, typ: type[object], value: Regexp[r"^\$\{[^}]+\}$"], ctx: Variables):
+    def deserialize(self, typ: Any, value: Regexp[r"^\$\{[^}]+\}$"], ctx: Variables):
         expr = value.lstrip("${").rstrip("}")
 
         def interpolate():
@@ -43,7 +44,7 @@ class VariableInterpolation(Medley):
         return LazyProxy(interpolate)
 
     @ovld(priority=1)
-    def deserialize(self, typ: type[object], value: Regexp[r"\$\{[^}]+\}"], ctx: Variables):
+    def deserialize(self, typ: Any, value: Regexp[r"\$\{[^}]+\}"], ctx: Variables):
         def interpolate():
             def repl(match):
                 return str(ctx.evaluate_reference(match.group(1)))
