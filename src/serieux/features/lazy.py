@@ -4,14 +4,15 @@ from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
 from ..instructions import NewInstruction
+from ..model import Model, model
 
 #############
 # Constants #
 #############
 
 
-Lazy = NewInstruction["Lazy", 1, False]
-DeepLazy = NewInstruction["DeepLazy", 1]
+Lazy = NewInstruction["Lazy", 2, False]
+DeepLazy = NewInstruction["DeepLazy", 2]
 
 
 ###########
@@ -20,7 +21,8 @@ DeepLazy = NewInstruction["DeepLazy", 1]
 
 
 class LazyProxy:
-    def __init__(self, evaluate):
+    def __init__(self, evaluate, type=None):
+        self._type = type
         self._evaluate = evaluate
         self._computing = False
 
@@ -38,8 +40,10 @@ class LazyProxy:
         return rval
 
     def __getattribute__(self, name):
-        if name in ("_obj", "_computing", "_evaluate", "__dict__"):
+        if name in ("_obj", "_computing", "_evaluate", "_type", "__dict__"):
             return object.__getattribute__(self, name)
+        elif name == "__class__":
+            return object.__getattribute__(self, "_type") or LazyProxy
         return getattr(self._obj, name)
 
     def __str__(self):
@@ -142,23 +146,37 @@ class LazyProxy:
 
 
 class LazyDeserialization(Medley):
-    @ovld(priority=1)
-    def deserialize(self, typ: type[Lazy], value: object, ctx: Context):
+    @ovld(priority=10)
+    def deserialize(self, t: type[Lazy], value: object, ctx: Context):
         def evaluate():
-            return call_next(typ.pushdown(), value, ctx)
+            return call_next(t.pushdown(), value, ctx)
 
-        return LazyProxy(evaluate)
+        return LazyProxy(evaluate, type=t)
 
-    @ovld(priority=1)
-    def deserialize(self, typ: type[DeepLazy], value: object, ctx: Context):
+    @ovld(priority=10)
+    def deserialize(self, t: type[DeepLazy], value: object, ctx: Context):
         def evaluate():
-            return call_next(typ, value, ctx)
+            return call_next(t, value, ctx)
 
-        return LazyProxy(evaluate)
+        return LazyProxy(evaluate, type=t)
 
     @ovld
-    def deserialize(self, typ: type[object], value: LazyProxy, ctx: Context):
-        return recurse(typ, value._obj, ctx)
+    def deserialize(self, t: type[object], value: LazyProxy, ctx: Context):
+        return recurse(t, value._obj, ctx)
+
+
+@model.register
+def _(t: type[Lazy]):
+    def construct(*args, **kwargs):
+        return LazyProxy(lambda: m.constructor(*args, **kwargs), type=t)
+
+    m = call_next(t)
+    if m:
+        return Model.make(
+            constructor=construct,
+            fields=m.fields,
+            original_type=t,
+        )
 
 
 # Add as a default feature in serieux.Serieux

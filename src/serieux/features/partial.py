@@ -45,13 +45,17 @@ def partialize(t: type[Modelizable]):
         for f in m.fields
     ]
     fields.append(
-        ("_serieux_ctx", Context, field(default=NOT_GIVEN, metadata={"serieux_metavar": "$ctx"}))
+        (
+            "_serieux_ctx",
+            Context,
+            field(repr=False, default=NOT_GIVEN, metadata={"serieux_metavar": "$ctx"}),
+        )
     )
     dc = make_dataclass(
         cls_name=f"Partial[{t.__name__}]",
         bases=(PartialBase,),
         fields=fields,
-        namespace={"_constructor": m.constructor},
+        namespace={"_constructor": staticmethod(m.constructor), "_model": m},
     )
     return dc
 
@@ -135,7 +139,7 @@ def merge(x: NOT_GIVEN_T, y: NOT_GIVEN_T):
 
 @ovld
 def merge(x: PartialBase, y: PartialBase):
-    if (xc := x._constructor) is not (yc := y._constructor):
+    if (xc := x._model) is not (yc := y._model):
         raise ValidationError(
             f"Cannot merge sources because of incompatible constructors: '{xc}', '{yc}'"
         )
@@ -149,7 +153,7 @@ def merge(x: PartialBase, y: PartialBase):
 
 @ovld
 def merge(x: PartialBase, y: object):
-    if (xc := x._constructor) is not type(y):
+    if (xc := x._model) is not model(type(y)):
         raise ValidationError(
             f"Cannot merge sources because of incompatible constructors: '{xc}', '{type(y)}'."
         )
@@ -158,7 +162,7 @@ def merge(x: PartialBase, y: object):
 
 @ovld
 def merge(x: object, y: PartialBase):
-    if (yc := y._constructor) is not type(x):
+    if (yc := y._model) is not model(type(x)):
         raise ValidationError(
             f"Cannot merge sources because of incompatible constructors: '{type(x)}', '{yc}'."
         )
@@ -219,7 +223,7 @@ def instantiate(xs: dict):
 @ovld
 def instantiate(p: PartialBase):
     dc = p._constructor
-    args = recurse({f.name: getattr(p, f.name) for f in fields(dc)})
+    args = recurse({f.name: getattr(p, f.name) for f in p._model.fields})
     if isinstance(args, SerieuxError):
         return args
     try:

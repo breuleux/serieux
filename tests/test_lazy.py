@@ -5,6 +5,9 @@ import pytest
 from serieux import Serieux
 from serieux.exc import ValidationError
 from serieux.features.lazy import DeepLazy, Lazy, LazyDeserialization, LazyProxy
+from serieux.features.partial import Sources
+
+from .definitions import Point
 
 deserialize = (Serieux + LazyDeserialization)().deserialize
 
@@ -97,3 +100,29 @@ def test_deep_laziness():
     with pytest.raises(ValidationError, match="Age cannot be negative"):
         deep_lazy[1].name
     assert deep_lazy[2].name == "Clara"
+
+
+@dataclass
+class ContainsLazy:
+    normal: str
+    pt: Lazy[Point]
+
+
+def test_lazy_partial_invalid():
+    result = deserialize(ContainsLazy, Sources({"normal": "hello", "pt": {"x": 1}}))
+    assert result.normal == "hello"
+    with pytest.raises(TypeError):
+        result.pt.x
+
+
+def test_lazy_partial():
+    result = deserialize(
+        ContainsLazy,
+        Sources(
+            {"normal": "hello", "pt": {"x": 1}},
+            {"pt": {"y": 18}},
+        ),
+    )
+    assert result.normal == "hello"
+    assert result.pt.x == 1
+    assert result.pt.y == 18
