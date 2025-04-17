@@ -27,7 +27,7 @@ def model_from_callable(t):
             property_name=None,
         )
         fields.append(field)
-    return Model.make(
+    return Model(
         original_type=t,
         fields=fields,
         constructor=t,

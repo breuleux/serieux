@@ -3,9 +3,8 @@ from typing import Callable, get_args, get_origin
 
 from ovld import Dataclass, call_next, class_check, ovld
 
-from serieux.instructions import InstructionType
-
 from .docstrings import get_attribute_docstrings
+from .instructions import InstructionType
 from .utils import evaluate_hint
 
 UNDEFINED = object()
@@ -13,8 +12,7 @@ UNDEFINED = object()
 
 @class_check
 def Modelizable(t):
-    m = model(t)
-    return isinstance(m, type) and issubclass(m, Model)
+    return isinstance(model(t), Model)
 
 
 @dataclass(kw_only=True)
@@ -53,30 +51,14 @@ class Field:
         return self.default is MISSING and self.default_factory is MISSING
 
 
-class Model(type):
-    original_type = object
-    fields = []
-    constructor = None
+@dataclass
+class Model:
+    original_type: type
+    fields: list[Field]
+    constructor: Callable
 
-    @staticmethod
-    def make(
-        original_type,
-        fields,
-        constructor,
-    ):
-        return Model(
-            f"Model[{getattr(original_type, '__name__', str(original_type))}]",
-            (Model,),
-            {
-                "original_type": original_type,
-                "fields": fields,
-                "constructor": constructor,
-            },
-        )
-
-    @classmethod
-    def accepts(cls, other):
-        ot = cls.original_type
+    def accepts(self, other):
+        ot = self.original_type
         return issubclass(other, get_origin(ot) or ot)
 
 
@@ -93,7 +75,7 @@ def _take_premade(t):
 def model(t: type[object]):
     t = evaluate_hint(t)
     if t not in _model_cache:
-        _premade[t] = Model.make(
+        _premade[t] = Model(
             original_type=t,
             fields=[],
             constructor=None,
@@ -138,7 +120,7 @@ def model(dc: type[Dataclass]):
 def model(t: type[InstructionType]):
     m = call_next(t.strip(t))
     if m:
-        return Model.make(
+        return Model(
             original_type=m.original_type,
             fields=[replace(field, type=t[field.type]) for field in m.fields],
             constructor=m.constructor,

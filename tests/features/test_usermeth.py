@@ -120,7 +120,7 @@ class RGBM:
 
     @classmethod
     def serieux_model(cls, call_next):
-        return Model.make(
+        return Model(
             original_type=cls,
             fields=[
                 Field(name="red", type=int, serialized_name="R"),
