@@ -129,3 +129,42 @@ def test_tsubclass_partial_merge():
     assert isinstance(animals.alpha, Wolf)
     assert animals.alpha.name == "Wolfie"
     assert animals.alpha.size == 13
+
+
+def test_tsubclass_partial_merge_subclass_left():
+    animals = deserialize(
+        Animals,
+        Sources(
+            {"alpha": {"name": "Roar"}},
+            {
+                "alpha": {
+                    "class": "tests.features.test_tsubclass:Wolf",
+                    "size": 10,
+                },
+                "betas": [],
+            },
+        ),
+    )
+    assert isinstance(animals.alpha, Wolf)
+    assert animals.alpha.name == "Roar"
+    assert animals.alpha.size == 10
+
+
+def test_tsubclass_partial_merge_subclass_right():
+    animals = deserialize(
+        Animals,
+        Sources(
+            {
+                "alpha": {
+                    "class": "tests.features.test_tsubclass:Wolf",
+                    "name": "Wolfie",
+                    "size": 10,
+                },
+                "betas": [],
+            },
+            {"alpha": {"name": "Roar"}},
+        ),
+    )
+    assert isinstance(animals.alpha, Wolf)
+    assert animals.alpha.name == "Roar"
+    assert animals.alpha.size == 10

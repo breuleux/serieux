@@ -5,7 +5,7 @@ from ovld import Dataclass, call_next, class_check, ovld
 
 from .docstrings import get_attribute_docstrings
 from .instructions import InstructionType
-from .utils import evaluate_hint
+from .utils import clsstring, evaluate_hint
 
 UNDEFINED = object()
 
@@ -60,6 +60,15 @@ class Model:
     def accepts(self, other):
         ot = self.original_type
         return issubclass(other, get_origin(ot) or ot)
+
+    def is_submodel_of(self, other):
+        # TODO: check that the fields are also the same
+        return issubclass(self.original_type, other.original_type)
+
+    def __str__(self):
+        return f"Model({clsstring(self.original_type)})"
+
+    __repr__ = __str__
 
 
 _model_cache = {}

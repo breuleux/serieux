@@ -136,16 +136,22 @@ def merge(x: NOT_GIVEN_T, y: NOT_GIVEN_T):
 
 @ovld
 def merge(x: PartialBase, y: PartialBase):
-    if (xc := x._model) is not (yc := y._model):
+    xm = x._model
+    ym = y._model
+    if xm is ym or xm.is_submodel_of(ym):
+        main = type(x)
+    elif ym.is_submodel_of(xm):
+        main = type(y)
+    else:
         raise ValidationError(
-            f"Cannot merge sources because of incompatible constructors: '{xc}', '{yc}'"
+            f"Cannot merge sources because of incompatible constructors: '{xm}', '{ym}'"
         )
     args = {}
-    for f in fields(type(x)):
-        xv = getattr(x, f.name)
-        yv = getattr(y, f.name)
+    for f in fields(main):
+        xv = getattr(x, f.name, NOT_GIVEN)
+        yv = getattr(y, f.name, NOT_GIVEN)
         args[f.name] = recurse(xv, yv)
-    return type(x)(**args)
+    return main(**args)
 
 
 @ovld
