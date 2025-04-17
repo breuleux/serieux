@@ -6,11 +6,15 @@ from .auto import Auto
 from .ctx import Context
 from .exc import ValidationError, ValidationExceptionGroup
 from .features.clargs import CommandLineArguments
+from .features.interpol import Variables
 from .features.lazy import DeepLazy, Lazy, LazyProxy
-from .features.partial import Sources
+from .features.partial import Partial, Sources
 from .features.tagged import Tagged
+from .features.tsubclass import TaggedSubclass
 from .impl import BaseImplementation
 from .instructions import InstructionType, NewInstruction
+from .model import Extensible, Model, Modelizable
+from .schema import RefPolicy, Schema
 from .version import version as __version__
 
 
@@ -33,8 +37,6 @@ default_features = _default_features()
 
 if TYPE_CHECKING:  # pragma: no cover
     from typing import TypeVar
-
-    from .schema import Schema
 
     T = TypeVar("T")
 
@@ -71,7 +73,6 @@ schema = serieux.schema
 load = serieux.load
 dump = serieux.dump
 
-
 __all__ = [
     "__version__",
     "Auto",
@@ -81,17 +82,27 @@ __all__ = [
     "DeepLazy",
     "deserialize",
     "dump",
+    "Extensible",
     "InstructionType",
+    "JSON",
     "Lazy",
     "LazyProxy",
     "load",
+    "Model",
+    "Modelizable",
     "NewInstruction",
+    "Partial",
+    "RefPolicy",
     "schema",
+    "Schema",
     "serialize",
     "serieux",
     "Serieux",
+    "Schema",
     "Sources",
     "Tagged",
+    "TaggedSubclass",
     "ValidationError",
     "ValidationExceptionGroup",
+    "Variables",
 ]
