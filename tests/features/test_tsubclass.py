@@ -1,8 +1,9 @@
+import json
 from dataclasses import dataclass
 
 import pytest
 
-from serieux import Serieux
+from serieux import Serieux, schema
 from serieux.exc import ValidationError
 from serieux.features.partial import Sources
 from serieux.features.tsubclass import TaggedSubclass, TaggedSubclassFeature
@@ -26,6 +27,11 @@ class Cat(Animal):
 
 
 @dataclass
+class HouseCat(Cat):
+    cute: bool = True
+
+
+@dataclass
 class Wolf(Animal):
     size: int
 
@@ -46,8 +52,10 @@ def test_tagged_subclass():
 
 
 def test_serialize_not_top_level():
-    class Lynx(Cat):
-        pass
+    @dataclass
+    class Lynx:
+        name: str
+        selfishness: int
 
     orig = Lynx(name="Lina", selfishness=9)
     with pytest.raises(ValidationError, match="Only top-level symbols"):
@@ -168,3 +176,8 @@ def test_tsubclass_partial_merge_subclass_right():
     assert isinstance(animals.alpha, Wolf)
     assert animals.alpha.name == "Roar"
     assert animals.alpha.size == 10
+
+
+def test_tsubclass_schema(file_regression):
+    sch = schema(TaggedSubclass[Animal])
+    file_regression.check(json.dumps(sch.compile(), indent=4))

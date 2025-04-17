@@ -420,7 +420,12 @@ class BaseImplementation(Medley):
             if f.required:
                 required.append(f.property_name)
 
-        return {"type": "object", "properties": properties, "required": required}
+        return {
+            "type": "object",
+            "properties": properties,
+            "required": required,
+            "additionalProperties": t.extensible,
+        }
 
     ###########################
     # Implementations: Unions #

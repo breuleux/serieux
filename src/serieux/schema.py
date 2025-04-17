@@ -3,6 +3,8 @@ from typing import Any, Counter
 
 from ovld import Medley, call_next, recurse
 
+from .features.partial import merge
+
 
 class Schema(dict):
     def __init__(self, t):
@@ -93,4 +95,4 @@ class SchemaCompiler(Medley):
 
     def __call__(self, x: AnnotatedSchema, pth: tuple):
         rval = recurse(x.parent, pth)
-        return {**rval, **x}
+        return merge(rval, x)

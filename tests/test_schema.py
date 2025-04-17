@@ -81,6 +81,7 @@ def test_schema_dataclass():
         "type": "object",
         "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
         "required": ["x", "y"],
+        "additionalProperties": False,
     }
 
 
@@ -93,6 +94,7 @@ def test_schema_dataclass_2():
             "cool": {"type": "boolean"},
         },
         "required": ["name"],
+        "additionalProperties": False,
     }
 
 
@@ -117,6 +119,7 @@ def test_schema_recursive():
             },
         },
         "required": ["left", "right"],
+        "additionalProperties": False,
     }
 
 
@@ -145,6 +148,7 @@ def test_schema_recursive_policy_always():
                     },
                 },
                 "required": ["left", "right"],
+                "additionalProperties": False,
             }
         },
     }
@@ -170,6 +174,7 @@ def test_schema_recursive_policy_two_trees():
                     "st": {"$ref": "#/$defs/Tree2"},
                 },
                 "required": ["it", "st"],
+                "additionalProperties": False,
             },
             "Tree": {
                 "type": "object",
@@ -188,6 +193,7 @@ def test_schema_recursive_policy_two_trees():
                     },
                 },
                 "required": ["left", "right"],
+                "additionalProperties": False,
             },
             "Tree2": {
                 "type": "object",
@@ -206,6 +212,7 @@ def test_schema_recursive_policy_two_trees():
                     },
                 },
                 "required": ["left", "right"],
+                "additionalProperties": False,
             },
         },
     }
@@ -241,15 +248,18 @@ def test_schema_policy_never_minimal():
                     "description": "First point",
                     "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
                     "required": ["x", "y"],
+                    "additionalProperties": False,
                 },
                 "b": {
                     "type": "object",
                     "description": "Second point",
                     "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
                     "required": ["x", "y"],
+                    "additionalProperties": False,
                 },
             },
             "required": ["a", "b"],
+            "additionalProperties": False,
         }
     )
 
@@ -263,6 +273,7 @@ def test_schema_policy_norepeat():
                 "description": "First point",
                 "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
                 "required": ["x", "y"],
+                "additionalProperties": False,
             },
             "b": {
                 "$ref": "#/properties/a",
@@ -270,6 +281,7 @@ def test_schema_policy_norepeat():
             },
         },
         "required": ["a", "b"],
+        "additionalProperties": False,
     }
 
 
@@ -281,6 +293,7 @@ def test_schema_policy_always():
                 "type": "object",
                 "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
                 "required": ["x", "y"],
+                "additionalProperties": False,
             },
             "TwoPoints": {
                 "type": "object",
@@ -289,6 +302,7 @@ def test_schema_policy_always():
                     "b": {"$ref": "#/$defs/Point", "description": "Second point"},
                 },
                 "required": ["a", "b"],
+                "additionalProperties": False,
             },
         },
     }
@@ -307,4 +321,5 @@ def test_schema_descriptions():
             },
         },
         "required": ["pinkness", "weight"],
+        "additionalProperties": False,
     }

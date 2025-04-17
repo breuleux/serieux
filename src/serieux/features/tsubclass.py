@@ -1,10 +1,12 @@
 import importlib
+from collections import deque
 
 from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
 from ..exc import ValidationError
-from ..instructions import NewInstruction
+from ..instructions import NewInstruction, strip_all
+from ..schema import AnnotatedSchema
 
 #############
 # Constants #
@@ -61,6 +63,31 @@ class TaggedSubclassFeature(Medley):
         if not issubclass(actual_class, base):
             raise ValidationError(f"'{actual_class}' is not a subclass of '{base}'", ctx=ctx)
         return recurse(TaggedSubclass.strip(t[actual_class]), obj, ctx)
+
+    def schema(self, t: type[TaggedSubclass], ctx: Context):
+        base = strip_all(t)
+        subschemas = [recurse(TaggedSubclass.strip(t))]
+        base_mod = base.__module__
+        queue = deque(strip_all(t).__subclasses__())
+        while queue:
+            sc = queue.popleft()
+            queue.extend(sc.__subclasses__())
+            sc_mod = sc.__module__
+            sc_name = sc.__name__
+            subsch = recurse(TaggedSubclass.strip(t[sc]))
+            subsch = AnnotatedSchema(
+                parent=subsch,
+                properties={
+                    "class": {
+                        "title": "Class",
+                        "description": "Reference to the class to instantiate",
+                        "const": sc_name if sc_mod == base_mod else f"{sc_mod}:{sc_name}",
+                    }
+                },
+                required=["class"],
+            )
+            subschemas.append(subsch)
+        return {"oneOf": subschemas}
 
 
 # Add as a default feature in serieux.Serieux

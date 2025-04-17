@@ -67,6 +67,7 @@ def test_custom_schema():
                     "blue": {"type": "integer"},
                 },
                 "required": ["red", "green", "blue"],
+                "additionalProperties": False,
             },
         ]
     }

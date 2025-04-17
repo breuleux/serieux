@@ -56,6 +56,7 @@ class Model:
     original_type: type
     fields: list[Field]
     constructor: Callable
+    extensible: bool = False
 
     def accepts(self, other):
         ot = self.original_type
