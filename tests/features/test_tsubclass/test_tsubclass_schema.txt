@@ -5,6 +5,10 @@
             "properties": {
                 "name": {
                     "type": "string"
+                },
+                "class": {
+                    "description": "Reference to the class to instantiate",
+                    "const": "Animal"
                 }
             },
             "required": [
@@ -22,7 +26,6 @@
                     "type": "integer"
                 },
                 "class": {
-                    "title": "Class",
                     "description": "Reference to the class to instantiate",
                     "const": "Cat"
                 }
@@ -44,7 +47,6 @@
                     "type": "integer"
                 },
                 "class": {
-                    "title": "Class",
                     "description": "Reference to the class to instantiate",
                     "const": "Wolf"
                 }
@@ -69,7 +71,6 @@
                     "type": "boolean"
                 },
                 "class": {
-                    "title": "Class",
                     "description": "Reference to the class to instantiate",
                     "const": "HouseCat"
                 }

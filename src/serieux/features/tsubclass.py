@@ -66,9 +66,9 @@ class TaggedSubclassFeature(Medley):
 
     def schema(self, t: type[TaggedSubclass], ctx: Context):
         base = strip_all(t)
-        subschemas = [recurse(TaggedSubclass.strip(t))]
+        subschemas = []
         base_mod = base.__module__
-        queue = deque(strip_all(t).__subclasses__())
+        queue = deque([base])
         while queue:
             sc = queue.popleft()
             queue.extend(sc.__subclasses__())
@@ -79,12 +79,11 @@ class TaggedSubclassFeature(Medley):
                 parent=subsch,
                 properties={
                     "class": {
-                        "title": "Class",
                         "description": "Reference to the class to instantiate",
                         "const": sc_name if sc_mod == base_mod else f"{sc_mod}:{sc_name}",
                     }
                 },
-                required=["class"],
+                required=[] if sc is base else ["class"],
             )
             subschemas.append(subsch)
         return {"oneOf": subschemas}
