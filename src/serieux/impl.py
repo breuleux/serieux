@@ -573,3 +573,24 @@ class BaseImplementation(Medley):
             "type": "string",
             "pattern": r"^[+-]?(\d+[dhms]|\d+ms|\d+us)+$",
         }
+
+    #########################
+    # Implementations: Path #
+    #########################
+
+    @ovld(priority=PRIO_DEFAULT)
+    def serialize(self, t: type[Path], obj: Path, ctx: Context):
+        if isinstance(ctx, WorkingDirectory):
+            obj = obj.relative_to(ctx.directory)
+        return str(obj)
+
+    @ovld(priority=PRIO_DEFAULT)
+    def deserialize(self, t: type[Path], obj: str, ctx: Context):
+        pth = Path(obj)
+        if isinstance(ctx, WorkingDirectory):
+            pth = ctx.directory / pth
+        return pth
+
+    @ovld(priority=PRIO_DEFAULT)
+    def schema(self, t: type[Path], ctx: Context, /):
+        return {"type": "string"}

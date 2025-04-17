@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from types import NoneType
 
 import pytest
@@ -57,6 +58,10 @@ def test_schema_timedelta():
         "type": "string",
         "pattern": r"^[+-]?(\d+[dhms]|\d+ms|\d+us)+$",
     }
+
+
+def test_schema_path():
+    assert schema(Path) == {"type": "string"}
 
 
 def test_schema_list():

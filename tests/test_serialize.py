@@ -1,5 +1,6 @@
 import inspect
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from ovld import Medley
@@ -7,6 +8,7 @@ from ovld import Medley
 from serieux import Serieux, dump, load, serialize
 from serieux.ctx import AccessPath, Context
 from serieux.exc import ValidationError
+from serieux.features.fromfile import WorkingDirectory
 
 from .common import has_312_features, one_test_per_assert
 from .definitions import Color, Level, Point
@@ -183,6 +185,14 @@ def test_serialize_timedelta():
         "30s",
         "432000s",
     ]
+
+
+def test_serialize_path():
+    assert serialize(Path, Path("hello/world.txt")) == "hello/world.txt"
+    assert (
+        serialize(Path, Path("hello/world.txt"), WorkingDirectory(directory=Path("hello")))
+        == "world.txt"
+    )
 
 
 ###############

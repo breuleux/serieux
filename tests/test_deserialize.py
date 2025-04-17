@@ -8,6 +8,7 @@ import pytest
 from serieux import deserialize
 from serieux.ctx import AccessPath
 from serieux.exc import ValidationError
+from serieux.features.fromfile import WorkingDirectory
 
 from .common import has_312_features, one_test_per_assert
 from .definitions import Color, Defaults, Level, Point, Point3D
@@ -175,6 +176,13 @@ def test_deserialize_timedelta():
         deserialize(timedelta, "1d3x")
     with pytest.raises(ValidationError, match="Could not convert"):
         deserialize(timedelta, "1.5.4d")
+
+
+def test_deserialize_path():
+    assert deserialize(Path, "hello/world.txt") == Path("hello/world.txt")
+    assert deserialize(Path, "world.txt", WorkingDirectory(directory=Path("hello"))) == Path(
+        "hello/world.txt"
+    )
 
 
 ###############
