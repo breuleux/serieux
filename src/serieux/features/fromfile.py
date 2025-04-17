@@ -32,7 +32,7 @@ def parse(path: FileSuffix[".json"]):  # type: ignore
 
 @ovld
 def parse(path: FileSuffix[".yaml", ".yml"]):  # type: ignore
-    return yaml.compose(path.read_text())
+    return yaml.compose(path.read_text()) or {}
 
 
 @ovld
