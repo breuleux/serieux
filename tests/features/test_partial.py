@@ -174,7 +174,7 @@ def test_merge_partial_with_object():
     assert load(RGB, Sources({"red": 0}, "#ffffff")) == RGB(255, 255, 255)
     assert load(RGB, Sources("#ffffff", {"red": 0})) == RGB(0, 255, 255)
 
-    with pytest.raises(SerieuxError, match="Cannot deserialize"):
+    with pytest.raises(SerieuxError, match="RGB.__init__.. missing 2"):
         load(RGB, Sources("#fffffX", {"red": 0}))
 
     with pytest.raises(SerieuxError, match="Cannot deserialize"):

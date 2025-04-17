@@ -111,7 +111,7 @@ def merge(x: object, y: SerieuxError):
 
 @ovld(priority=2)
 def merge(x: SerieuxError, y: object):
-    return x
+    return y
 
 
 @ovld(priority=2)

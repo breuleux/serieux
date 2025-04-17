@@ -45,7 +45,10 @@ class Variables(AccessPath):
         return LazyProxy(lambda: self.evaluate_reference(expr))
 
     def resolve_variable(self, method: Literal["env"], expr: str, /):
-        return StringEncoded(self.environ[expr])
+        try:
+            return StringEncoded(self.environ[expr])
+        except KeyError:
+            raise ValidationError(f"Environment variable '{expr}' is not defined")
 
     def resolve_variable(self, method: str, expr: str, /):
         raise ValidationError(

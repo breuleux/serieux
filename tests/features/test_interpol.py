@@ -137,3 +137,8 @@ def test_unsupported_resolver():
         match="Cannot resolve 'unknown:xyz' because the 'unknown' resolver is not defined",
     ):
         deserialize(str, "${unknown:xyz}", Variables())
+
+
+def test_missing_env():
+    with pytest.raises(ValidationError, match="Environment variable 'MISSING' is not defined"):
+        deserialize(str, "${env:MISSING}", Variables())
