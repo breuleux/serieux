@@ -4,6 +4,7 @@ from datetime import date
 import pytest
 
 from serieux import Serieux
+from serieux.exc import ValidationError
 from serieux.features.interpol import VariableInterpolation, Variables
 
 deserialize = (Serieux + VariableInterpolation)().deserialize
@@ -93,3 +94,46 @@ def test_deadlock():
     player = deserialize(Player, data, Variables())
     with pytest.raises(Exception, match="Deadlock"):
         player.name == "x"
+
+
+def test_env():
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("TESTOTRON", "123")
+        data = {"name": "Jon", "nickname": "Jonathan", "number": "${env:TESTOTRON}"}
+        player = deserialize(Player, data, Variables())
+        assert player.name == "Jon"
+        assert player.number == 123
+
+
+def test_env_types():
+    vars = Variables(environ={"BOOL": "yes"})
+    vars = Variables(
+        environ={
+            "BOOL": "yes",
+            "INT": "42",
+            "FLOAT": "3.14",
+            "STR": "hello",
+            "LIST": "a,b,c",
+            "BOOL_FALSE": "no",
+        }
+    )
+
+    assert deserialize(bool, "${env:BOOL}", vars) is True
+    assert deserialize(int, "${env:INT}", vars) == 42
+    assert deserialize(float, "${env:FLOAT}", vars) == 3.14
+    assert deserialize(str, "${env:STR}", vars) == "hello"
+    assert deserialize(list[str], "${env:LIST}", vars) == ["a", "b", "c"]
+    assert deserialize(bool, "${env:BOOL_FALSE}", vars) is False
+
+
+def test_invalid_boolean():
+    with pytest.raises(ValidationError, match="Cannot convert 'invalid' to boolean"):
+        deserialize(bool, "${env:INVALID_BOOL}", Variables(environ={"INVALID_BOOL": "invalid"}))
+
+
+def test_unsupported_resolver():
+    with pytest.raises(
+        ValidationError,
+        match="Cannot resolve 'unknown:xyz' because the 'unknown' resolver is not defined",
+    ):
+        deserialize(str, "${unknown:xyz}", Variables())

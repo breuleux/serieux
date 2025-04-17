@@ -160,7 +160,7 @@ class LazyDeserialization(Medley):
 
         return LazyProxy(evaluate, type=t)
 
-    @ovld
+    @ovld  # pragma: no cover
     def deserialize(self, t: Any, value: LazyProxy, ctx: Context):
         return recurse(t, value._obj, ctx)
 
