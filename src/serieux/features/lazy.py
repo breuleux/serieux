@@ -171,7 +171,7 @@ def _(t: type[Lazy]):
     def construct(*args, **kwargs):
         return LazyProxy(lambda: m.constructor(*args, **kwargs), type=t)
 
-    m = call_next(t)
+    m = call_next(Lazy.strip(t))
     if m:
         return Model.make(
             constructor=construct,
