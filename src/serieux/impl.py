@@ -216,7 +216,7 @@ class BaseImplementation(Medley):
     # Implementations: basic types #
     ################################
 
-    for T in (int, str, bool, float, NoneType):
+    for T in (str, bool, int, float, NoneType):
 
         @code_generator(priority=PRIO_DEFAULT)
         def serialize(cls, t: type[T], obj: T, ctx: Context, /):
@@ -225,6 +225,14 @@ class BaseImplementation(Medley):
         @code_generator(priority=PRIO_DEFAULT)
         def deserialize(cls, t: type[T], obj: T, ctx: Context, /):
             return Lambda(Code("$obj"))
+
+    @code_generator(priority=PRIO_DEFAULT)
+    def serialize(cls, t: type[float], obj: int, ctx: Context, /):
+        return Lambda(Code("$obj"))
+
+    @code_generator(priority=PRIO_DEFAULT)
+    def deserialize(cls, t: type[float], obj: int, ctx: Context, /):
+        return Lambda(Code("float($obj)"))
 
     @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[int], ctx: Context, /):

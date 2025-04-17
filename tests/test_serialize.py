@@ -23,6 +23,11 @@ def test_serialize_scalars():
     assert serialize(None) is None
 
 
+@one_test_per_assert
+def test_serialize_scalars_conversion():
+    assert serialize(float, 10) == 10.0
+
+
 def test_serialize_point():
     pt = Point(1, 2)
     assert serialize(Point, pt) == {"x": 1, "y": 2}

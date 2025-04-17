@@ -26,6 +26,11 @@ def test_deserialize_scalars():
     assert deserialize(type(None), None) is None
 
 
+@one_test_per_assert
+def test_deserialize_scalars_conversion():
+    assert deserialize(float, 10) == 10.0
+
+
 def test_deserialize_dict():
     assert deserialize(dict[str, int], {"a": 1, "b": 2}) == {"a": 1, "b": 2}
 
