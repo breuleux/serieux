@@ -1,3 +1,4 @@
+import json
 from enum import Enum
 from typing import Any, Counter
 
@@ -6,25 +7,36 @@ from ovld import Medley, call_next, recurse
 from .features.partial import merge
 
 
-class Schema(dict):
+class Schema:
     def __init__(self, t):
         self.for_type = t
-        super().__init__()
+        self.data = {}
+
+    def update(self, data):
+        if isinstance(data, Schema):
+            data = data.data
+        self.data.update(data)
+
+    def get(self, key, default):
+        return self.data.get(key, default)
+
+    def __contains__(self, key):
+        return key in self.data
 
     def compile(self, **kwargs):
         return SchemaCompiler(**kwargs)(self)
 
-    def __eq__(self, other):
-        return self is other
+    def json(self, fp=None):
+        if fp:  # pragma: no cover
+            return json.dump(self.compile(), fp, indent=4)
+        else:
+            return json.dumps(self.compile(), indent=4)
 
-    def __hash__(self):
-        return id(self)
 
-
-class AnnotatedSchema(dict):
+class AnnotatedSchema:
     def __init__(self, parent, **annotations):
         self.parent = parent
-        super().__init__(annotations)
+        self.data = annotations
 
 
 class RefPolicy(str, Enum):
@@ -72,20 +84,20 @@ class SchemaCompiler(Medley):
     def __call__(self, x: Schema, pth: tuple):
         is_always = self.ref_policy == RefPolicy.ALWAYS
         if x.get("type", "object") != "object" or "oneOf" in x:
-            return call_next(x, pth)
+            return call_next(x.data, pth)
         elif x in self.refs:
             if x not in self.done and self.ref_policy == RefPolicy.NEVER:
                 raise Exception("Recursive schema cannot be compiled without $ref")
             elif x not in self.done or self.ref_policy not in (RefPolicy.NEVER, RefPolicy.MINIMAL):
                 return {"$ref": "/".join(self.refs[x])}
             else:
-                return call_next(x, pth)
+                return call_next(x.data, pth)
         else:
             if is_always:
                 name = self.unique_name(x.for_type)
                 pth = ("#", "$defs", name)
             self.refs[x] = pth
-            rval = call_next(x, pth)
+            rval = call_next(x.data, pth)
             if "$ref" not in rval:
                 self.done.add(x)
             if is_always:
@@ -95,4 +107,4 @@ class SchemaCompiler(Medley):
 
     def __call__(self, x: AnnotatedSchema, pth: tuple):
         rval = recurse(x.parent, pth)
-        return merge(rval, x)
+        return merge(rval, x.data)

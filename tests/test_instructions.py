@@ -1,4 +1,3 @@
-import json
 from typing import get_args
 
 from ovld import ovld, recurse, subclasscheck
@@ -106,6 +105,6 @@ def test_with_ovld():
 def test_ser_deser_ignores_them():
     assert serialize(Useless[list[Point]], [Point(1, 2)]) == [{"x": 1, "y": 2}]
     assert deserialize(Useless[list[Point]], [{"x": 1, "y": 2}]) == [Point(1, 2)]
-    s1 = json.dumps(schema(Useless[list[Point]]))
-    s2 = json.dumps(schema(list[Point]))
+    s1 = schema(Useless[list[Point]]).json()
+    s2 = schema(list[Point]).json()
     assert s1 == s2
