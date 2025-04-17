@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from .auto import Auto
 from .ctx import Context
-from .exc import ValidationError, ValidationExceptionGroup
+from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
 from .features.clargs import CommandLineArguments
 from .features.interpol import Variables
 from .features.lazy import DeepLazy, Lazy, LazyProxy
@@ -98,6 +98,7 @@ __all__ = [
     "serialize",
     "serieux",
     "Serieux",
+    "SerieuxError",
     "Schema",
     "Sources",
     "Tagged",
