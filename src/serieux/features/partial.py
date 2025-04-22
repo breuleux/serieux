@@ -93,7 +93,12 @@ class PartialBuilding(Medley):
 
     @ovld(priority=PRIO_HIGH)
     def deserialize(self, t: Any, obj: Sources, ctx: Context, /):
-        parts = [recurse(Partial[t], src, ctx) for src in obj.sources]
+        parts = []
+        for src in obj.sources:
+            try:
+                parts.append(recurse(Partial[t], src, ctx))
+            except SerieuxError as exc:
+                parts.append(exc)
         rval = instantiate(reduce(merge, parts))
         if isinstance(rval, SerieuxError):
             raise rval

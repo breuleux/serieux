@@ -1,6 +1,7 @@
 import os
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Literal, get_args
 
 from ovld import Medley, call_next, ovld, recurse
@@ -9,6 +10,7 @@ from ovld.dependent import Regexp
 from ..ctx import AccessPath, Context
 from ..exc import NotGivenError, ValidationError
 from .lazy import LazyProxy
+from .partial import Sources
 
 
 @dataclass
@@ -49,6 +51,16 @@ class Variables(AccessPath):
             return StringEncoded(self.environ[expr])
         except KeyError:
             raise NotGivenError(f"Environment variable '{expr}' is not defined")
+
+    def resolve_variable(self, method: Literal["envfile"], expr: str, /):
+        try:
+            pth = Path(self.environ[expr])
+        except KeyError:
+            raise NotGivenError(f"Environment variable '{expr}' is not defined")
+        if pth.exists():
+            return pth
+        else:
+            return Sources(*[Path(x.strip()) for x in str(pth).split(",")])
 
     def resolve_variable(self, method: str, expr: str, /):
         raise ValidationError(

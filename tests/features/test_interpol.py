@@ -1,5 +1,8 @@
+import os
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -7,8 +10,11 @@ from serieux import Serieux
 from serieux.exc import NotGivenError, ValidationError
 from serieux.features.interpol import VariableInterpolation, Variables
 from serieux.features.partial import Sources
+from tests.definitions import Country
 
 deserialize = (Serieux + VariableInterpolation)().deserialize
+
+datapath = Path(__file__).parent.parent / "data"
 
 
 @dataclass
@@ -159,3 +165,25 @@ def test_not_given_ignore():
 
     d = deserialize(Fool, srcs, Variables(environ={"INTEL": "31"}))
     assert d.iq == 31
+
+
+_canada = str(datapath / "canada.yaml")
+_france = str(datapath / "france.yaml")
+
+
+@mock.patch.dict(os.environ, {"FILOU": _canada})
+def test_resolve_envfile():
+    canada = deserialize(Country, "${envfile:FILOU}", Variables())
+    assert canada.capital == "Ottawa"
+
+
+@mock.patch.dict(os.environ, {"FILOU": f"{_canada}, {_france}"})
+def test_resolve_envfile_two_files():
+    canada = deserialize(Country, "${envfile:FILOU}", Variables())
+    assert canada.capital == "Ottawa"
+    assert [c.name for c in canada.citizens] == ["Olivier", "Abraham", "Jeannot"]
+
+
+def test_resolve_envfile_not_given():
+    canada = deserialize(Country, Sources(Path(_canada), "${envfile:FILOU}"), Variables())
+    assert canada.capital == "Ottawa"
