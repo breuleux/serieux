@@ -7,7 +7,7 @@ from ovld import Medley, call_next, ovld, recurse
 from ovld.dependent import Regexp
 
 from ..ctx import AccessPath, Context
-from ..exc import ValidationError
+from ..exc import NotGivenError, ValidationError
 from .lazy import LazyProxy
 
 
@@ -48,7 +48,7 @@ class Variables(AccessPath):
         try:
             return StringEncoded(self.environ[expr])
         except KeyError:
-            raise ValidationError(f"Environment variable '{expr}' is not defined")
+            raise NotGivenError(f"Environment variable '{expr}' is not defined")
 
     def resolve_variable(self, method: str, expr: str, /):
         raise ValidationError(

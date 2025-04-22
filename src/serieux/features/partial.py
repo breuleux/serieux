@@ -5,7 +5,13 @@ from typing import Any
 from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
-from ..exc import SerieuxError, ValidationError, ValidationExceptionGroup, merge_errors
+from ..exc import (
+    NotGivenError,
+    SerieuxError,
+    ValidationError,
+    ValidationExceptionGroup,
+    merge_errors,
+)
 from ..instructions import NewInstruction
 from ..model import Modelizable, model
 from ..utils import PRIO_HIGH
@@ -102,6 +108,11 @@ def _(p: type[Partial[object]]):
 ######################
 # Merge partial data #
 ######################
+
+
+@ovld(priority=2)
+def merge(x: object, y: NotGivenError):
+    return x
 
 
 @ovld(priority=2)

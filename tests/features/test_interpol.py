@@ -4,8 +4,9 @@ from datetime import date
 import pytest
 
 from serieux import Serieux
-from serieux.exc import ValidationError
+from serieux.exc import NotGivenError, ValidationError
 from serieux.features.interpol import VariableInterpolation, Variables
+from serieux.features.partial import Sources
 
 deserialize = (Serieux + VariableInterpolation)().deserialize
 
@@ -139,6 +140,22 @@ def test_unsupported_resolver():
         deserialize(str, "${unknown:xyz}", Variables())
 
 
-def test_missing_env():
-    with pytest.raises(ValidationError, match="Environment variable 'MISSING' is not defined"):
+def test_not_given():
+    with pytest.raises(NotGivenError, match="Environment variable 'MISSING' is not defined"):
         deserialize(str, "${env:MISSING}", Variables())
+
+
+@dataclass
+class Fool:
+    name: str
+    iq: int = 100
+
+
+def test_not_given_ignore():
+    srcs = Sources({"name": "John"}, {"iq": "${env:INTEL}"})
+
+    d = deserialize(Fool, srcs, Variables())
+    assert d.iq == 100
+
+    d = deserialize(Fool, srcs, Variables(environ={"INTEL": "31"}))
+    assert d.iq == 31

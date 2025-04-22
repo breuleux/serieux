@@ -81,6 +81,10 @@ class SerieuxError(Exception):
     pass
 
 
+class NotGivenError(SerieuxError):
+    pass
+
+
 class ValidationExceptionGroup(SerieuxError, ExceptionGroup):
     def derive(self, excs):  # pragma: no cover
         return ValidationExceptionGroup(self.message, excs)
