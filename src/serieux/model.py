@@ -1,7 +1,7 @@
 from dataclasses import MISSING, dataclass, field, fields, replace
-from typing import Callable, get_args, get_origin
+from typing import Any, Callable, get_args, get_origin
 
-from ovld import Dataclass, call_next, class_check, ovld
+from ovld import Dataclass, call_next, class_check, ovld, recurse
 
 from .docstrings import get_attribute_docstrings
 from .instructions import InstructionType, NewInstruction
@@ -148,4 +148,44 @@ def model(t: type[InstructionType]):
 
 @ovld(priority=-1)
 def model(t: object):
+    return None
+
+
+@ovld
+def field_at(t: Any, path: Any):
+    return field_at(t, path, Field(name="ROOT", type=t))
+
+
+@ovld
+def field_at(t: Any, path: str, f: Field):
+    return recurse(t, path.split("."), f)
+
+
+@ovld(priority=1)
+def field_at(t: Any, path: list, f: Field):
+    if not path:
+        return f
+    else:
+        return call_next(t, path, f)
+
+
+@ovld
+def field_at(t: type[dict], path: list, f: Field):
+    (_, et) = get_args(t) or (str, object)
+    _, *rest = path
+    return recurse(et, rest, Field(name=f.name, type=et))
+
+
+@ovld
+def field_at(t: type[Modelizable], path: list, f: Field):
+    m = model(t)
+    curr, *rest = path
+    for f2 in m.fields:
+        if f2.serialized_name == curr:
+            return recurse(f2.type, rest, f2)
+    return None
+
+
+@ovld(priority=-1)
+def field_at(t: Any, path: list, f: Field):
     return None

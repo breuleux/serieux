@@ -9,7 +9,7 @@ from serieux.ctx import Context
 from serieux.features.clargs import CommandLineArguments
 from serieux.features.tagged import Tagged
 
-from ..definitions import Point
+from ..definitions import Defaults, Job, Point, Worker
 
 
 @dataclass
@@ -69,6 +69,16 @@ def test_booleans():
     assert f("--no-beautiful") == HeroProfile(False, False, True)
     assert f("--no-beautiful", "--has-superpowers", "--no-loves-adventure") == HeroProfile(
         False, True, False
+    )
+
+
+def test_lists():
+    def f(*argv):
+        return deserialize(Defaults, CommandLineArguments(argv), Context())
+
+    assert f("--name", "Tyrone") == Defaults(name="Tyrone", aliases=[], cool=False)
+    assert f("--name", "Tyrone", "--aliases", "Ty", "Ro", "Ne") == Defaults(
+        name="Tyrone", aliases=["Ty", "Ro", "Ne"], cool=False
     )
 
 
@@ -186,6 +196,16 @@ def test_positional():
 
 
 @dataclass
+class Sentence:
+    sentence: str = field(metadata={"argparse": {"nargs": "*"}})
+
+
+def test_nargs_on_str():
+    result = deserialize(Sentence, CommandLineArguments(["--sentence", "Hi", "guys!"]), Context())
+    assert result == Sentence(sentence="Hi guys!")
+
+
+@dataclass
 class Duck:
     quacks: int = field(metadata={"argparse": {"option": "-q"}})
 
@@ -193,3 +213,13 @@ class Duck:
 def test_replace_option():
     result = deserialize(Duck, CommandLineArguments(["-q", "7"]), Context())
     assert result == Duck(quacks=7)
+
+
+def test_mapping():
+    cla = CommandLineArguments(
+        ["--tit", "Inspector", "--yar", "35000", "-n", "Gunther"],
+        autofill=False,
+        mapping={"job.title": "--tit", "job.yearly_pay": "--yar", "name": "-n"},
+    )
+    result = deserialize(Worker, cla, Context())
+    assert result == Worker(name="Gunther", job=Job(title="Inspector", yearly_pay=35000))

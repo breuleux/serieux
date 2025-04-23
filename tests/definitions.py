@@ -89,7 +89,9 @@ class Team:
 
 @dataclass
 class Job:
+    # Name of the job
     title: str
+    # How much it pays, in dollars
     yearly_pay: float
 
 

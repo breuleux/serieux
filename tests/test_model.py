@@ -1,9 +1,9 @@
 from numbers import Number
 
-from serieux.model import model
+from serieux.model import field_at, model
 
 from .common import has_312_features
-from .definitions import Pig, Point, Tree
+from .definitions import Job, Pig, Point, Tree, Worker
 
 
 def test_model_cached():
@@ -45,3 +45,18 @@ def test_field_descriptions():
 
     assert b.name == "beautiful"
     assert b.description == "Is the pig...\ntruly...\n...beautiful?"
+
+
+def test_field_at():
+    fld1 = field_at(dict[str, Worker], ["Jonathan", "job"])
+    assert fld1.type is Job
+
+    fld2 = field_at(dict[str, Worker], ["Jonathan", "job", "title"])
+    assert fld2.name == "title"
+    assert fld2.type is str
+
+    fld3 = field_at(dict[str, Worker], ["Jonathan", "job", "gluglu"])
+    assert fld3 is None
+
+    fld4 = field_at(object, ["Jonathan", "job", "gluglu"])
+    assert fld4 is None
