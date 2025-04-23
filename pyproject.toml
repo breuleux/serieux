@@ -6,7 +6,7 @@ authors = [
     { name = "Olivier Breuleux", email = "breuleux@gmail.com" }
 ]
 dependencies = [
-    "ovld~=0.5.1",
+    "ovld~=0.5.2",
     "pyyaml>=6.0.2",
 ]
 readme = "README.md"
