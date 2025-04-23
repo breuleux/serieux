@@ -180,9 +180,15 @@ class BaseImplementation(Medley):
                 return obj
         except TypeError:  # pragma: no cover
             pass
+        disp = str(obj)
+        if len(disp) > (n := 30):  # pragma: no cover
+            disp = disp[:n] + "..."
+        if isinstance(obj, str):
+            descr = f"string '{disp}'"
+        else:
+            descr = f"object `{disp}` of type '{clsstring(type(obj))}'"
         raise ValidationError(
-            f"Cannot deserialize object of type '{clsstring(type(obj))}'"
-            f" into expected type '{clsstring(t)}'.",
+            f"Cannot deserialize {descr} into expected type '{clsstring(t)}'.",
             ctx=ctx,
         )
 

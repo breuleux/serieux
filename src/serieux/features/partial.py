@@ -121,13 +121,18 @@ def merge(x: object, y: NotGivenError):
 
 
 @ovld(priority=2)
+def merge(x: NotGivenError, y: object):  # pragma: no cover
+    return y
+
+
+@ovld(priority=2)
 def merge(x: object, y: SerieuxError):
     return y
 
 
 @ovld(priority=2)
 def merge(x: SerieuxError, y: object):
-    return y
+    return x
 
 
 @ovld(priority=2)

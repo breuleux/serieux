@@ -7,6 +7,7 @@ import pytest
 
 from serieux import Serieux
 from serieux.ctx import Context
+from serieux.exc import ValidationError
 from serieux.features.clargs import CommandLineArguments
 from serieux.features.fromfile import FromFileExtra, WorkingDirectory
 from serieux.features.tagged import Tagged
@@ -251,3 +252,11 @@ def test_mapping_with_config_file():
 
     result = deserialize_cli(["--config", "worker.yaml", "--title", "Inspector"])
     assert result == Worker(name="Hagrid", job=Job(title="Inspector", yearly_pay=10))
+
+    with pytest.raises(ValidationError, match="there was no such file"):
+        deserialize_cli(["--config", "whatever.yaml", "--title", "Inspector"])
+
+    result = deserialize_cli(
+        ["--config", '{"name":"Hagrid","job":{"title":"Vagrant","yearly_pay":10}}']
+    )
+    assert result == Worker(name="Hagrid", job=Job(title="Vagrant", yearly_pay=10))

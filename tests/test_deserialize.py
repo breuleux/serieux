@@ -191,8 +191,13 @@ def test_deserialize_path():
 
 
 def test_deserialize_scalar_error():
-    with pytest.raises(ValidationError, match=r"Cannot deserialize object of type 'str'"):
+    with pytest.raises(ValidationError, match=r"Cannot deserialize string 'foo'"):
         deserialize(int, "foo")
+
+
+def test_deserialize_scalar_error_2():
+    with pytest.raises(ValidationError, match=r"Cannot deserialize object `13`"):
+        deserialize(str, 13)
 
 
 def test_deserialize_missing_field():

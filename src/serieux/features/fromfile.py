@@ -12,6 +12,7 @@ from ovld.dependent import HasKey
 
 from ..ctx import Context
 from ..exc import ValidationError
+from ..utils import PRIO_LAST, clsstring
 from .partial import PartialBuilding, Sources
 
 
@@ -154,13 +155,20 @@ class FromFileExtra(FromFile):
         incl = recurse(str, obj.pop("$include"), ctx)
         return recurse(t, Sources(Path(incl), obj), ctx)
 
-    @ovld(priority=-50)
+    @ovld(priority=PRIO_LAST)
     def deserialize(self, t: type[object], obj: str, ctx: WorkingDirectory):
+        if "." not in obj or obj.rsplit(".", 1)[1].isnumeric():
+            return call_next(t, obj, ctx)
+
         path = ctx.directory / obj
         if path.exists():
             return recurse(t, path, ctx)
         else:
-            return call_next(t, obj, ctx)
+            raise ValidationError(
+                f"Tried to read '{obj}' as a configuration file (at path '{path}')"
+                f" to deserialize into object of type {clsstring(t)},"
+                " but there was no such file."
+            )
 
 
 # Add as a default feature in serieux.Serieux

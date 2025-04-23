@@ -1,4 +1,6 @@
 import argparse
+import json
+import re
 from dataclasses import MISSING, dataclass, field
 from enum import Enum
 from types import NoneType
@@ -38,6 +40,13 @@ class ConcatenateAction(argparse.Action):
         setattr(namespace, self.dest, " ".join(values))
 
 
+class ParseStringAction(argparse.Action):
+    def __call__(self, parser, namespace, value, option_string=None):
+        if re.fullmatch(string=value, pattern=r"[\[\{].*[\}\]]"):
+            value = json.loads(value)
+        setattr(namespace, self.dest, value)
+
+
 @ovld
 def make_argument(t: type[str], partial: dict, model_field: Field):
     rval = {**partial, "type": t}
@@ -71,7 +80,7 @@ def make_argument(t: type[Enum], partial: dict, model_field: Field):
 
 @ovld
 def make_argument(t: type[object], partial: dict, model_field: Field):
-    return {**partial, "type": str}
+    return {**partial, "action": ParseStringAction}
 
 
 @ovld

@@ -138,7 +138,7 @@ def test_error_at_construction():
 
 
 def test_multiple_errors():
-    msg = "Cannot deserialize object of type 'str' into expected type 'int'."
+    msg = "Cannot deserialize string"
     with validation_errors({".0.y": msg, ".1.x": msg, ".1.y": msg}):
         load(list[Point], Sources([{"x": 23, "y": "crap"}, {"x": "oh", "y": "no"}]), AccessPath())
 
@@ -174,7 +174,7 @@ def test_merge_partial_with_object():
     assert load(RGB, Sources({"red": 0}, "#ffffff")) == RGB(255, 255, 255)
     assert load(RGB, Sources("#ffffff", {"red": 0})) == RGB(0, 255, 255)
 
-    with pytest.raises(SerieuxError, match="RGB.__init__.. missing 2"):
+    with pytest.raises(SerieuxError, match="Cannot deserialize string"):
         load(RGB, Sources("#fffffX", {"red": 0}))
 
     with pytest.raises(SerieuxError, match="Cannot deserialize"):
