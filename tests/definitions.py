@@ -98,4 +98,4 @@ class Job:
 @dataclass
 class Worker:
     name: str
-    job: Job
+    job: Job = None

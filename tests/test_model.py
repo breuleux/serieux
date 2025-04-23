@@ -33,6 +33,15 @@ def test_model_default():
     assert model(int) is None
 
 
+def test_model_none_default():
+    m = model(Worker)
+    assert len(m.fields) == 2
+    assert m.fields[0].name == "name"
+    assert m.fields[0].type is str
+    assert m.fields[1].name == "job"
+    assert m.fields[1].type == Job | None
+
+
 def test_field_descriptions():
     m = model(Pig)
     p, w, b = m.fields
@@ -49,7 +58,7 @@ def test_field_descriptions():
 
 def test_field_at():
     fld1 = field_at(dict[str, Worker], ["Jonathan", "job"])
-    assert fld1.type is Job
+    assert fld1.type == Job | None
 
     fld2 = field_at(dict[str, Worker], ["Jonathan", "job", "title"])
     assert fld2.name == "title"

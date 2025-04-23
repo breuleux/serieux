@@ -1,11 +1,11 @@
 from dataclasses import MISSING, dataclass, field, fields, replace
-from typing import Any, Callable, get_args, get_origin
+from typing import Any, Callable, Optional, get_args, get_origin
 
 from ovld import Dataclass, call_next, class_check, ovld, recurse
 
 from .docstrings import get_attribute_docstrings
 from .instructions import InstructionType, NewInstruction
-from .utils import clsstring, evaluate_hint
+from .utils import UnionAlias, clsstring, evaluate_hint
 
 UNDEFINED = object()
 
@@ -99,6 +99,26 @@ def model(t: type[object]):
 
 @ovld
 def model(dc: type[Dataclass]):
+    def make_field(i, field):
+        typ = evaluate_hint(field.type, dc, None, tsub)
+        if field.default is None and not isinstance(field.default, typ):
+            typ = Optional[typ]
+
+        return Field(
+            name=field.name,
+            description=(
+                (meta := field.metadata).get("description", None)
+                or attributes.get(field.name, None)
+            ),
+            type=typ,
+            default=field.default,
+            default_factory=field.default_factory,
+            flatten=meta.get("flatten", False),
+            metavar=meta.get("serieux_metavar", None),
+            metadata=dict(meta),
+            argument_name=field.name if field.kw_only else i,
+        )
+
     rval = _take_premade(dc)
     tsub = {}
     constructor = dc
@@ -108,23 +128,7 @@ def model(dc: type[Dataclass]):
 
     attributes = get_attribute_docstrings(dc)
 
-    rval.fields = [
-        Field(
-            name=field.name,
-            description=(
-                (meta := field.metadata).get("description", None)
-                or attributes.get(field.name, None)
-            ),
-            type=evaluate_hint(field.type, dc, None, tsub),
-            default=field.default,
-            default_factory=field.default_factory,
-            flatten=meta.get("flatten", False),
-            metavar=meta.get("serieux_metavar", None),
-            metadata=dict(meta),
-            argument_name=field.name if field.kw_only else i,
-        )
-        for i, field in enumerate(fields(constructor))
-    ]
+    rval.fields = [make_field(i, field) for i, field in enumerate(fields(constructor))]
     rval.constructor = constructor
     return rval
 
@@ -183,6 +187,14 @@ def field_at(t: type[Modelizable], path: list, f: Field):
     for f2 in m.fields:
         if f2.serialized_name == curr:
             return recurse(f2.type, rest, f2)
+    return None
+
+
+@ovld
+def field_at(t: type[UnionAlias], path: list, f: Field):
+    for opt in get_args(t):
+        if (rval := field_at(opt, path, f)) is not None:
+            return rval
     return None
 
 
