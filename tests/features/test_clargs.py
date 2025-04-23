@@ -1,15 +1,21 @@
 from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
+from pathlib import Path
 
 import pytest
 
-from serieux import deserialize
+from serieux import Serieux
 from serieux.ctx import Context
 from serieux.features.clargs import CommandLineArguments
+from serieux.features.fromfile import FromFileExtra, WorkingDirectory
 from serieux.features.tagged import Tagged
 
 from ..definitions import Defaults, Job, Point, Worker
+
+deserialize = (Serieux + FromFileExtra)().deserialize
+
+datapath = Path(__file__).parent.parent / "data"
 
 
 @dataclass
@@ -218,8 +224,30 @@ def test_replace_option():
 def test_mapping():
     cla = CommandLineArguments(
         ["--tit", "Inspector", "--yar", "35000", "-n", "Gunther"],
-        autofill=False,
         mapping={"job.title": "--tit", "job.yearly_pay": "--yar", "name": "-n"},
     )
     result = deserialize(Worker, cla, Context())
     assert result == Worker(name="Gunther", job=Job(title="Inspector", yearly_pay=35000))
+
+
+def test_recursive():
+    cla = CommandLineArguments(
+        ["--name", "Gunther", "--title", "Inspector", "--yearly-pay", "35000"]
+    )
+    result = deserialize(Worker, cla, WorkingDirectory(datapath))
+    assert result == Worker(name="Gunther", job=Job(title="Inspector", yearly_pay=35000))
+
+
+def test_mapping_with_config_file():
+    def deserialize_cli(args):
+        cla = CommandLineArguments(
+            args,
+            mapping={"": {"auto": True, "option": "--config"}},
+        )
+        return deserialize(Worker, cla, WorkingDirectory(datapath))
+
+    result = deserialize_cli(["--config", "worker.yaml"])
+    assert result == Worker(name="Hagrid", job=Job(title="Vagrant", yearly_pay=10))
+
+    result = deserialize_cli(["--config", "worker.yaml", "--title", "Inspector"])
+    assert result == Worker(name="Hagrid", job=Job(title="Inspector", yearly_pay=10))

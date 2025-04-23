@@ -1,6 +1,7 @@
 import argparse
 from dataclasses import MISSING, dataclass, field
 from enum import Enum
+from types import NoneType
 from typing import Any, get_args
 
 from ovld import Medley, ovld, recurse
@@ -11,6 +12,7 @@ from ..instructions import strip_all
 from ..model import Field, Modelizable, field_at, model
 from ..utils import UnionAlias, clsstring
 from .dotted import unflatten
+from .partial import Sources
 from .tagged import Tagged
 
 ##################
@@ -25,11 +27,10 @@ def _compose(dest, new_part):
 @dataclass
 class CommandLineArguments:
     arguments: list[str]
-    mapping: dict[str, str | dict[str, Any]] = field(default_factory=dict)
-    autofill: bool = True
+    mapping: dict[str, str | dict[str, Any]] = field(default_factory=lambda: {"": {"auto": True}})
 
     def make_parser(self, base):
-        return make_parser(base=base, mapping=self.mapping, autofill=self.autofill)
+        return make_parser(base=base, mapping=self.mapping)
 
 
 class ConcatenateAction(argparse.Action):
@@ -104,7 +105,7 @@ def add_argument_from_field(parser, fdest, overrides, field: Field):
 
     args = make_argument(typ, args, field)
     if args == "subparser":
-        add_arguments(typ, parser, fdest)
+        add_arguments(typ, parser, fdest, overrides.get("required", None) is False)
     else:
         pos = args.pop("__args__")
         if opt := args.pop("option", None):
@@ -119,19 +120,22 @@ def add_argument_from_field(parser, fdest, overrides, field: Field):
 
 
 @ovld
-def add_arguments(t: type[Modelizable], parser: argparse.ArgumentParser, dest: str):
+def add_arguments(t: type[Modelizable], parser: argparse.ArgumentParser, dest: str, partial: bool):
     m = model(t)
     for fld in m.fields:
         if fld.name.startswith("_"):  # pragma: no cover
             continue
         fdest = _compose(dest, fld.name)
-        add_argument_from_field(parser, fdest, {}, fld)
+        overrides = {"required": False} if partial else {}
+        add_argument_from_field(parser, fdest, overrides, fld)
     return parser
 
 
 @ovld
-def add_arguments(t: type[UnionAlias], parser: argparse.ArgumentParser, dest: str):
-    options = get_args(t)
+def add_arguments(t: type[UnionAlias], parser: argparse.ArgumentParser, dest: str, partial: bool):
+    options = [o for o in get_args(t) if o is not NoneType]
+    if len(options) == 1:
+        return recurse(options[0], parser, dest, partial)
     if any(not issubclass(option, Tagged) for option in options):  # pragma: no cover
         raise ValidationError("All Union members must be Tagged to make a cli")
 
@@ -139,19 +143,21 @@ def add_arguments(t: type[UnionAlias], parser: argparse.ArgumentParser, dest: st
     for opt in options:
         subparsers.required = True
         subparser = subparsers.add_parser(opt.tag, help=f"{opt.cls.__doc__ or opt.tag}")
-        add_arguments(opt.cls, subparser, dest)
+        recurse(opt.cls, subparser, dest, partial)
 
 
-def make_parser(*, base=None, mapping=None, parser=None, autofill=True):
+def make_parser(*, base=None, mapping=None, parser=None):
     if parser is None:
         description = base.__doc__ or f"Arguments for {clsstring(base)}"
         parser = argparse.ArgumentParser(description=description)
-    if autofill:
-        add_arguments(base, parser, "")
     for k, v in mapping.items():
+        fld = field_at(base, k)
         if isinstance(v, str):
             v = {"__args__": [v]}
-        fld = field_at(base, k)
+        elif v.pop("auto", False):
+            add_arguments(fld.type, parser, k, bool(v))
+            if not v:
+                continue
         add_argument_from_field(parser, k, v, fld)
     return parser
 
@@ -162,7 +168,11 @@ class FromArguments(Medley):
         parser = obj.make_parser(t)
         ns = parser.parse_args(obj.arguments)
         values = {k: v for k, v in vars(ns).items() if v is not None}
-        return recurse(t, unflatten(values), ctx)
+        if (root := values.pop("", None)) is not None:
+            vals = Sources(root, unflatten(values))
+        else:
+            vals = unflatten(values)
+        return recurse(t, vals, ctx)
 
 
 # Add as a default feature in serieux.Serieux
