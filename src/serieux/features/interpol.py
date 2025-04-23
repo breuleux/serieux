@@ -54,13 +54,13 @@ class Variables(AccessPath):
 
     def resolve_variable(self, method: Literal["envfile"], expr: str, /):
         try:
-            pth = Path(self.environ[expr])
+            pth = Path(self.environ[expr]).expanduser()
         except KeyError:
             raise NotGivenError(f"Environment variable '{expr}' is not defined")
         if pth.exists():
             return pth
         else:
-            return Sources(*[Path(x.strip()) for x in str(pth).split(",")])
+            return Sources(*[Path(x.strip()).expanduser() for x in str(pth).split(",")])
 
     def resolve_variable(self, method: str, expr: str, /):
         raise ValidationError(

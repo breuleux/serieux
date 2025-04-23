@@ -113,7 +113,7 @@ def ScalarNode(value: yaml.ScalarNode, tag_suffix):
 class FromFile(PartialBuilding):
     def deserialize(self, t: Any, obj: Path, ctx: Context):
         if isinstance(ctx, WorkingDirectory):
-            obj = ctx.directory / obj
+            obj = ctx.directory / obj.expanduser()
         data = parse(obj)
         ctx = ctx + WorkingDirectory(origin=obj, directory=obj.parent)
         return recurse(t, data, ctx)
