@@ -31,6 +31,7 @@ def _default_features():
             mod = importlib.import_module(f"{__spec__.name}.features.{name.stem}")
             if feat := getattr(mod, "__default_features__", None):
                 features.append(feat)
+    features.sort(key=lambda t: -len(t.mro()))
     return features
 
 
