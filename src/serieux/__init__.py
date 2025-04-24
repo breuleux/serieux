@@ -6,6 +6,8 @@ from .auto import Auto
 from .ctx import Context
 from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
 from .features.clargs import CommandLineArguments
+from .features.dotted import DottedNotation
+from .features.fromfile import FromFileExtra
 from .features.interpol import Variables
 from .features.lazy import DeepLazy, Lazy, LazyProxy
 from .features.partial import Partial, Sources
@@ -81,8 +83,10 @@ __all__ = [
     "Context",
     "DeepLazy",
     "deserialize",
+    "DottedNotation",
     "dump",
     "Extensible",
+    "FromFileExtra",
     "InstructionType",
     "JSON",
     "Lazy",

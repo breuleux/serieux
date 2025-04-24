@@ -81,25 +81,9 @@ class SerieuxError(Exception):
     pass
 
 
-class NotGivenError(SerieuxError):
-    pass
-
-
-class ValidationExceptionGroup(SerieuxError, ExceptionGroup):
-    def derive(self, excs):  # pragma: no cover
-        return ValidationExceptionGroup(self.message, excs)
-
-    def display(self, file=sys.stderr):
-        for i, exc in enumerate(self.exceptions):
-            exc.display(file=file, prefix=f"[#{i}] ")
-
-
-class ValidationError(SerieuxError):
-    def __init__(self, message=None, *, exc=None, ctx=None):
-        if message is None:
-            message = f"{type(exc).__name__}: {exc}"
+class IndividualSerieuxError(SerieuxError):
+    def __init__(self, message=None, *, ctx=None):
         super().__init__(message)
-        self.exc = exc
         self.ctx = ctx
         if self.ctx is None:
             frame = sys._getframe(1)
@@ -135,3 +119,24 @@ class ValidationError(SerieuxError):
             return f"{self.ctx.origin}:{lc} -- {self.message}"
         else:
             return f"At path {access_string(self.ctx)}: {self.message}"
+
+
+class NotGivenError(IndividualSerieuxError):
+    pass
+
+
+class ValidationExceptionGroup(SerieuxError, ExceptionGroup):
+    def derive(self, excs):  # pragma: no cover
+        return ValidationExceptionGroup(self.message, excs)
+
+    def display(self, file=sys.stderr):
+        for i, exc in enumerate(self.exceptions):
+            exc.display(file=file, prefix=f"[#{i}] ")
+
+
+class ValidationError(IndividualSerieuxError):
+    def __init__(self, message=None, *, exc=None, ctx=None):
+        if message is None:
+            message = f"{type(exc).__name__}: {exc}"
+        super().__init__(message=message, ctx=ctx)
+        self.exc = exc

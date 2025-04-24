@@ -135,7 +135,7 @@ def merge(x: SerieuxError, y: object):
     return x
 
 
-@ovld(priority=2)
+@ovld(priority=3)
 def merge(x: SerieuxError, y: SerieuxError):
     return ValidationExceptionGroup("Some errors occurred", [x, y])
 
