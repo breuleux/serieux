@@ -10,6 +10,7 @@ from ovld.dependent import Regexp
 
 from ..ctx import AccessPath, Patcher
 from ..exc import NotGivenError, ValidationError
+from ..instructions import strip_all
 from ..model import field_at
 from .lazy import LazyProxy
 from .partial import Sources
@@ -122,7 +123,7 @@ class VariableInterpolation(Medley):
     @ovld(priority=2)
     def deserialize(self, t: Any, obj: Regexp[r"^\$\{[^}]+\}$"], ctx: Variables):
         expr = obj.lstrip("${").rstrip("}")
-        obj = ctx.resolve_variable(t, expr)
+        obj = ctx.resolve_variable(strip_all(t), expr)
         if isinstance(obj, LazyProxy):
 
             def interpolate():

@@ -64,19 +64,20 @@ class Patch:
 
 
 class Patcher(Context):
-    patches: list[tuple[Context, Any]] = field(default_factory=list)
+    patches: dict[int, tuple[Context, Any]] = field(default_factory=dict)
 
     def declare_patch(self, patch):
         if not isinstance(patch, Patch):
             patch = Patch(patch, ctx=self)
         elif not patch.ctx:
             patch = replace(patch, ctx=self)
-        self.patches.append(patch)
+        start = patch.ctx.location.start if isinstance(patch.ctx, Located) else None
+        self.patches[start] = patch
 
     def apply_patches(self):
         codes = {}
         patches = defaultdict(list)
-        for patch in self.patches:
+        for patch in self.patches.values():
             match patch.ctx:
                 case Located(location=loc):
                     codes[loc.source] = loc.code
