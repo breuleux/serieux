@@ -23,10 +23,10 @@ class AccessPath(Context):
 
     @property
     def access_path(self):
-        return tuple(k for _, k in self.full_path)
+        return tuple(k for _, _, k in self.full_path)
 
     def follow(self, objt, obj, field):
-        return replace(self, full_path=(*self.full_path, (obj, field)))
+        return replace(self, full_path=(*self.full_path, (objt, obj, field)))
 
 
 @dataclass

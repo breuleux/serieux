@@ -10,6 +10,7 @@ from ovld.dependent import Regexp
 
 from ..ctx import AccessPath, Patcher
 from ..exc import NotGivenError, ValidationError
+from ..model import field_at
 from .lazy import LazyProxy
 from .partial import Sources
 
@@ -96,6 +97,10 @@ class Variables(AccessPath):
             return Sources(*[Path(x.strip()).expanduser() for x in str(pth).split(",")])
 
     def resolve_variable(self, t: Any, method: Literal["prompt"], expr: str, /):
+        if not expr:
+            objt, _, field = self.full_path[-1]
+            fld = field_at(objt, [field])
+            expr = (fld and fld.description) or "Enter value"
         value = decode_string(t, self.prompt_function(self, expr))
         if isinstance(self, Patcher):
             self.declare_patch(value)

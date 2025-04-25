@@ -192,8 +192,11 @@ def test_resolve_envfile_not_given():
 
 @dataclass
 class Person:
+    # NAME of the person
     name: str
+    # AGE of the person
     age: int
+    # MADNESS of the person
     mad: bool
 
 
@@ -233,8 +236,8 @@ def test_resolve_prompt_string():
 
 
 TEST_YAML = """
-name: "${prompt:Enter your name}"
-age: "${prompt:Enter your age}"
+name: "${prompt:}"
+age: "${prompt:}"
 mad: "${prompt:Is the person mad?}"
 """
 
@@ -252,7 +255,7 @@ def test_prompt_with_patcher(tmp_path):
 
     # Create a prompter that returns fixed values
     prompter = _prompter(
-        {"Enter your name": "John Doe", "Enter your age": "42", "Is the person mad?": "yes"}
+        {"NAME of the person": "John Doe", "AGE of the person": "42", "Is the person mad?": "yes"}
     )
 
     # Deserialize with Patcher

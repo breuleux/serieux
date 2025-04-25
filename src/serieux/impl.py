@@ -269,7 +269,7 @@ class BaseImplementation(Medley):
         (t,) = get_args(t)
         (lt,) = get_args(t) or (object,)
         if hasattr(ctx, "follow"):
-            ctx_expr = Code("$ctx.follow($objt, $obj, IDX)", objt=obj)
+            ctx_expr = Code("$ctx.follow($objt, $obj, IDX)", objt=t)
             return Lambda(
                 "[$lbody for IDX, X in enumerate($obj)]",
                 lbody=cls.subcode(method, lt, "X", ctx, ctx_expr=ctx_expr),
@@ -298,9 +298,7 @@ class BaseImplementation(Medley):
         (t,) = get_args(t)
         kt, vt = get_args(t) or (object, object)
         ctx_expr = (
-            Code("$ctx.follow($objt, $obj, K)", objt=obj)
-            if hasattr(ctx, "follow")
-            else Code("$ctx")
+            Code("$ctx.follow($objt, $obj, K)", objt=t) if hasattr(ctx, "follow") else Code("$ctx")
         )
         return Lambda(
             "{$kbody: $vbody for K, V in $obj.items()}",
@@ -326,8 +324,8 @@ class BaseImplementation(Medley):
 
     @code_generator_wrap_error(priority=PRIO_DEFAULT)
     def serialize(cls, t: type[Modelizable], obj: Any, ctx: Context, /):
-        (t,) = get_args(t)
-        t = model(t)
+        (orig_t,) = get_args(t)
+        t = model(orig_t)
         if not t.accepts(obj):
             return None
         stmts = []
@@ -338,7 +336,7 @@ class BaseImplementation(Medley):
                     f"Cannot serialize '{clsstring(t)}' because its model does not specify how to serialize property '{f.name}'"
                 )
             ctx_expr = (
-                Code("$ctx.follow($objt, $obj, $fld)", objt=obj, fld=f.name)
+                Code("$ctx.follow($objt, $obj, $fld)", objt=orig_t, fld=f.name)
                 if follow
                 else Code("$ctx")
             )
@@ -364,14 +362,14 @@ class BaseImplementation(Medley):
 
     @code_generator_wrap_error(priority=PRIO_DEFAULT)
     def deserialize(cls, t: type[Modelizable], obj: dict, ctx: Context, /):
-        (t,) = get_args(t)
-        t = model(t)
+        (orig_t,) = get_args(t)
+        t = model(orig_t)
         follow = hasattr(ctx, "follow")
         stmts = []
         args = []
         for i, f in enumerate(t.fields):
             ctx_expr = (
-                Code("$ctx.follow($objt, $obj, $fld)", objt=obj, fld=f.name)
+                Code("$ctx.follow($objt, $obj, $fld)", objt=orig_t, fld=f.name)
                 if follow
                 else Code("$ctx")
             )
