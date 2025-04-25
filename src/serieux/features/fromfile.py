@@ -2,7 +2,6 @@ import hashlib
 import json
 import tomllib
 import uuid
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +9,7 @@ import yaml
 from ovld import call_next, dependent_check, ovld, recurse
 from ovld.dependent import HasKey
 
-from ..ctx import Context
+from ..ctx import Context, Located, Location
 from ..exc import ValidationError
 from ..utils import PRIO_LAST, clsstring
 from .partial import PartialBuilding, Sources
@@ -78,23 +77,6 @@ class WorkingDirectory(Context):
             with open(dest, mode=mode, encoding=encoding) as f:
                 f.write(data)
         return str(dest.relative_to(self.directory))
-
-
-@dataclass
-class Location:
-    source: Path
-    code: str
-    start: int
-    end: int
-    linecols: tuple
-
-    @property
-    def text(self):
-        return self.code[self.start : self.end]
-
-
-class Located(Context):
-    location: Location = None
 
 
 def yaml_source_extract(node, ctx):

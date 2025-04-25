@@ -1,26 +1,59 @@
+import json
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import field
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import Any, Callable, Literal, get_args
 
 from ovld import Medley, call_next, ovld, recurse
 from ovld.dependent import Regexp
 
-from ..ctx import AccessPath, Context
+from ..ctx import AccessPath, Patcher
 from ..exc import NotGivenError, ValidationError
 from .lazy import LazyProxy
 from .partial import Sources
 
 
-@dataclass
-class StringEncoded:
-    value: str
+@ovld
+def decode_string(t: type[int] | type[float] | type[str], value: str):
+    return t(value)
+
+
+@ovld
+def decode_string(t: type[bool], value: str):
+    val = str(value).lower()
+    if val in ("true", "1", "yes", "on"):
+        return True
+    elif val in ("false", "0", "no", "off"):
+        return False
+    else:
+        raise ValidationError(f"Cannot convert '{value}' to boolean")
+
+
+@ovld
+def decode_string(t: type[object], value: str):
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return value
+
+
+@ovld
+def decode_string(t: type[list], value: str):
+    (element_type,) = get_args(t) or (object,)
+    return [recurse(element_type, item.strip()) for item in str(value).split(",")]
+
+
+def default_prompt(ctx, prompt):  # pragma: no cover
+    return input(
+        f"\033[1;36m[{'.'.join(str(x) for x in ctx.access_path)}]\033[0m \033[1;33m{prompt}\033[0m\n\033[1;32m>\033[0m "
+    )
 
 
 class Variables(AccessPath):
     refs: dict[tuple[str, ...], object] = field(default_factory=dict, repr=False)
     environ: dict = field(default_factory=lambda: os.environ, repr=False)
+    prompt_function: Callable[[str], str] = default_prompt
 
     def evaluate_reference(self, ref):
         def try_int(x):
@@ -36,23 +69,23 @@ class Variables(AccessPath):
         return self.refs[(*root, *parts)]
 
     @ovld
-    def resolve_variable(self, expr: str, /):
+    def resolve_variable(self, t: Any, expr: str, /):
         match expr.split(":", 1):
             case (method, expr):
-                return recurse(method, expr)
+                return recurse(t, method, expr)
             case _:
-                return recurse("", expr)
+                return recurse(t, "", expr)
 
-    def resolve_variable(self, method: Literal[""], expr: str, /):
+    def resolve_variable(self, t: Any, method: Literal[""], expr: str, /):
         return LazyProxy(lambda: self.evaluate_reference(expr))
 
-    def resolve_variable(self, method: Literal["env"], expr: str, /):
+    def resolve_variable(self, t: Any, method: Literal["env"], expr: str, /):
         try:
-            return StringEncoded(self.environ[expr])
+            return decode_string(t, self.environ[expr])
         except KeyError:
             raise NotGivenError(f"Environment variable '{expr}' is not defined")
 
-    def resolve_variable(self, method: Literal["envfile"], expr: str, /):
+    def resolve_variable(self, t: Any, method: Literal["envfile"], expr: str, /):
         try:
             pth = Path(self.environ[expr]).expanduser()
         except KeyError:
@@ -62,7 +95,13 @@ class Variables(AccessPath):
         else:
             return Sources(*[Path(x.strip()).expanduser() for x in str(pth).split(",")])
 
-    def resolve_variable(self, method: str, expr: str, /):
+    def resolve_variable(self, t: Any, method: Literal["prompt"], expr: str, /):
+        value = decode_string(t, self.prompt_function(self, expr))
+        if isinstance(self, Patcher):
+            self.declare_patch(value)
+        return value
+
+    def resolve_variable(self, t: Any, method: str, expr: str, /):
         raise ValidationError(
             f"Cannot resolve '{method}:{expr}' because the '{method}' resolver is not defined."
         )
@@ -78,7 +117,7 @@ class VariableInterpolation(Medley):
     @ovld(priority=2)
     def deserialize(self, t: Any, obj: Regexp[r"^\$\{[^}]+\}$"], ctx: Variables):
         expr = obj.lstrip("${").rstrip("}")
-        obj = ctx.resolve_variable(expr)
+        obj = ctx.resolve_variable(t, expr)
         if isinstance(obj, LazyProxy):
 
             def interpolate():
@@ -92,41 +131,12 @@ class VariableInterpolation(Medley):
     def deserialize(self, t: Any, obj: Regexp[r"\$\{[^}]+\}"], ctx: Variables):
         def interpolate():
             def repl(match):
-                return str(ctx.resolve_variable(match.group(1)))
+                return str(ctx.resolve_variable(str, match.group(1)))
 
             subbed = re.sub(r"\$\{([^}]+)\}", repl, obj)
             return recurse(t, subbed, ctx)
 
         return LazyProxy(interpolate)
-
-    #####################################
-    # Deserialize string-encoded values #
-    #####################################
-
-    def deserialize(self, t: type[int], obj: StringEncoded, ctx: Context):
-        return int(obj.value)
-
-    def deserialize(self, t: type[str], obj: StringEncoded, ctx: Context):
-        return str(obj.value)
-
-    def deserialize(self, t: type[float], obj: StringEncoded, ctx: Context):
-        return float(obj.value)
-
-    def deserialize(self, t: type[bool], obj: StringEncoded, ctx: Context):
-        val = str(obj.value).lower()
-        if val in ("true", "1", "yes", "on"):
-            return True
-        elif val in ("false", "0", "no", "off"):
-            return False
-        else:
-            raise ValidationError(f"Cannot convert '{obj.value}' to boolean")
-
-    def deserialize(self, t: type[list], obj: StringEncoded, ctx: Context):
-        (element_type,) = get_args(t) or (object,)
-        return [
-            recurse(element_type, StringEncoded(item.strip()), ctx)
-            for item in str(obj.value).split(",")
-        ]
 
 
 # Add as a default feature in serieux.Serieux

@@ -28,7 +28,7 @@ def context_string(
         if c2 == 0:
             l2 -= 1
             c2 = 10_000_000_000_000
-        lines = location.source.split("\n")
+        lines = location.code.split("\n")
         start = l1 - source_context
         while start < 0 or not lines[start].strip():
             start += 1
@@ -36,7 +36,7 @@ def context_string(
         while end >= len(lines) or not lines[end].strip():  # pragma: no cover
             end -= 1
 
-        return_lines.append(f"{'':{indent}}@ {ctx.origin}:{l1 + 1}")
+        return_lines.append(f"{'':{indent}}@ {location.source}:{l1 + 1}")
         for li in range(start, end + 1):
             line = lines[li]
             if li == l2 and not line.strip():  # pragma: no cover
@@ -116,7 +116,7 @@ class IndividualSerieuxError(SerieuxError):
         if location:
             (l1, c1), (l2, c2) = location.linecols
             lc = f"{l1}:{c1}-{l2}:{c2}" if l1 != l2 else f"{l1}:{c1}-{c2}"
-            return f"{self.ctx.origin}:{lc} -- {self.message}"
+            return f"{location.source}:{lc} -- {self.message}"
         else:
             return f"At path {access_string(self.ctx)}: {self.message}"
 
