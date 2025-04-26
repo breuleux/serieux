@@ -8,7 +8,7 @@ import pytest
 from serieux import Serieux
 from serieux.ctx import Context
 from serieux.exc import ValidationError
-from serieux.features.clargs import CommandLineArguments
+from serieux.features.clargs import CommandLineArguments, parse_cli
 from serieux.features.fromfile import FromFileExtra, WorkingDirectory
 from serieux.features.tagged import Tagged
 
@@ -260,3 +260,24 @@ def test_mapping_with_config_file():
         ["--config", '{"name":"Hagrid","job":{"title":"Vagrant","yearly_pay":10}}']
     )
     assert result == Worker(name="Hagrid", job=Job(title="Vagrant", yearly_pay=10))
+
+
+def test_parse_cli():
+    result = parse_cli(
+        root_type=Worker,
+        mapping={
+            "name": "-n",
+            "job.title": "--tit",
+            "job.yearly_pay": "--yar",
+        },
+        argv=["-n", "Gunther", "--tit", "Inspector", "--yar", "35000"],
+    )
+    worker = deserialize(Worker, result, Context())
+    assert worker == Worker(name="Gunther", job=Job(title="Inspector", yearly_pay=35000))
+
+    result = parse_cli(
+        root_type=Worker,
+        argv=["--name", "Gunther", "--title", "Inspector", "--yearly-pay", "35000"],
+    )
+    worker = deserialize(Worker, result, Context())
+    assert worker == Worker(name="Gunther", job=Job(title="Inspector", yearly_pay=35000))

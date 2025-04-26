@@ -1,6 +1,7 @@
 import argparse
 import json
 import re
+import sys
 from dataclasses import MISSING, dataclass, field
 from enum import Enum
 from types import NoneType
@@ -31,8 +32,8 @@ class CommandLineArguments:
     arguments: list[str]
     mapping: dict[str, str | dict[str, Any]] = field(default_factory=lambda: {"": {"auto": True}})
 
-    def make_parser(self, base):
-        return make_parser(base=base, mapping=self.mapping)
+    def parse(self, root_type, argv):
+        return parse_cli(root_type=root_type, mapping=self.mapping, argv=argv)
 
 
 class ConcatenateAction(argparse.Action):
@@ -155,32 +156,47 @@ def add_arguments(t: type[UnionAlias], parser: argparse.ArgumentParser, dest: st
         recurse(opt.cls, subparser, dest, partial)
 
 
-def make_parser(*, base=None, mapping=None, parser=None):
-    if parser is None:
-        description = base.__doc__ or f"Arguments for {clsstring(base)}"
-        parser = argparse.ArgumentParser(description=description)
-    for k, v in mapping.items():
-        fld = field_at(base, k)
-        if isinstance(v, str):
-            v = {"__args__": [v]}
-        elif v.pop("auto", False):
-            add_arguments(fld.type, parser, k, bool(v))
-            if not v:
-                continue
-        add_argument_from_field(parser, k, v, fld)
-    return parser
+@dataclass
+class CLIDefinition:
+    root_type: type = None
+    mapping: dict[str, str | dict[str, Any]] = field(default_factory=lambda: {"": {"auto": True}})
+    argparser: argparse.ArgumentParser = None
 
+    def __post_init__(self):
+        if self.argparser is None:
+            description = self.root_type.__doc__ or f"Arguments for {clsstring(self.root_type)}"
+            self.argparser = argparse.ArgumentParser(description=description)
+        for k, v in self.mapping.items():
+            fld = field_at(self.root_type, k)
+            if isinstance(v, str):
+                v = {"__args__": [v]}
+            elif v.pop("auto", False):
+                add_arguments(fld.type, self.argparser, k, bool(v))
+                if not v:
+                    continue
+            add_argument_from_field(self.argparser, k, v, fld)
 
-class FromArguments(Medley):
-    @ovld(priority=1)
-    def deserialize(self, t: Any, obj: CommandLineArguments, ctx: Context):
-        parser = obj.make_parser(t)
-        ns = parser.parse_args(obj.arguments)
+    def __call__(self, argv):
+        ns = self.argparser.parse_args(argv)
         values = {k: v for k, v in vars(ns).items() if v is not None}
         if (root := values.pop("", None)) is not None:
             vals = Sources(root, unflatten(values))
         else:
             vals = unflatten(values)
+        return vals
+
+
+def parse_cli(root_type, argv=None, mapping=None):
+    mapping = {"": {"auto": True}} if mapping is None else mapping
+    argv = sys.argv[1:] if argv is None else argv
+    parser = CLIDefinition(root_type=root_type, mapping=mapping)
+    return parser(argv)
+
+
+class FromArguments(Medley):
+    @ovld(priority=1)
+    def deserialize(self, t: Any, obj: CommandLineArguments, ctx: Context):
+        vals = obj.parse(t, obj.arguments)
         return recurse(t, vals, ctx)
 
 

@@ -38,7 +38,12 @@ class PartialBase:
 
 class Sources:
     def __init__(self, *sources):
-        self.sources = sources
+        self.sources = []
+        for src in sources:
+            if isinstance(src, Sources):  # pragma: no cover
+                self.sources.extend(src.sources)
+            else:
+                self.sources.append(src)
 
 
 @ovld

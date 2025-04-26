@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from .auto import Auto
 from .ctx import Context
 from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
-from .features.clargs import CommandLineArguments
+from .features.clargs import CLIDefinition, CommandLineArguments, parse_cli
 from .features.dotted import DottedNotation
 from .features.fromfile import FromFileExtra
 from .features.interpol import Variables
@@ -80,6 +80,7 @@ __all__ = [
     "__version__",
     "Auto",
     "BaseImplementation",
+    "CLIDefinition",
     "CommandLineArguments",
     "Context",
     "DeepLazy",
@@ -96,15 +97,16 @@ __all__ = [
     "Model",
     "Modelizable",
     "NewInstruction",
+    "parse_cli",
     "Partial",
     "RefPolicy",
     "schema",
+    "Schema",
     "Schema",
     "serialize",
     "serieux",
     "Serieux",
     "SerieuxError",
-    "Schema",
     "Sources",
     "Tagged",
     "TaggedSubclass",

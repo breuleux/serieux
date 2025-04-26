@@ -123,6 +123,7 @@ def test_env_types():
             "STR": "hello",
             "LIST": "a,b,c",
             "BOOL_FALSE": "no",
+            "DICT": '{"a": 1, "b": 2}',
         }
     )
 
@@ -132,6 +133,15 @@ def test_env_types():
     assert deserialize(str, "${env:STR}", vars) == "hello"
     assert deserialize(list[str], "${env:LIST}", vars) == ["a", "b", "c"]
     assert deserialize(bool, "${env:BOOL_FALSE}", vars) is False
+    assert deserialize(dict[str, int], "${env:DICT}", vars) == {"a": 1, "b": 2}
+
+
+def test_env_custom_deser():
+    from .test_usermeth import RGB
+
+    vars = Variables(environ={"COLOR": "#ff00ff"})
+    rgb = deserialize(RGB, "${env:COLOR}", vars)
+    assert rgb == RGB(red=255, green=0, blue=255)
 
 
 def test_invalid_boolean():

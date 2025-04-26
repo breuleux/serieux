@@ -38,7 +38,7 @@ class Location:
     linecols: tuple
 
     @property
-    def text(self):
+    def text(self):  # pragma: no cover
         return self.code[self.start : self.end]
 
 
@@ -52,15 +52,18 @@ class Patch:
     ctx: Context = None
     description: str | None = None
 
+    def __post_init__(self):
+        if self.description is None:
+            self.description = f"Set to: {self.data!r}"
+
     def compute(self):
-        if callable(self.data):
+        if callable(self.data):  # pragma: no cover
             return self.data()
         else:
             return self.data
 
-    def __str__(self):
-        descr = self.description or self.data
-        return f"Patch({descr!r})"
+    def __str__(self):  # pragma: no cover
+        return f"Patch({self.description!r})"
 
 
 class Patcher(Context):
@@ -69,7 +72,7 @@ class Patcher(Context):
     def declare_patch(self, patch):
         if not isinstance(patch, Patch):
             patch = Patch(patch, ctx=self)
-        elif not patch.ctx:
+        elif not patch.ctx:  # pragma: no cover
             patch = replace(patch, ctx=self)
         start = patch.ctx.location.start if isinstance(patch.ctx, Located) else None
         self.patches[start] = patch
