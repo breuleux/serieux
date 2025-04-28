@@ -164,7 +164,7 @@ def field_at(t: Any, path: Any):
 def field_at(t: Any, path: str, f: Field):
     if not path:
         return f
-    return recurse(t, path.split("."), f)
+    return recurse(t, path.lstrip(".").split("."), f)
 
 
 @ovld(priority=1)

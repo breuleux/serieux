@@ -1,8 +1,11 @@
-from typing import TYPE_CHECKING, TypeAlias
+from functools import reduce
+from operator import or_
+from typing import TYPE_CHECKING, TypeAlias, Union
 
 from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
+from ..instructions import strip_all
 from ..tell import KeyValueTell, TypeTell, tells
 from ..utils import clsstring
 
@@ -10,6 +13,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from typing import Annotated
 
     Tagged: TypeAlias = Annotated
+    TaggedUnion = Union
 
 else:
 
@@ -21,13 +25,26 @@ else:
             return isinstance(obj, cls.cls)
 
         def __class_getitem__(cls, args):
-            cls, tag = args
+            if isinstance(args, (list, tuple)):
+                cls, tag = args
+            else:
+                cls = args
+                clsn = strip_all(cls)
+                tag = getattr(clsn, "__tag__", None) or clsn.__name__.lower()
             return Tagged(
                 f"{tag}::{clsstring(cls)}",
                 (Tagged,),
                 # Set module to None for better display
                 {"cls": cls, "tag": tag, "__module__": None},
             )
+
+    class TaggedUnion(type):
+        def __class_getitem__(cls, args):
+            if isinstance(args, dict):
+                return reduce(or_, [Tagged[v, k] for k, v in args.items()])
+            elif not isinstance(args, (list, tuple)):
+                return Tagged[args]
+            return reduce(or_, [Tagged[arg] for arg in args])
 
 
 @tells.register
@@ -47,7 +64,7 @@ class TaggedTypes(Medley):
     @ovld(priority=10)
     def deserialize(self, t: type[Tagged], obj: dict, ctx: Context, /):
         obj = dict(obj)
-        klas = obj.pop("class", None)
+        klas = recurse(str, obj.pop("class", None), ctx)
         if "return" in obj:
             obj = obj["return"]
         assert klas == t.tag

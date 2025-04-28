@@ -62,7 +62,7 @@ class AttributeVisitor(ast.NodeVisitor):
         if self.prefix is not None:
             self.add_data(node, "VARIABLE", f"{self.prefix}{node.name}")
         for arg in node.args.args:
-            self.add_data(arg, "VARIABLE", f"{self.prefix}{arg.arg}" if self.prefix else arg.arg)
+            self.add_data(arg, "ARGUMENT", f"{self.prefix}{arg.arg}" if self.prefix else arg.arg)
         self.visit_body(node.name, node.body)
 
     def visit_Assign(self, node):  # pragma: no cover
@@ -121,21 +121,24 @@ def _get_attribute_docstrings(cls):
     # We concatenate comment tokens from the tokenizer with
     # variable/docstring tokens extracted using the ast module
     data = sorted(scrape_comments(src) + scrape_variables_and_docstrings(src))
+    current_kind = None
     for line, _, kind, content in data:
         if kind == "COMMENT":
             if current is not None and current_line == line:
                 docs[current].append(content)
             else:
                 for_next.append(content)
-        elif kind == "DOC" and current:
+        elif kind == "DOC" and current_kind == "VARIABLE":
             docs[current].append(content)
-        elif kind == "VARIABLE":
+        elif kind == "VARIABLE" or kind == "ARGUMENT":
             docs[content] = for_next
             for_next = []
             current = content
+            current_kind = kind
             current_line = line
         elif kind == "OTHER":
             current = current_line = None
+            current_kind = None
             for_next = []
     rval = _cached_docstrings[cls] = {k: "\n".join(lines) for k, lines in docs.items()}
     return rval

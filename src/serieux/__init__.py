@@ -7,11 +7,11 @@ from .ctx import Context
 from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
 from .features.clargs import CLIDefinition, CommandLineArguments, parse_cli
 from .features.dotted import DottedNotation
-from .features.fromfile import FromFileExtra
+from .features.fromfile import FromFileExtra, WorkingDirectory
 from .features.interpol import Variables
 from .features.lazy import DeepLazy, Lazy, LazyProxy
 from .features.partial import Partial, Sources
-from .features.tagged import Tagged
+from .features.tagged import Tagged, TaggedUnion
 from .features.tsubclass import TaggedSubclass
 from .impl import BaseImplementation
 from .instructions import InstructionType, NewInstruction
@@ -109,8 +109,10 @@ __all__ = [
     "SerieuxError",
     "Sources",
     "Tagged",
+    "TaggedUnion",
     "TaggedSubclass",
     "ValidationError",
     "ValidationExceptionGroup",
     "Variables",
+    "WorkingDirectory",
 ]

@@ -10,7 +10,7 @@ from serieux.ctx import Context
 from serieux.exc import ValidationError
 from serieux.features.clargs import CommandLineArguments, parse_cli
 from serieux.features.fromfile import FromFileExtra, WorkingDirectory
-from serieux.features.tagged import Tagged
+from serieux.features.tagged import Tagged, TaggedUnion
 
 from ..definitions import Defaults, Job, Point, Worker
 
@@ -125,7 +125,7 @@ class Act:
     """Do stuff!"""
 
     # What to do
-    command: Tagged[Eat, "eat"] | Tagged[Sleep, "sleep"]  # noqa: F821
+    command: TaggedUnion[Eat, Sleep]  # noqa: F821
 
     # Do we do it fast?
     fast: bool = field(default=False, metadata={"argparse": {"alias": "-f"}})
@@ -143,7 +143,7 @@ class TalkingPoint(Point):
 def test_subcommands():
     def do(*args):
         result = deserialize(
-            Tagged[Eat, "eat"] | Tagged[Sleep, "sleep"],
+            TaggedUnion[Eat, Sleep],
             CommandLineArguments(args),
             Context(),
         )
@@ -151,6 +151,18 @@ def test_subcommands():
 
     assert do("eat", "--food", "jam") == "I eat jam"
     assert do("sleep", "--hours", "8") == "I sleep 8 hours"
+
+
+def test_single_subcommand():
+    def text(*args):
+        result = deserialize(
+            Tagged[Eat],
+            CommandLineArguments(args),
+            Context(),
+        )
+        return result.do()
+
+    assert text("eat", "--food", "jam") == "I eat jam"
 
 
 def test_args_plus_subcommands():

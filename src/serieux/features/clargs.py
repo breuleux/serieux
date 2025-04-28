@@ -144,16 +144,27 @@ def add_arguments(t: type[Modelizable], parser: argparse.ArgumentParser, dest: s
 @ovld
 def add_arguments(t: type[UnionAlias], parser: argparse.ArgumentParser, dest: str, partial: bool):
     options = [o for o in get_args(t) if o is not NoneType]
-    if len(options) == 1:
-        return recurse(options[0], parser, dest, partial)
+    recurse(options, parser, dest, partial)
+
+
+@ovld
+def add_arguments(options: list, parser: argparse.ArgumentParser, dest: str, partial: bool):
     if any(not issubclass(option, Tagged) for option in options):  # pragma: no cover
-        raise ValidationError("All Union members must be Tagged to make a cli")
+        if len(options) == 1:
+            return recurse(options[0], parser, dest, partial)
+        else:
+            raise ValidationError("All Union members must be Tagged to make a cli")
 
     subparsers = parser.add_subparsers(dest=_compose(dest, "class"))
     for opt in options:
         subparsers.required = True
-        subparser = subparsers.add_parser(opt.tag, help=f"{opt.cls.__doc__ or opt.tag}")
+        subparser = subparsers.add_parser(opt.tag, help=f"{strip_all(opt.cls).__doc__ or opt.tag}")
         recurse(opt.cls, subparser, dest, partial)
+
+
+@ovld
+def add_arguments(t: type[Tagged], parser: argparse.ArgumentParser, dest: str, partial: bool):
+    recurse([t], parser, dest, partial)
 
 
 @dataclass
