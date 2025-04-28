@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
 from ovld import Dataclass, Dependent, Lambda, ovld
 from ovld.dependent import Regexp
 
 from serieux import deserialize, schema, serialize
+from serieux.features.clargs import CommandLineArguments
 from serieux.model import Field, Model
 
 
@@ -131,6 +133,7 @@ class RGBM:
             constructor=cls,
             from_string=Lambda("$from_string($obj, $t)", from_string=_rgb_from_string),
             regexp=r"^#[0-9a-fA-F]{6}$",
+            string_description="A RGB color in hex, such as #ff0000",
         )
 
 
@@ -162,3 +165,28 @@ def test_custom_m_schema(file_regression):
             {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"},
         ]
     }
+
+
+@dataclass
+class HasColor:
+    color: RGBM
+
+
+def test_clargs_rgbm():
+    clargs = CommandLineArguments(
+        arguments=["--color", "#ff0000"],
+        mapping={"": {"auto": True}},
+    )
+    obj = deserialize(HasColor, clargs)
+    color = obj.color
+    assert isinstance(color, RGBM)
+    assert color.red == 255 and color.green == 0 and color.blue == 0
+
+
+def test_clargs_bad_regexp():
+    clargs = CommandLineArguments(
+        arguments=["--color", "#ff00XX"],
+        mapping={"": {"auto": True}},
+    )
+    with pytest.raises(SystemExit):
+        deserialize(HasColor, clargs)

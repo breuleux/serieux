@@ -12,7 +12,7 @@ from ovld import Medley, ovld, recurse
 from ..ctx import Context
 from ..exc import ValidationError
 from ..instructions import strip_all
-from ..model import Field, FieldModelizable, field_at, model
+from ..model import Field, FieldModelizable, StringModelizable, field_at, model
 from ..utils import UnionAlias, clsstring
 from .dotted import unflatten
 from .partial import Sources
@@ -77,6 +77,26 @@ def make_argument(t: type[list], partial: dict, model_field: Field):
 @ovld(priority=1)
 def make_argument(t: type[Enum], partial: dict, model_field: Field):
     return {**partial, "type": str, "choices": [e.value for e in t]}
+
+
+def regex_checker(pattern, descr):
+    def check(value):
+        if not re.fullmatch(pattern, value):
+            msg = (
+                f"is invalid. It must be: {descr}"
+                if descr
+                else f"does not match pattern {pattern!r}"
+            )
+            raise argparse.ArgumentError(None, f"Value {value!r} {msg}")
+        return value
+
+    return check
+
+
+@ovld
+def make_argument(t: type[StringModelizable], partial: dict, model_field: Field):
+    m = model(t)
+    return {**partial, "type": regex_checker(m.regexp, m.string_description) if m.regexp else str}
 
 
 @ovld
