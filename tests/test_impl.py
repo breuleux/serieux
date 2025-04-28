@@ -7,6 +7,7 @@ import pytest
 from serieux import deserialize, serialize
 from serieux.exc import ValidationError
 from serieux.features.fromfile import WorkingDirectory
+from serieux.tell import TypeTell, tells
 
 from .test_schema import schema
 
@@ -38,6 +39,10 @@ def test_schema_date():
     assert schema(date) == {"type": "string", "format": "date"}
 
 
+def test_tells_date():
+    assert tells(date) == {TypeTell(str)}
+
+
 #################
 # Test datetime #
 #################
@@ -60,6 +65,10 @@ def test_deserialize_datetime():
 
 def test_schema_datetime():
     assert schema(datetime) == {"type": "string", "format": "date-time"}
+
+
+def test_tells_datetime():
+    assert tells(datetime) == {TypeTell(str)}
 
 
 ##################
@@ -105,6 +114,10 @@ def test_schema_timedelta():
     }
 
 
+def test_tells_timedelta():
+    assert tells(timedelta) == {TypeTell(str)}
+
+
 #############
 # Test Path #
 #############
@@ -129,6 +142,10 @@ def test_schema_path():
     assert schema(Path) == {"type": "string"}
 
 
+def test_tells_path():
+    assert tells(Path) == {TypeTell(str)}
+
+
 #################
 # Test ZoneInfo #
 #################
@@ -148,3 +165,7 @@ def test_deserialize_zoneinfo():
 
 def test_schema_zoneinfo():
     assert schema(ZoneInfo) == {"type": "string"}
+
+
+def test_tells_zoneinfo():
+    assert tells(ZoneInfo) == {TypeTell(str)}

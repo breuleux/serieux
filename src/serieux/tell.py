@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from types import NoneType
+from zoneinfo import ZoneInfo
 
 from ovld import Code, ovld, recurse
 
@@ -66,7 +68,7 @@ def tells(
 
 
 @ovld
-def tells(typ: type[date] | type[datetime] | type[timedelta]):
+def tells(typ: type[date] | type[datetime] | type[timedelta] | type[Path] | type[ZoneInfo]):
     return {TypeTell(str)}
 
 
