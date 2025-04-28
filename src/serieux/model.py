@@ -97,11 +97,18 @@ def model(t: type[object]):
     return _model_cache[t]
 
 
+def safe_isinstance(obj, t):
+    try:
+        return isinstance(obj, t)
+    except TypeError:  # pragma: no cover
+        return False
+
+
 @ovld
 def model(dc: type[Dataclass]):
     def make_field(i, field):
         typ = evaluate_hint(field.type, dc, None, tsub)
-        if field.default is None and not isinstance(field.default, typ):
+        if field.default is None and not safe_isinstance(field.default, typ):
             typ = Optional[typ]
 
         return Field(
