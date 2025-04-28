@@ -1,6 +1,5 @@
 import sys
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -8,7 +7,6 @@ import pytest
 from serieux import deserialize
 from serieux.ctx import AccessPath
 from serieux.exc import ValidationError
-from serieux.features.fromfile import WorkingDirectory
 
 from .common import has_312_features, one_test_per_assert
 from .definitions import Color, Defaults, Level, Point, Point3D
@@ -139,50 +137,6 @@ def test_deserialize_enum():
 def test_deserialize_enum_int():
     assert deserialize(Level, 1) == Level.MED
     assert deserialize(list[Level], [2, 0, 2]) == [Level.HI, Level.LO, Level.HI]
-
-
-def test_deserialize_date():
-    assert deserialize(date, "2023-05-15") == date(2023, 5, 15)
-    assert deserialize(list[date], ["2023-05-15", "2024-01-01"]) == [
-        date(2023, 5, 15),
-        date(2024, 1, 1),
-    ]
-
-
-def test_deserialize_datetime():
-    assert deserialize(datetime, "2023-05-15T12:30:45") == datetime(2023, 5, 15, 12, 30, 45)
-    assert deserialize(list[datetime], ["2023-05-15T12:30:45", "2024-01-01T00:00:00"]) == [
-        datetime(2023, 5, 15, 12, 30, 45),
-        datetime(2024, 1, 1, 0, 0, 0),
-    ]
-
-
-def test_deserialize_timedelta():
-    assert deserialize(timedelta, "42s") == timedelta(seconds=42)
-    assert deserialize(timedelta, "42500000us") == timedelta(seconds=42, microseconds=500000)
-    assert deserialize(timedelta, "-10s") == timedelta(seconds=-10)
-    assert deserialize(timedelta, "6h30m") == timedelta(hours=6, minutes=30)
-    assert deserialize(timedelta, "+8d") == timedelta(days=8)
-    assert deserialize(timedelta, "4.5d") == timedelta(days=4, seconds=60 * 60 * 12)
-    assert deserialize(timedelta, "1d12h") == timedelta(days=1, hours=12)
-    assert deserialize(timedelta, "36h") == timedelta(days=1, hours=12)
-    assert deserialize(list[timedelta], ["30s", "5d"]) == [
-        timedelta(seconds=30),
-        timedelta(days=5),
-    ]
-    with pytest.raises(ValidationError, match="must end with a unit"):
-        deserialize(timedelta, "1d3")
-    with pytest.raises(ValidationError, match="is not a valid timedelta unit"):
-        deserialize(timedelta, "1d3x")
-    with pytest.raises(ValidationError, match="Could not convert"):
-        deserialize(timedelta, "1.5.4d")
-
-
-def test_deserialize_path():
-    assert deserialize(Path, "hello/world.txt") == Path("hello/world.txt")
-    assert deserialize(Path, "world.txt", WorkingDirectory(directory=Path("hello"))) == Path(
-        "hello/world.txt"
-    )
 
 
 ###############

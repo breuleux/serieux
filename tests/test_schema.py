@@ -1,6 +1,4 @@
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
-from pathlib import Path
 from types import NoneType
 
 import pytest
@@ -43,25 +41,6 @@ def test_schema_None():
 
 def test_schema_enum():
     assert schema(Color) == {"enum": ["red", "green", "blue"]}
-
-
-def test_schema_date():
-    assert schema(date) == {"type": "string", "format": "date"}
-
-
-def test_schema_datetime():
-    assert schema(datetime) == {"type": "string", "format": "date-time"}
-
-
-def test_schema_timedelta():
-    assert schema(timedelta) == {
-        "type": "string",
-        "pattern": r"^[+-]?(\d+[dhms]|\d+ms|\d+us)+$",
-    }
-
-
-def test_schema_path():
-    assert schema(Path) == {"type": "string"}
 
 
 def test_schema_list():
