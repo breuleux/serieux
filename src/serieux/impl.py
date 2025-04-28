@@ -7,6 +7,7 @@ from itertools import pairwise
 from pathlib import Path
 from types import NoneType, UnionType
 from typing import Any, get_args, get_origin
+from zoneinfo import ZoneInfo
 
 import yaml
 from ovld import (
@@ -578,19 +579,38 @@ class BaseImplementation(Medley):
             "pattern": r"^[+-]?(\d+[dhms]|\d+ms|\d+us)+$",
         }
 
+    #############################
+    # Implementations: ZoneInfo #
+    #############################
+
+    @ovld(priority=PRIO_DEFAULT)
+    def serialize(self, t: type[ZoneInfo], obj: ZoneInfo, ctx: Context):
+        return obj.key
+
+    @ovld(priority=PRIO_DEFAULT)
+    def deserialize(self, t: type[ZoneInfo], obj: str, ctx: Context):
+        try:
+            return ZoneInfo(obj)
+        except Exception as e:
+            raise ValidationError(f"Invalid timezone: {obj}", ctx=ctx) from e
+
+    @ovld(priority=PRIO_DEFAULT)
+    def schema(self, t: type[ZoneInfo], ctx: Context, /):
+        return {"type": "string"}
+
     #########################
     # Implementations: Path #
     #########################
 
     @ovld(priority=PRIO_DEFAULT)
     def serialize(self, t: type[Path], obj: Path, ctx: Context):
-        if isinstance(ctx, WorkingDirectory):
+        if isinstance(ctx, WorkingDirectory) and not obj.is_absolute():
             obj = obj.relative_to(ctx.directory)
         return str(obj)
 
     @ovld(priority=PRIO_DEFAULT)
     def deserialize(self, t: type[Path], obj: str, ctx: Context):
-        pth = Path(obj)
+        pth = Path(obj).expanduser()
         if isinstance(ctx, WorkingDirectory):
             pth = ctx.directory / pth
         return pth
