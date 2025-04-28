@@ -3,6 +3,7 @@ from typing import Any
 from ovld import Medley, call_next, ovld
 
 from ..ctx import Context
+from ..model import Modelizable
 
 
 def unflatten(d: dict):
@@ -19,7 +20,7 @@ def unflatten(d: dict):
 class DottedNotation(Medley):
     @ovld(priority=10)
     def deserialize(self, t: Any, obj: dict, ctx: Context):
-        if any("." in k for k in obj.keys()):
+        if issubclass(t, Modelizable) and any("." in k for k in obj.keys()):
             return call_next(t, unflatten(obj), ctx)
         return call_next(t, obj, ctx)
 
