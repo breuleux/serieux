@@ -1,13 +1,11 @@
-import re
 from dataclasses import MISSING, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from enum import Enum
 from functools import wraps
 from itertools import pairwise
 from pathlib import Path
 from types import NoneType, UnionType
 from typing import Any, get_args, get_origin
-from zoneinfo import ZoneInfo
 
 import yaml
 from ovld import (
@@ -23,6 +21,7 @@ from ovld import (
     ovld,
     recurse,
 )
+from ovld.codegen import Function
 from ovld.medley import KeepLast, use_combiner
 from ovld.types import All
 
@@ -30,7 +29,7 @@ from .ctx import AccessPath, Context
 from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
 from .features.fromfile import WorkingDirectory
 from .instructions import InstructionType, strip_all
-from .model import Modelizable, model
+from .model import FieldModelizable, Modelizable, StringModelizable, model
 from .schema import AnnotatedSchema, Schema
 from .tell import tells as get_tells
 from .utils import (
@@ -153,7 +152,7 @@ class BaseImplementation(Medley):
     def serialize(self, t: Any, obj: Any, ctx: Context, /):
         raise ValidationError(
             f"Cannot serialize object of type '{clsstring(type(obj))}'"
-            f" into expected type '{clsstring(t)}'.",
+            + (f" into expected type '{clsstring(t)}'." if t is not type(obj) else ""),
             ctx=ctx,
         )
 
@@ -319,12 +318,12 @@ class BaseImplementation(Medley):
         kt, vt = get_args(t)
         return {"type": "object", "additionalProperties": recurse(vt, ctx)}
 
-    ################################
-    # Implementations: Modelizable #
-    ################################
+    #####################################
+    # Implementations: FieldModelizable #
+    #####################################
 
     @code_generator_wrap_error(priority=PRIO_DEFAULT)
-    def serialize(cls, t: type[Modelizable], obj: Any, ctx: Context, /):
+    def serialize(cls, t: type[FieldModelizable], obj: Any, ctx: Context, /):
         (orig_t,) = get_args(t)
         t = model(orig_t)
         if not t.accepts(obj):
@@ -362,7 +361,7 @@ class BaseImplementation(Medley):
         return Def(stmts, VE=ValidationError, VEG=ValidationExceptionGroup)
 
     @code_generator_wrap_error(priority=PRIO_DEFAULT)
-    def deserialize(cls, t: type[Modelizable], obj: dict, ctx: Context, /):
+    def deserialize(cls, t: type[FieldModelizable], obj: dict, ctx: Context, /):
         (orig_t,) = get_args(t)
         t = model(orig_t)
         follow = hasattr(ctx, "follow")
@@ -415,30 +414,102 @@ class BaseImplementation(Medley):
         stmts.append(final)
         return Def(stmts, VE=ValidationError, VEG=ValidationExceptionGroup)
 
+    ######################################
+    # Implementations: StringModelizable #
+    ######################################
+
+    @code_generator_wrap_error(priority=PRIO_DEFAULT)
+    def serialize(self, t: type[StringModelizable], obj: Any, ctx: Context, /):
+        (t,) = get_args(t)
+        m = model(t)
+        if not m.accepts(obj) or m.to_string is None:
+            return None
+        if isinstance(m.to_string, Function):
+            return m.to_string
+        else:
+            return Lambda("$to_string($obj)", to_string=m.to_string)
+
+    @code_generator_wrap_error(priority=PRIO_DEFAULT)
+    def deserialize(self, t: type[StringModelizable], obj: str, ctx: Context, /):
+        (t,) = get_args(t)
+        m = model(t)
+        if m.regexp:
+            if isinstance(m.from_string, Def):  # pragma: no cover
+                raise Exception("In model definitions, use Lambda with regexp, not Def")
+            elif isinstance(m.from_string, Lambda):
+                expr = m.from_string.create_expression(["t", "obj", "ctx"])
+            else:
+                expr = Code("$from_string($obj)", from_string=m.from_string)
+            descr = m.string_description or f"pattern {m.regexp.pattern!r}"
+            pattern = f"String {{$obj!r}} is not a valid {clsstring(t)}. It should match: {descr}"
+            return Def(
+                ["t", "obj", "ctx"],
+                Code(
+                    [
+                        ["if $regexp.match($obj):", ["return $expr"]],
+                        [
+                            "else:",
+                            [f"""raise $VE(f"{pattern}")"""],
+                        ],
+                    ]
+                ),
+                from_string=m.from_string,
+                regexp=m.regexp,
+                expr=expr,
+                descr=descr,
+                VE=ValidationError,
+            )
+        elif isinstance(m.from_string, Function):
+            return m.from_string
+        else:
+            return Lambda("$from_string($obj)", from_string=m.from_string)
+
+    ################################
+    # Implementations: Modelizable #
+    ################################
+
     @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[Modelizable], ctx: Context, /):
-        t = model(t)
-        properties = {}
-        required = []
+        m = model(t)
 
-        for f in t.fields:
-            fsch = recurse(f.type, ctx)
-            extra = {}
-            if f.description:
-                extra["description"] = f.description
-            if f.default is not MISSING:
-                extra["default"] = f.default
-            fsch = fsch if not f.description else AnnotatedSchema(fsch, **extra)
-            properties[f.property_name] = fsch
-            if f.required:
-                required.append(f.property_name)
+        f_schema, s_schema = None, None
 
-        return {
-            "type": "object",
-            "properties": properties,
-            "required": required,
-            "additionalProperties": t.extensible,
-        }
+        if m.fields is not None:
+            properties = {}
+            required = []
+
+            for f in m.fields:
+                fsch = recurse(f.type, ctx)
+                extra = {}
+                if f.description:
+                    extra["description"] = f.description
+                if f.default is not MISSING:
+                    extra["default"] = f.default
+                fsch = fsch if not f.description else AnnotatedSchema(fsch, **extra)
+                properties[f.serialized_name] = fsch
+                if f.required:
+                    required.append(f.serialized_name)
+
+            f_schema = {
+                "type": "object",
+                "properties": properties,
+                "required": required,
+                "additionalProperties": m.extensible,
+            }
+
+        if m.from_string is not None:
+            s_schema = {"type": "string"}
+            if m.regexp:
+                s_schema["pattern"] = m.regexp.pattern
+
+        assert f_schema or s_schema
+
+        if f_schema is not None and s_schema is not None:
+            return {"oneOf": [f_schema, s_schema]}
+        elif f_schema is not None:
+            return f_schema
+        else:
+            return s_schema
 
     ###########################
     # Implementations: Unions #
@@ -512,14 +583,8 @@ class BaseImplementation(Medley):
     # Implementations: Dates #
     ##########################
 
-    @code_generator_wrap_error(priority=PRIO_DEFAULT)
-    def serialize(self, t: type[date] | type[datetime], obj: date | datetime, ctx: Context, /):
-        return Lambda(Code("$obj.isoformat()"))
-
-    @code_generator_wrap_error(priority=PRIO_DEFAULT)
-    def deserialize(self, t: type[date] | type[datetime], obj: str, ctx: Context, /):
-        (t,) = get_args(t)
-        return Lambda(Code("$t.fromisoformat($obj)", t=t))
+    # We specify schemas explicitly because they have special formats
+    # The serialization/deserializable is taken care of by their model()
 
     @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[date], ctx: Context, /):
@@ -528,75 +593,6 @@ class BaseImplementation(Medley):
     @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[datetime], ctx: Context, /):
         return {"type": "string", "format": "date-time"}
-
-    ##############################
-    # Implementations: timedelta #
-    ##############################
-
-    @ovld(priority=PRIO_DEFAULT)
-    def serialize(self, t: type[timedelta], obj: timedelta, ctx: Context):
-        """Serialize timedelta as Xs (seconds) or Xus (microseconds)."""
-        seconds = int(obj.total_seconds())
-        if obj.microseconds:
-            return f"{seconds}{obj.microseconds:06}us"
-        else:
-            return f"{seconds}s"
-
-    @ovld(priority=PRIO_DEFAULT)
-    def deserialize(self, t: type[timedelta], obj: str, ctx: Context):
-        """Deserialize a combination of days, hours, etc. as a timedelta."""
-        units = {
-            "d": "days",
-            "h": "hours",
-            "m": "minutes",
-            "s": "seconds",
-            "ms": "milliseconds",
-            "us": "microseconds",
-        }
-        sign = 1
-        if obj.startswith("-"):
-            obj = obj[1:]
-            sign = -1
-        kw = {}
-        parts = re.split(string=obj, pattern="([a-z ]+)")
-        if parts[-1] != "":
-            raise ValidationError("timedelta representation must end with a unit", ctx=ctx)
-        for i in range(len(parts) // 2):
-            n = parts[i * 2]
-            unit = parts[i * 2 + 1].strip()
-            if unit not in units:
-                raise ValidationError(f"'{unit}' is not a valid timedelta unit", ctx=ctx)
-            try:
-                kw[units[unit]] = float(n)
-            except ValueError:
-                raise ValidationError(f"Could not convert '{n}' ({units[unit]}) to float", ctx=ctx)
-        return sign * timedelta(**kw)
-
-    @ovld(priority=PRIO_DEFAULT)
-    def schema(self, t: type[timedelta], ctx: Context, /):
-        return {
-            "type": "string",
-            "pattern": r"^[+-]?(\d+[dhms]|\d+ms|\d+us)+$",
-        }
-
-    #############################
-    # Implementations: ZoneInfo #
-    #############################
-
-    @ovld(priority=PRIO_DEFAULT)
-    def serialize(self, t: type[ZoneInfo], obj: ZoneInfo, ctx: Context):
-        return obj.key
-
-    @ovld(priority=PRIO_DEFAULT)
-    def deserialize(self, t: type[ZoneInfo], obj: str, ctx: Context):
-        try:
-            return ZoneInfo(obj)
-        except Exception as e:
-            raise ValidationError(f"Invalid timezone: {obj}", ctx=ctx) from e
-
-    @ovld(priority=PRIO_DEFAULT)
-    def schema(self, t: type[ZoneInfo], ctx: Context, /):
-        return {"type": "string"}
 
     #########################
     # Implementations: Path #

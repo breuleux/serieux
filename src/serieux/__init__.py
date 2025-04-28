@@ -15,7 +15,7 @@ from .features.tagged import Tagged, TaggedUnion
 from .features.tsubclass import TaggedSubclass
 from .impl import BaseImplementation
 from .instructions import InstructionType, NewInstruction
-from .model import Extensible, Model, Modelizable
+from .model import Extensible, FieldModelizable, Model, Modelizable, StringModelizable
 from .schema import RefPolicy, Schema
 from .version import version as __version__
 
@@ -95,6 +95,7 @@ __all__ = [
     "LazyProxy",
     "load",
     "Model",
+    "FieldModelizable",
     "Modelizable",
     "NewInstruction",
     "parse_cli",
@@ -108,6 +109,7 @@ __all__ = [
     "Serieux",
     "SerieuxError",
     "Sources",
+    "StringModelizable",
     "Tagged",
     "TaggedUnion",
     "TaggedSubclass",

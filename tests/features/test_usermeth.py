@@ -2,11 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ovld import Dataclass, Dependent, ovld
+from ovld import Dataclass, Dependent, Lambda, ovld
 from ovld.dependent import Regexp
 
 from serieux import deserialize, schema, serialize
 from serieux.model import Field, Model
+
+
+def _rgb_from_string(obj, cls):
+    hex_str = obj.lstrip("#")
+    red = int(hex_str[0:2], 16)
+    green = int(hex_str[2:4], 16)
+    blue = int(hex_str[4:6], 16)
+    return cls(red=red, green=green, blue=blue)
 
 
 @dataclass
@@ -18,11 +26,7 @@ class RGB:
     @classmethod
     def serieux_deserialize(cls, obj, ctx, call_next):
         if isinstance(obj, str):
-            hex_str = obj.lstrip("#")
-            red = int(hex_str[0:2], 16)
-            green = int(hex_str[2:4], 16)
-            blue = int(hex_str[4:6], 16)
-            return RGB(red=red, green=green, blue=blue)
+            return _rgb_from_string(obj, cls=RGB)
         else:
             return call_next(cls, obj, ctx)
 
@@ -82,11 +86,7 @@ class RGBO:
     @classmethod
     @ovld
     def serieux_deserialize(cls, obj: Regexp[r"^#[0-9a-fA-F]{6}$"], ctx, call_next):
-        hex_str = obj.lstrip("#")
-        red = int(hex_str[0:2], 16)
-        green = int(hex_str[2:4], 16)
-        blue = int(hex_str[4:6], 16)
-        return RGBO(red=red, green=green, blue=blue)
+        return _rgb_from_string(obj, cls=RGBO)
 
     @classmethod
     @ovld
@@ -129,6 +129,8 @@ class RGBM:
                 Field(name="blue", type=int, serialized_name="B"),
             ],
             constructor=cls,
+            from_string=Lambda("$from_string($obj, $t)", from_string=_rgb_from_string),
+            regexp=r"^#[0-9a-fA-F]{6}$",
         )
 
 
@@ -136,3 +138,27 @@ def test_custom_deserialize_m():
     obj = deserialize(RGBM, {"R": 30, "G": 100, "B": 200})
     assert isinstance(obj, RGBM)
     assert obj.red == 30 and obj.green == 100 and obj.blue == 200
+
+
+def test_custom_deserialize_m_from_string():
+    obj = deserialize(RGBM, "#ff0000")
+    assert isinstance(obj, RGBM)
+    assert obj.red == 255 and obj.green == 0 and obj.blue == 0
+
+
+def test_custom_m_schema(file_regression):
+    assert schema(RGBM).compile(root=False) == {
+        "oneOf": [
+            {
+                "type": "object",
+                "properties": {
+                    "R": {"type": "integer"},
+                    "G": {"type": "integer"},
+                    "B": {"type": "integer"},
+                },
+                "required": ["R", "G", "B"],
+                "additionalProperties": False,
+            },
+            {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"},
+        ]
+    }

@@ -27,6 +27,13 @@ def test_serialize_date():
     ]
 
 
+def test_serialize_date_error():
+    with pytest.raises(ValidationError, match="Cannot serialize"):
+        serialize(date, "2023-05-15")
+    with pytest.raises(ValidationError, match="Cannot serialize"):
+        serialize(list[date], ["2023-05-15", "2024-01-01"])
+
+
 def test_deserialize_date():
     assert deserialize(date, "2023-05-15") == date(2023, 5, 15)
     assert deserialize(list[date], ["2023-05-15", "2024-01-01"]) == [
@@ -99,9 +106,11 @@ def test_deserialize_timedelta():
         timedelta(seconds=30),
         timedelta(days=5),
     ]
-    with pytest.raises(ValidationError, match="must end with a unit"):
+    with pytest.raises(ValidationError, match="is not a valid timedelta"):
+        deserialize(timedelta, "1dd")
+    with pytest.raises(ValidationError, match="is not a valid timedelta"):
         deserialize(timedelta, "1d3")
-    with pytest.raises(ValidationError, match="is not a valid timedelta unit"):
+    with pytest.raises(ValidationError, match="is not a valid timedelta"):
         deserialize(timedelta, "1d3x")
     with pytest.raises(ValidationError, match="Could not convert"):
         deserialize(timedelta, "1.5.4d")
@@ -110,7 +119,7 @@ def test_deserialize_timedelta():
 def test_schema_timedelta():
     assert schema(timedelta) == {
         "type": "string",
-        "pattern": r"^[+-]?(\d+[dhms]|\d+ms|\d+us)+$",
+        "pattern": r"^[+-]?([\d.]+[dhms]|[\d.]+ms|[\d.]+us)+$",
     }
 
 
@@ -159,7 +168,7 @@ def test_serialize_zoneinfo():
 def test_deserialize_zoneinfo():
     assert deserialize(ZoneInfo, "America/New_York") == ZoneInfo("America/New_York")
     assert deserialize(ZoneInfo, "UTC") == ZoneInfo("UTC")
-    with pytest.raises(ValidationError, match="Invalid timezone"):
+    with pytest.raises(ValidationError, match="No time zone found"):
         deserialize(ZoneInfo, "Invalid/Timezone")
 
 

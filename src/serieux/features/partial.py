@@ -13,7 +13,7 @@ from ..exc import (
     merge_errors,
 )
 from ..instructions import NewInstruction
-from ..model import Modelizable, model
+from ..model import FieldModelizable, model
 from ..utils import PRIO_HIGH
 from .lazy import LazyProxy
 
@@ -47,7 +47,7 @@ class Sources:
 
 
 @ovld
-def partialize(t: type[Modelizable]):
+def partialize(t: type[FieldModelizable]):
     m = model(t)
     fields = [
         (

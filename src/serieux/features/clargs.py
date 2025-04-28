@@ -12,7 +12,7 @@ from ovld import Medley, ovld, recurse
 from ..ctx import Context
 from ..exc import ValidationError
 from ..instructions import strip_all
-from ..model import Field, Modelizable, field_at, model
+from ..model import Field, FieldModelizable, field_at, model
 from ..utils import UnionAlias, clsstring
 from .dotted import unflatten
 from .partial import Sources
@@ -130,7 +130,9 @@ def add_argument_from_field(parser, fdest, overrides, field: Field):
 
 
 @ovld
-def add_arguments(t: type[Modelizable], parser: argparse.ArgumentParser, dest: str, partial: bool):
+def add_arguments(
+    t: type[FieldModelizable], parser: argparse.ArgumentParser, dest: str, partial: bool
+):
     m = model(t)
     for fld in m.fields:
         if fld.name.startswith("_"):  # pragma: no cover

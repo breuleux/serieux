@@ -1,13 +1,11 @@
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
 from pathlib import Path
 from types import NoneType
-from zoneinfo import ZoneInfo
 
 from ovld import Code, ovld, recurse
 
 from .instructions import InstructionType
-from .model import Modelizable, model
+from .model import FieldModelizable, StringModelizable, model
 
 
 class Tell:
@@ -68,16 +66,21 @@ def tells(
 
 
 @ovld
-def tells(typ: type[date] | type[datetime] | type[timedelta] | type[Path] | type[ZoneInfo]):
+def tells(typ: type[Path]):
     return {TypeTell(str)}
 
 
 @ovld
-def tells(typ: type[Modelizable]):
+def tells(typ: type[FieldModelizable]):
     m = model(typ)
     return {TypeTell(dict)} | {KeyTell(f.serialized_name) for f in m.fields}
 
 
+@ovld
+def tells(typ: type[StringModelizable]):
+    return {TypeTell(str)}
+
+
 @ovld(priority=-1)
-def tells(m: type[InstructionType]):
-    return recurse(m.pushdown())
+def tells(typ: type[InstructionType]):
+    return recurse(typ.pushdown())

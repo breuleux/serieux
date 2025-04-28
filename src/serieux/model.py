@@ -1,10 +1,14 @@
+import re
 from dataclasses import MISSING, dataclass, field, fields, replace
+from datetime import date, datetime, timedelta
 from typing import Any, Callable, Optional, get_args, get_origin
+from zoneinfo import ZoneInfo
 
-from ovld import Dataclass, call_next, class_check, ovld, recurse
+from ovld import Dataclass, Lambda, call_next, class_check, ovld, recurse
 
 from .docstrings import get_attribute_docstrings
-from .instructions import InstructionType, NewInstruction
+from .exc import ValidationError
+from .instructions import InstructionType, NewInstruction, strip_all
 from .utils import UnionAlias, clsstring, evaluate_hint
 
 UNDEFINED = object()
@@ -16,6 +20,16 @@ Extensible = NewInstruction["Extensible"]
 @class_check
 def Modelizable(t):
     return isinstance(model(t), Model)
+
+
+@class_check
+def StringModelizable(t):
+    return strip_all(t) is t and isinstance(m := model(t), Model) and m.from_string is not None
+
+
+@class_check
+def FieldModelizable(t):
+    return isinstance(m := model(t), Model) and m.fields is not None
 
 
 @dataclass(kw_only=True)
@@ -57,9 +71,17 @@ class Field:
 @dataclass
 class Model:
     original_type: type
-    fields: list[Field]
-    constructor: Callable
+    fields: list[Field] = None
+    constructor: Callable = None
+    from_string: Callable = None
+    to_string: Callable = None
+    regexp: re.Pattern = None
+    string_description: str = None
     extensible: bool = False
+
+    def __post_init__(self):
+        if isinstance(self.regexp, str):
+            self.regexp = re.compile(self.regexp)
 
     def accepts(self, other):
         ot = self.original_type
@@ -82,6 +104,11 @@ _premade = {}
 def _take_premade(t):
     _model_cache[t] = _premade.pop(t)
     return _model_cache[t]
+
+
+#########
+# model #
+#########
 
 
 @ovld(priority=100)
@@ -149,17 +176,90 @@ def model(t: type[Extensible]):
 @ovld(priority=-1)
 def model(t: type[InstructionType]):
     m = call_next(t.strip(t))
-    if m:
+    if m and m.fields is not None:
         return Model(
             original_type=m.original_type,
             fields=[replace(field, type=t[field.type]) for field in m.fields],
             constructor=m.constructor,
         )
+    else:
+        return m
+
+
+@ovld
+def model(t: type[ZoneInfo]):
+    return Model(
+        original_type=t,
+        from_string=ZoneInfo,
+        to_string=Lambda("$obj.key"),
+    )
+
+
+@ovld
+def model(t: type[date] | type[datetime]):
+    return Model(
+        original_type=t,
+        from_string=Lambda("$t.fromisoformat($obj)"),
+        to_string=Lambda("$obj.isoformat()"),
+    )
+
+
+def _timedelta_to_string(obj: timedelta):
+    """Serialize timedelta as Xs (seconds) or Xus (microseconds)."""
+    seconds = int(obj.total_seconds())
+    if obj.microseconds:
+        return f"{seconds}{obj.microseconds:06}us"
+    else:
+        return f"{seconds}s"
+
+
+def _timedelta_from_string(obj: str):
+    """Deserialize a combination of days, hours, etc. as a timedelta."""
+    units = {
+        "d": "days",
+        "h": "hours",
+        "m": "minutes",
+        "s": "seconds",
+        "ms": "milliseconds",
+        "us": "microseconds",
+    }
+    sign = 1
+    if obj.startswith("-"):
+        obj = obj[1:]
+        sign = -1
+    kw = {}
+    parts = re.split(string=obj, pattern="([a-z ]+)")
+    assert parts[-1] == ""
+    for i in range(len(parts) // 2):
+        n = parts[i * 2]
+        unit = parts[i * 2 + 1].strip()
+        assert unit in units
+        try:
+            kw[units[unit]] = float(n)
+        except ValueError:
+            raise ValidationError(f"Could not convert '{n}' ({units[unit]}) to float")
+    return sign * timedelta(**kw)
+
+
+@ovld
+def model(t: type[timedelta]):
+    return Model(
+        original_type=t,
+        from_string=_timedelta_from_string,
+        to_string=_timedelta_to_string,
+        regexp=r"^[+-]?([\d.]+[dhms]|[\d.]+ms|[\d.]+us)+$",
+        string_description="A string such as 1d, 5h or 3d5h7s, ending in a unit. Valid units are d, h, m, s, ms, us.",
+    )
 
 
 @ovld(priority=-1)
 def model(t: object):
     return None
+
+
+############
+# field_at #
+############
 
 
 @ovld
@@ -190,7 +290,7 @@ def field_at(t: type[dict], path: list, f: Field):
 
 
 @ovld
-def field_at(t: type[Modelizable], path: list, f: Field):
+def field_at(t: type[FieldModelizable], path: list, f: Field):
     m = model(t)
     curr, *rest = path
     for f2 in m.fields:

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date
 
 import pytest
 from ovld import Medley
@@ -182,3 +183,7 @@ def test_merge_partial_with_object():
 
     with pytest.raises(SerieuxError, match="Some errors occurred"):
         load(RGB, Sources("#fffffX", "#fffffX"))
+
+
+def test_partial_string_modelizable():
+    assert load(Partial[date], "2023-05-15") == date(2023, 5, 15)

@@ -10,7 +10,7 @@ from rich.pretty import pprint
 from serieux import Serieux, Sources, deserialize
 from serieux.ctx import Context
 from serieux.instructions import strip_all
-from serieux.model import Modelizable, model
+from serieux.model import FieldModelizable, model
 
 ##################
 # Implementation #
@@ -42,7 +42,7 @@ def parser_for(t: type):
 
 @Serieux.extend
 class FromArguments(Medley):
-    def deserialize(self, t: type[Modelizable], obj: CommandLineArguments, ctx: Context):
+    def deserialize(self, t: type[FieldModelizable], obj: CommandLineArguments, ctx: Context):
         parser = parser_for(t)
         ns = parser.parse_args(obj.arguments)
         values = {k: v for k, v in vars(ns).items() if v is not None}
