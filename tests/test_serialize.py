@@ -8,7 +8,7 @@ from serieux.ctx import AccessPath, Context
 from serieux.exc import ValidationError
 
 from .common import has_312_features, one_test_per_assert
-from .definitions import Color, Level, Point
+from .definitions import Color, DIDHolder, Level, LTHolder, Point
 
 
 @one_test_per_assert
@@ -212,3 +212,29 @@ def test_dump(tmp_path):
     pt = Point(1, 2)
     dump(Point, pt, dest=dest)
     assert load(Point, dest) == pt
+
+
+def test_serialize_recursive_type():
+    data = DIDHolder(
+        did={
+            "a": 1,
+            "b": {
+                "c": 2,
+                "d": 3,
+            },
+        }
+    )
+    ser = serialize(DIDHolder, data)
+    assert ser["did"] == data.did
+
+
+def test_serialize_recursive_type_2():
+    def p(x):
+        return Point(x, x)
+
+    data = LTHolder(lt=[p(1), [p(2), [p(3)], p(4)]])
+    ser = serialize(LTHolder, data)
+    assert ser["lt"] == [
+        {"x": 1, "y": 1},
+        [{"x": 2, "y": 2}, [{"x": 3, "y": 3}], {"x": 4, "y": 4}],
+    ]

@@ -6,6 +6,7 @@ from ovld import Code, ovld, recurse
 
 from .instructions import InstructionType
 from .model import FieldModelizable, StringModelizable, model
+from .utils import basic_type
 
 
 class Tell:
@@ -62,7 +63,7 @@ def tells(
     | type[list]
     | type[dict],
 ):
-    return {TypeTell(typ)}
+    return {TypeTell(basic_type(typ))}
 
 
 @ovld

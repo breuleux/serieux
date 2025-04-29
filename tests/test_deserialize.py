@@ -9,7 +9,7 @@ from serieux.ctx import AccessPath
 from serieux.exc import ValidationError
 
 from .common import has_312_features, one_test_per_assert
-from .definitions import Color, Defaults, Level, Point, Point3D
+from .definitions import Color, Defaults, DIDHolder, Level, LTHolder, Point, Point3D
 
 here = Path(__file__).parent
 
@@ -174,3 +174,26 @@ def test_error_display(capsys, file_regression):
     exc.value.display(file=sys.stderr)
     cap = capsys.readouterr()
     file_regression.check("\n".join([cap.out, "=" * 80, cap.err]))
+
+
+def test_deserialize_recursive_type():
+    data = {
+        "did": {
+            "a": 1,
+            "b": {
+                "c": 2,
+                "d": 3,
+            },
+        }
+    }
+    deser = deserialize(DIDHolder, data)
+    assert deser.did == data["did"]
+
+
+def test_deserialize_recursive_type_2():
+    def p(x):
+        return Point(x, x)
+
+    data = {"lt": [{"x": 1, "y": 1}, [{"x": 2, "y": 2}, [{"x": 3, "y": 3}], {"x": 4, "y": 4}]]}
+    deser = deserialize(LTHolder, data)
+    assert deser.lt == [p(1), [p(2), [p(3)], p(4)]]

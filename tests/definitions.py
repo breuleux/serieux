@@ -42,7 +42,7 @@ class Point3D(Point):
     z: int
 
 
-class Color(Enum):
+class Color(str, Enum):
     RED = "red"
     GREEN = "green"
     BLUE = "blue"
@@ -99,3 +99,19 @@ class Job:
 class Worker:
     name: str
     job: Job = None
+
+
+DID = dict[str, "int | DID"]
+
+
+@dataclass
+class DIDHolder:
+    did: DID
+
+
+ListTree = list["Point | ListTree"]
+
+
+@dataclass
+class LTHolder:
+    lt: ListTree

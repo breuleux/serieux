@@ -13,6 +13,8 @@ from typing import (
 
 from ovld import class_check, parametrized_class_check
 
+from .instructions import strip_all
+
 PRIO_LAST = -100
 PRIO_LOW = -2
 PRIO_DEFAULT = -1
@@ -40,12 +42,21 @@ def clsstring(cls):
             return r
 
 
+def basic_type(t):
+    return get_origin(bt := strip_all(t)) or bt
+
+
 #################
 # evaluate_hint #
 #################
 
 
-def evaluate_hint(typ, ctx=None, lcl=None, typesub=None):
+class Indirect:
+    def __init__(self, value):
+        self.value = value
+
+
+def evaluate_hint(typ, ctx=None, lcl=None, typesub=None, seen=None):
     def get_eval_args():
         glb = ctx
         tsub = typesub
@@ -63,15 +74,26 @@ def evaluate_hint(typ, ctx=None, lcl=None, typesub=None):
         return glb, local, tsub
 
     if isinstance(typ, str):
-        glb, lcl, typesub = get_eval_args()
-        return evaluate_hint(eval(typ, glb, lcl), glb, lcl, typesub)
+        if seen and (typ in seen):
+            if seen[typ] is None:
+                seen[typ] = Indirect(None)
+            return seen[typ]
+        else:
+            glb, lcl, typesub = get_eval_args()
+            if not seen:
+                seen = {}
+            seen[typ] = None
+            rval = evaluate_hint(eval(typ, glb, lcl), glb, lcl, typesub, seen)
+            if seen[typ] is not None:
+                seen[typ].value = rval
+            return rval
 
     elif isinstance(typ, (UnionType, GenericAlias, _GenericAlias)):
         origin = get_origin(typ)
         args = get_args(typ)
         if origin is UnionType:
             origin = Union
-        new_args = [evaluate_hint(arg, ctx, lcl, typesub) for arg in args]
+        new_args = [evaluate_hint(arg, ctx, lcl, typesub, seen) for arg in args]
         return origin[tuple(new_args)]
 
     elif isinstance(typ, TypeVar):
@@ -86,6 +108,9 @@ def evaluate_hint(typ, ctx=None, lcl=None, typesub=None):
 
     elif isinstance(typ, type):
         return typ
+
+    elif isinstance(typ, Indirect):
+        return typ.value
 
     else:  # pragma: no cover
         raise TypeError("Cannot evaluate hint:", typ, type(typ))

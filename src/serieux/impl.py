@@ -28,7 +28,7 @@ from ovld.types import All
 from .ctx import AccessPath, Context
 from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
 from .features.fromfile import WorkingDirectory
-from .instructions import InstructionType, strip_all
+from .instructions import InstructionType
 from .model import FieldModelizable, Modelizable, StringModelizable, model
 from .schema import AnnotatedSchema, Schema
 from .tell import tells as get_tells
@@ -37,7 +37,9 @@ from .utils import (
     PRIO_LAST,
     PRIO_LOW,
     PRIO_TOP,
+    Indirect,
     UnionAlias,
+    basic_type,
     clsstring,
 )
 
@@ -156,6 +158,10 @@ class BaseImplementation(Medley):
             ctx=ctx,
         )
 
+    @ovld(priority=PRIO_LAST)
+    def serialize(self, t: Indirect, obj: Any, ctx: Context, /):
+        return recurse(t.value, obj, ctx)
+
     @ovld(priority=PRIO_LOW)
     def serialize(self, t: type[InstructionType], obj: Any, ctx: Context, /):
         return recurse(t.pushdown(), obj, ctx)
@@ -191,6 +197,10 @@ class BaseImplementation(Medley):
             f"Cannot deserialize {descr} into expected type '{clsstring(t)}'.",
             ctx=ctx,
         )
+
+    @ovld(priority=PRIO_LAST)
+    def deserialize(self, t: Indirect, obj: Any, ctx: Context, /):
+        return recurse(t.value, obj, ctx)
 
     @ovld(priority=PRIO_LOW)
     def deserialize(self, t: type[InstructionType], obj: Any, ctx: Context, /):
@@ -523,7 +533,7 @@ class BaseImplementation(Medley):
         for opt in rest:
             code = Code(
                 "$ocode if isinstance($obj, $sopt) else $code",
-                sopt=strip_all(opt),
+                sopt=basic_type(opt),
                 ocode=cls.subcode("serialize", opt, "$obj", ctx, validate=False),
                 code=code,
             )
@@ -566,16 +576,16 @@ class BaseImplementation(Medley):
     # Implementations: Enums #
     ##########################
 
-    @code_generator_wrap_error(priority=PRIO_DEFAULT)
+    @code_generator_wrap_error(priority=PRIO_DEFAULT + 0.125)
     def serialize(self, t: type[Enum], obj: Enum, ctx: Context, /):
         return Lambda(Code("$obj.value"))
 
-    @code_generator_wrap_error(priority=PRIO_DEFAULT)
+    @code_generator_wrap_error(priority=PRIO_DEFAULT + 0.125)
     def deserialize(self, t: type[Enum], obj: Any, ctx: Context, /):
         (t,) = get_args(t)
         return Lambda(Code("$t($obj)", t=t))
 
-    @ovld(priority=PRIO_DEFAULT)
+    @ovld(priority=PRIO_DEFAULT + 0.125)
     def schema(self, t: type[Enum], ctx: Context, /):
         return {"enum": [e.value for e in t]}
 
