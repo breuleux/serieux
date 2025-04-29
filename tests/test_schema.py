@@ -8,7 +8,7 @@ from serieux.model import Extensible
 from serieux.schema import Schema
 
 from .common import has_312_features
-from .definitions import Color, Defaults, Pig, Point
+from .definitions import Color, Defaults, LTHolder, Pig, Point
 
 
 def schema(t, root=False, ref_policy="norepeat"):
@@ -315,5 +315,32 @@ def test_schema_descriptions():
             },
         },
         "required": ["pinkness", "weight"],
+        "additionalProperties": False,
+    }
+
+
+@pytest.mark.xfail
+def test_schema_recursive_ltholder():
+    assert schema(LTHolder) == {
+        "type": "object",
+        "properties": {
+            "lt": {
+                "type": "array",
+                "items": {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
+                            "required": ["x", "y"],
+                            "additionalProperties": False,
+                        },
+                        {
+                            "$ref": "#/properties/lt",
+                        },
+                    ]
+                },
+            },
+        },
+        "required": ["lt"],
         "additionalProperties": False,
     }

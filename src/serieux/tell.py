@@ -6,7 +6,7 @@ from ovld import Code, ovld, recurse
 
 from .instructions import InstructionType
 from .model import FieldModelizable, StringModelizable, model
-from .utils import basic_type
+from .utils import TypeAliasType, basic_type
 
 
 class Tell:
@@ -80,6 +80,11 @@ def tells(typ: type[FieldModelizable]):
 @ovld
 def tells(typ: type[StringModelizable]):
     return {TypeTell(str)}
+
+
+@ovld
+def tells(typ: TypeAliasType):
+    return recurse(typ.__value__)
 
 
 @ovld(priority=-1)

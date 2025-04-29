@@ -38,6 +38,7 @@ from .utils import (
     PRIO_LOW,
     PRIO_TOP,
     Indirect,
+    TypeAliasType,
     UnionAlias,
     basic_type,
     clsstring,
@@ -159,8 +160,8 @@ class BaseImplementation(Medley):
         )
 
     @ovld(priority=PRIO_LAST)
-    def serialize(self, t: Indirect, obj: Any, ctx: Context, /):
-        return recurse(t.value, obj, ctx)
+    def serialize(self, t: Indirect | TypeAliasType, obj: Any, ctx: Context, /):
+        return recurse(t.__value__, obj, ctx)
 
     @ovld(priority=PRIO_LOW)
     def serialize(self, t: type[InstructionType], obj: Any, ctx: Context, /):
@@ -199,8 +200,8 @@ class BaseImplementation(Medley):
         )
 
     @ovld(priority=PRIO_LAST)
-    def deserialize(self, t: Indirect, obj: Any, ctx: Context, /):
-        return recurse(t.value, obj, ctx)
+    def deserialize(self, t: Indirect | TypeAliasType, obj: Any, ctx: Context, /):
+        return recurse(t.__value__, obj, ctx)
 
     @ovld(priority=PRIO_LOW)
     def deserialize(self, t: type[InstructionType], obj: Any, ctx: Context, /):
@@ -221,12 +222,16 @@ class BaseImplementation(Medley):
             holder.update(result)
         return self._schema_cache[t]
 
-    def schema(self, t: Any, /):
-        return recurse(t, self.default_context)
+    @ovld(priority=PRIO_LAST)
+    def schema(self, t: Indirect | TypeAliasType, ctx: Context, /):
+        return recurse(t.__value__, ctx)
 
     @ovld(priority=PRIO_LOW)
     def schema(self, t: type[InstructionType], ctx: Context, /):
         return recurse(t.pushdown(), ctx)
+
+    def schema(self, t: Any, /):
+        return recurse(t, self.default_context)
 
     ################################
     # Implementations: basic types #

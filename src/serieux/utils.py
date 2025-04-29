@@ -15,6 +15,14 @@ from ovld import class_check, parametrized_class_check
 
 from .instructions import strip_all
 
+try:
+    from typing import TypeAliasType
+except ImportError:  # pragma: no cover
+    # It won't occur anyway
+    class TypeAliasType:
+        pass
+
+
 PRIO_LAST = -100
 PRIO_LOW = -2
 PRIO_DEFAULT = -1
@@ -53,7 +61,7 @@ def basic_type(t):
 
 class Indirect:
     def __init__(self, value):
-        self.value = value
+        self.__value__ = value
 
 
 def evaluate_hint(typ, ctx=None, lcl=None, typesub=None, seen=None):
@@ -85,7 +93,7 @@ def evaluate_hint(typ, ctx=None, lcl=None, typesub=None, seen=None):
             seen[typ] = None
             rval = evaluate_hint(eval(typ, glb, lcl), glb, lcl, typesub, seen)
             if seen[typ] is not None:
-                seen[typ].value = rval
+                seen[typ].__value__ = rval
             return rval
 
     elif isinstance(typ, (UnionType, GenericAlias, _GenericAlias)):
@@ -109,8 +117,8 @@ def evaluate_hint(typ, ctx=None, lcl=None, typesub=None, seen=None):
     elif isinstance(typ, type):
         return typ
 
-    elif isinstance(typ, Indirect):
-        return typ.value
+    elif isinstance(typ, (Indirect, TypeAliasType)):
+        return typ.__value__
 
     else:  # pragma: no cover
         raise TypeError("Cannot evaluate hint:", typ, type(typ))

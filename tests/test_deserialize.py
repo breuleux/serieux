@@ -197,3 +197,15 @@ def test_deserialize_recursive_type_2():
     data = {"lt": [{"x": 1, "y": 1}, [{"x": 2, "y": 2}, [{"x": 3, "y": 3}], {"x": 4, "y": 4}]]}
     deser = deserialize(LTHolder, data)
     assert deser.lt == [p(1), [p(2), [p(3)], p(4)]]
+
+
+@pytest.mark.skipif(sys.version_info < (3, 12), reason="Requires Python 3.12+")
+def test_deserialize_recursive_type_py312():
+    from .definitions_py312 import LTHolder, Point
+
+    def p(x):
+        return Point(x, x)
+
+    data = {"lt": [{"x": 1, "y": 1}, [{"x": 2, "y": 2}, [{"x": 3, "y": 3}], {"x": 4, "y": 4}]]}
+    deser = deserialize(LTHolder, data)
+    assert deser.lt == [p(1), [p(2), [p(3)], p(4)]]
