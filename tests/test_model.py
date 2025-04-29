@@ -56,6 +56,14 @@ def test_field_descriptions():
     assert b.description == "Is the pig...\ntruly...\n...beautiful?"
 
 
+def test_eval_annotations_cross_file():
+    from .lilmod.base import Point
+    from .lilmod.ext import DrawingLine
+
+    mdl = model(DrawingLine)
+    assert {f.name: f.type for f in mdl.fields} == {"p1": Point, "p2": Point, "thickness": int}
+
+
 def test_field_at():
     fld1 = field_at(dict[str, Worker], ["Jonathan", "job"])
     assert fld1.type == Job | None

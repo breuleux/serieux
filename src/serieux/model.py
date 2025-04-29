@@ -1,5 +1,5 @@
 import re
-from dataclasses import MISSING, dataclass, field, fields, replace
+from dataclasses import MISSING, dataclass, field, fields, is_dataclass, replace
 from datetime import date, datetime, timedelta
 from typing import Any, Callable, Optional, get_args, get_origin
 from zoneinfo import ZoneInfo
@@ -134,7 +134,12 @@ def safe_isinstance(obj, t):
 @ovld
 def model(dc: type[Dataclass]):
     def make_field(i, field):
-        typ = evaluate_hint(field.type, dc, None, tsub)
+        for target in reversed(dc.mro()):
+            # Find where the field was defined
+            if is_dataclass(target) and field in fields(target):
+                break
+
+        typ = evaluate_hint(field.type, target, None, tsub)
         if field.default is None and not safe_isinstance(field.default, typ):
             typ = Optional[typ]
 

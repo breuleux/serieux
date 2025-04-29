@@ -46,18 +46,25 @@ def clsstring(cls):
 
 
 def evaluate_hint(typ, ctx=None, lcl=None, typesub=None):
-    if isinstance(typ, str):
-        if ctx is not None and not isinstance(ctx, dict):
-            if isinstance(ctx, (GenericAlias, _GenericAlias)):
-                origin = get_origin(ctx)
+    def get_eval_args():
+        glb = ctx
+        tsub = typesub
+        local = lcl
+        if glb is not None and not isinstance(glb, dict):
+            if isinstance(glb, (GenericAlias, _GenericAlias)):
+                origin = get_origin(glb)
                 if hasattr(origin, "__type_params__"):
-                    subs = {p: arg for p, arg in zip(origin.__type_params__, get_args(ctx))}
-                    typesub = {**subs, **(typesub or {})}
-                ctx = origin
-            if hasattr(ctx, "__type_params__"):
-                lcl = {p.__name__: p for p in ctx.__type_params__}
-            ctx = importlib.import_module(ctx.__module__).__dict__
-        return evaluate_hint(eval(typ, ctx, lcl), ctx, lcl, typesub)
+                    subs = {p: arg for p, arg in zip(origin.__type_params__, get_args(glb))}
+                    tsub = {**subs, **(typesub or {})}
+                glb = origin
+            if hasattr(glb, "__type_params__"):
+                local = {p.__name__: p for p in glb.__type_params__}
+            glb = importlib.import_module(glb.__module__).__dict__
+        return glb, local, tsub
+
+    if isinstance(typ, str):
+        glb, lcl, typesub = get_eval_args()
+        return evaluate_hint(eval(typ, glb, lcl), glb, lcl, typesub)
 
     elif isinstance(typ, (UnionType, GenericAlias, _GenericAlias)):
         origin = get_origin(typ)
@@ -71,10 +78,11 @@ def evaluate_hint(typ, ctx=None, lcl=None, typesub=None):
         return typesub.get(typ, typ) if typesub else typ
 
     elif isinstance(typ, ForwardRef):
+        glb, lcl, _ = get_eval_args()
         if sys.version_info >= (3, 13):
-            return typ._evaluate(ctx, lcl, type_params=None, recursive_guard=frozenset())
+            return typ._evaluate(glb, lcl, type_params=None, recursive_guard=frozenset())
         else:  # pragma: no cover
-            return typ._evaluate(ctx, lcl, recursive_guard=frozenset())
+            return typ._evaluate(glb, lcl, recursive_guard=frozenset())
 
     elif isinstance(typ, type):
         return typ
