@@ -1,7 +1,7 @@
 from .clargs import FromArguments
 from .dotted import DottedNotation
 from .fromfile import FromFile, FromFileExtra
-from .interpol import VariableInterpolation
+from .interpol import Interpolation
 from .lazy import LazyDeserialization
 from .partial import PartialBuilding
 from .tagged import TaggedTypes
@@ -12,9 +12,9 @@ __all__ = [
     "FromArguments",
     "FromFile",
     "FromFileExtra",
+    "Interpolation",
     "LazyDeserialization",
     "PartialBuilding",
     "TaggedSubclassFeature",
     "TaggedTypes",
-    "VariableInterpolation",
 ]

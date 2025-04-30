@@ -3,15 +3,14 @@ import os
 import re
 from dataclasses import field
 from pathlib import Path
-from typing import Any, Callable, Literal, get_args
+from typing import Any, Literal, get_args
 
 from ovld import Medley, call_next, ovld, recurse
 from ovld.dependent import Regexp
 
-from ..ctx import AccessPath, Patcher
+from ..ctx import AccessPath
 from ..exc import NotGivenError, ValidationError
 from ..instructions import strip_all
-from ..model import field_at
 from .lazy import LazyProxy
 from .partial import Sources
 
@@ -46,16 +45,9 @@ def decode_string(t: type[list], value: str):
     return [recurse(element_type, item.strip()) for item in str(value).split(",")]
 
 
-def default_prompt(ctx, prompt):  # pragma: no cover
-    return input(
-        f"\033[1;36m[{'.'.join(str(x) for x in ctx.access_path)}]\033[0m \033[1;33m{prompt}\033[0m\n\033[1;32m>\033[0m "
-    )
-
-
 class Variables(AccessPath):
     refs: dict[tuple[str, ...], object] = field(default_factory=dict, repr=False)
     environ: dict = field(default_factory=lambda: os.environ, repr=False)
-    prompt_function: Callable[[str], str] = default_prompt
 
     def evaluate_reference(self, ref):
         def try_int(x):
@@ -97,23 +89,13 @@ class Variables(AccessPath):
         else:
             return Sources(*[Path(x.strip()).expanduser() for x in str(pth).split(",")])
 
-    def resolve_variable(self, t: Any, method: Literal["prompt"], expr: str, /):
-        if not expr:
-            objt, _, field = self.full_path[-1]
-            fld = field_at(objt, [field])
-            expr = (fld and fld.description) or "Enter value"
-        value = decode_string(t, self.prompt_function(self, expr))
-        if isinstance(self, Patcher):
-            self.declare_patch(value)
-        return value
-
     def resolve_variable(self, t: Any, method: str, expr: str, /):
         raise ValidationError(
             f"Cannot resolve '{method}:{expr}' because the '{method}' resolver is not defined."
         )
 
 
-class VariableInterpolation(Medley):
+class Interpolation(Medley):
     @ovld(priority=3)
     def deserialize(self, t: Any, obj: object, ctx: Variables):
         rval = call_next(t, obj, ctx)
@@ -146,4 +128,4 @@ class VariableInterpolation(Medley):
 
 
 # Add as a default feature in serieux.Serieux
-__default_features__ = VariableInterpolation
+__default_features__ = Interpolation

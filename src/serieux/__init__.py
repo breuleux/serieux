@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .auto import Auto
-from .ctx import Context
+from .ctx import AccessPath, Context, Patch, Patcher
 from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
 from .features.clargs import CLIDefinition, CommandLineArguments, parse_cli
 from .features.dotted import DottedNotation
@@ -78,6 +78,7 @@ dump = serieux.dump
 
 __all__ = [
     "__version__",
+    "AccessPath",
     "Auto",
     "BaseImplementation",
     "CLIDefinition",
@@ -100,6 +101,8 @@ __all__ = [
     "NewInstruction",
     "parse_cli",
     "Partial",
+    "Patch",
+    "Patcher",
     "RefPolicy",
     "schema",
     "Schema",
