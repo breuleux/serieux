@@ -61,7 +61,7 @@ class AttributeVisitor(ast.NodeVisitor):
     def visit_FunctionDef(self, node):
         if self.prefix is not None:
             self.add_data(node, "VARIABLE", f"{self.prefix}{node.name}")
-        for arg in node.args.args:
+        for arg in [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]:
             self.add_data(arg, "ARGUMENT", f"{self.prefix}{arg.arg}" if self.prefix else arg.arg)
         self.visit_body(node.name, node.body)
 
@@ -98,7 +98,7 @@ def scrape_variables_and_docstrings(src: str):
 _cached_docstrings = {}
 
 
-def _get_attribute_docstrings(cls):
+def get_variable_data(cls):
     """Get the docstrings for individual attributes of a class.
 
     Arguments:
@@ -147,5 +147,5 @@ def _get_attribute_docstrings(cls):
 def get_attribute_docstrings(cls):
     results = {}
     for subcls in cls.mro():
-        results.update(_get_attribute_docstrings(subcls))
+        results.update(get_variable_data(subcls))
     return results
