@@ -71,7 +71,10 @@ def make_argument(t: type[bool], partial: dict, model_field: Field):
 @ovld
 def make_argument(t: type[list], partial: dict, model_field: Field):
     (lt,) = get_args(t) or (object,)
-    return {"nargs": "*", "type": lt, **partial}
+    if partial.get("action", None) == "append":
+        return {"type": lt, **partial}
+    else:
+        return {"nargs": "*", "type": lt, **partial}
 
 
 @ovld(priority=1)

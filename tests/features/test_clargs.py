@@ -89,6 +89,25 @@ def test_lists():
     )
 
 
+@dataclass
+class Defaults2:
+    name: str
+    aliases: list[str] = field(
+        default_factory=list, metadata={"argparse": {"option": "-a", "action": "append"}}
+    )
+    cool: bool = field(default=False, kw_only=True)
+
+
+def test_lists_append():
+    def f(*argv):
+        return deserialize(Defaults2, CommandLineArguments(argv), Context())
+
+    assert f("--name", "Tyrone") == Defaults2(name="Tyrone", aliases=[], cool=False)
+    assert f("--name", "Tyrone", "-a", "Ty", "-a", "Ro", "-a", "Ne") == Defaults2(
+        name="Tyrone", aliases=["Ty", "Ro", "Ne"], cool=False
+    )
+
+
 def test_misc_types():
     def f(*argv):
         return deserialize(House, CommandLineArguments(argv), Context())
