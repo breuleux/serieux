@@ -12,7 +12,7 @@ from ..schema import AnnotatedSchema
 # Constants #
 #############
 
-TaggedSubclass = NewInstruction["TaggedSubclass"]
+TaggedSubclass = NewInstruction["TaggedSubclass", 1, False]
 
 
 ###################

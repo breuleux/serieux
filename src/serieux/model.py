@@ -184,7 +184,7 @@ def model(t: type[InstructionType]):
     if m and m.fields is not None:
         return Model(
             original_type=m.original_type,
-            fields=[replace(field, type=t[field.type]) for field in m.fields],
+            fields=[replace(field, type=t.inherit(field.type)) for field in m.fields],
             constructor=m.constructor,
         )
     else:

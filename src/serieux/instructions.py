@@ -74,6 +74,11 @@ class InstructionType(type):
     def pushdown(cls):
         return pushdown(cls)
 
+    @classmethod
+    def inherit(cls, t):
+        instrs = frozenset(i for i in cls._instructions if i.inherit)
+        return _create(instrs, t)
+
 
 def pushdown(cls):
     if not isinstance(cls, type) or not issubclass(cls, InstructionType):
