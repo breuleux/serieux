@@ -2,7 +2,7 @@ import argparse
 import json
 import re
 import sys
-from dataclasses import MISSING, dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
 from types import NoneType
 from typing import Any, get_args
@@ -140,9 +140,6 @@ def add_argument_from_field(parser, fdest, overrides, field: Field):
             **meta,
             **overrides,
         }
-
-    if field.default is not MISSING:
-        args["default"] = field.default
 
     args = make_argument(typ, args, field)
     if args == "subparser":
