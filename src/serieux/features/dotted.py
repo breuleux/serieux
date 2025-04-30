@@ -18,7 +18,7 @@ def unflatten(d: dict):
 
 
 class DottedNotation(Medley):
-    @ovld(priority=10)
+    @ovld(priority=11)
     def deserialize(self, t: Any, obj: dict, ctx: Context):
         if issubclass(t, FieldModelizable) and any("." in k for k in obj.keys()):
             return call_next(t, unflatten(obj), ctx)
