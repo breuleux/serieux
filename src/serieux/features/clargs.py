@@ -12,7 +12,7 @@ from ovld import Medley, ovld, recurse
 from ..ctx import Context
 from ..exc import ValidationError
 from ..instructions import strip_all
-from ..model import Field, FieldModelizable, StringModelizable, field_at, model
+from ..model import Field, FieldModelizable, Modelizable, StringModelizable, field_at, model
 from ..utils import UnionAlias, clsstring
 from .dotted import unflatten
 from .partial import Sources
@@ -38,7 +38,7 @@ class CommandLineArguments:
 
 class ConcatenateAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        setattr(namespace, self.dest, " ".join(values))
+        setattr(namespace, self.dest, " ".join(values) if isinstance(values, list) else values)
 
 
 class ParseStringAction(argparse.Action):
@@ -106,7 +106,14 @@ def make_argument(t: type[object], partial: dict, model_field: Field):
 
 @ovld
 def make_argument(t: type[UnionAlias], partial: dict, model_field: Field):
-    return "subparser"
+    if any(issubclass(o, (Modelizable, Tagged)) for o in get_args(t)):
+        return "subparser"
+    else:
+        options = [o for o in get_args(t) if o is not NoneType]
+        if len(options) == 1:
+            return recurse(options[0], partial, model_field)
+        else:  # pragma: no cover
+            raise TypeError("Unions of primitive/non-Modelizable types are not supported yet")
 
 
 def add_argument_from_field(parser, fdest, overrides, field: Field):
@@ -119,6 +126,7 @@ def add_argument_from_field(parser, fdest, overrides, field: Field):
 
     if positional:
         args = {"__args__": [fdest], "help": fhelp, "metavar": mvar, **overrides}
+        args["nargs"] = "?" if not field.required else 1
     else:
         args = {
             "__args__": [f"--{name}" if len(name) > 1 else f"-{name}"],

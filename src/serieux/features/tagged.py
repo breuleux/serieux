@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, TypeAlias, Union
 from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
+from ..exc import ValidationError
 from ..instructions import strip_all
 from ..tell import KeyValueTell, TypeTell, tells
 from ..utils import clsstring
@@ -64,10 +65,14 @@ class TaggedTypes(Medley):
     @ovld(priority=10)
     def deserialize(self, t: type[Tagged], obj: dict, ctx: Context, /):
         obj = dict(obj)
-        klas = recurse(str, obj.pop("class", None), ctx)
+        found = recurse(str, obj.pop("class", None), ctx)
         if "return" in obj:
             obj = obj["return"]
-        assert klas == t.tag
+        if found != t.tag:  # pragma: no cover
+            raise ValidationError(
+                f"Cannot deserialize into '{t}' because we found incompatible tag {found!r}",
+                ctx=ctx,
+            )
         return recurse(t.cls, obj, ctx)
 
 

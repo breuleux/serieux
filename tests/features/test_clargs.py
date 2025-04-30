@@ -104,7 +104,7 @@ def test_misc_types():
 class Eat:
     """Stuffing your mouth."""
 
-    food: str
+    food: str = None
 
     def do(self):
         return f"I eat {self.food}"
