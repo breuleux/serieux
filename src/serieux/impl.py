@@ -548,11 +548,13 @@ class BaseImplementation(Medley):
     def deserialize(cls, t: type[UnionAlias] | type[UnionType], obj: Any, ctx: Context, /):
         (t,) = get_args(t)
         options = get_args(t)
+
         tells = [get_tells(o) for o in options]
+        elim = set()
         for tl1, tl2 in pairwise(tells):
-            inter = tl1 & tl2
-            tl1 -= inter
-            tl2 -= inter
+            elim |= tl1 & tl2
+        for tls in tells:
+            tls -= elim
 
         if sum(not tl for tl in tells) > 1:
             raise Exception(f"Cannot differentiate the possible union members in type '{t}'")
