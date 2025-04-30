@@ -11,6 +11,7 @@ from ovld.dependent import Regexp
 from ..ctx import AccessPath
 from ..exc import NotGivenError, ValidationError
 from ..instructions import strip_all
+from ..utils import PRIO_HIGH
 from .lazy import LazyProxy
 from .partial import Sources
 
@@ -75,9 +76,11 @@ class Variables(AccessPath):
 
     def resolve_variable(self, t: Any, method: Literal["env"], expr: str, /):
         try:
-            return decode_string(t, self.environ[expr])
+            env_value = self.environ[expr]
         except KeyError:
             raise NotGivenError(f"Environment variable '{expr}' is not defined")
+        else:
+            return decode_string(t, env_value)
 
     def resolve_variable(self, t: Any, method: Literal["envfile"], expr: str, /):
         try:
@@ -96,13 +99,13 @@ class Variables(AccessPath):
 
 
 class Interpolation(Medley):
-    @ovld(priority=3)
+    @ovld(priority=PRIO_HIGH + 0.3)
     def deserialize(self, t: Any, obj: object, ctx: Variables):
         rval = call_next(t, obj, ctx)
         ctx.refs[ctx.access_path] = rval
         return rval
 
-    @ovld(priority=2)
+    @ovld(priority=PRIO_HIGH + 0.2)
     def deserialize(self, t: Any, obj: Regexp[r"^\$\{[^}]+\}$"], ctx: Variables):
         expr = obj.lstrip("${").rstrip("}")
         obj = ctx.resolve_variable(strip_all(t), expr)
@@ -115,7 +118,7 @@ class Interpolation(Medley):
         else:
             return recurse(t, obj, ctx)
 
-    @ovld(priority=1)
+    @ovld(priority=PRIO_HIGH + 0.1)
     def deserialize(self, t: Any, obj: Regexp[r"\$\{[^}]+\}"], ctx: Variables):
         def interpolate():
             def repl(match):

@@ -26,8 +26,8 @@ except ImportError:  # pragma: no cover
 PRIO_LAST = -100
 PRIO_LOW = -2
 PRIO_DEFAULT = -1
-PRIO_HIGH = 1
-PRIO_HIGHER = 2
+PRIO_HIGH = 10
+PRIO_HIGHER = 20
 PRIO_TOP = 1000
 
 

@@ -8,7 +8,7 @@ from ..ctx import Context
 from ..exc import ValidationError
 from ..instructions import strip_all
 from ..tell import KeyValueTell, TypeTell, tells
-from ..utils import clsstring
+from ..utils import PRIO_HIGH, clsstring
 
 if TYPE_CHECKING:  # pragma: no cover
     from typing import Annotated
@@ -54,7 +54,7 @@ def tells(typ: type[Tagged]):
 
 
 class TaggedTypes(Medley):
-    @ovld(priority=10)
+    @ovld(priority=PRIO_HIGH)
     def serialize(self, t: type[Tagged], obj: object, ctx: Context, /):
         result = call_next(t.cls, obj, ctx)
         if not isinstance(result, dict):
@@ -62,7 +62,7 @@ class TaggedTypes(Medley):
         result["class"] = t.tag
         return result
 
-    @ovld(priority=10)
+    @ovld(priority=PRIO_HIGH)
     def deserialize(self, t: type[Tagged], obj: dict, ctx: Context, /):
         obj = dict(obj)
         found = recurse(str, obj.pop("class", None), ctx)

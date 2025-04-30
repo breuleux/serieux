@@ -89,20 +89,20 @@ def partialize(t: object):
 
 
 class PartialBuilding(Medley):
-    @ovld(priority=PRIO_HIGH)
+    @ovld(priority=PRIO_HIGH + 1)
     def deserialize(self, t: type[Partial], obj: object, ctx: Context, /):
         try:
             return call_next(t, obj, ctx)
         except SerieuxError as exc:
             return exc
 
-    @ovld(priority=PRIO_HIGH)
+    @ovld(priority=PRIO_HIGH + 1)
     def deserialize(self, t: Any, obj: Sources, ctx: Context, /):
         parts = []
         for src in obj.sources:
             try:
                 parts.append(recurse(Partial[t], src, ctx))
-            except SerieuxError as exc:
+            except SerieuxError as exc:  # pragma: no cover
                 parts.append(exc)
         rval = instantiate(reduce(merge, parts))
         if isinstance(rval, SerieuxError):
