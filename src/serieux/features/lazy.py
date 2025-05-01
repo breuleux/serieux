@@ -147,14 +147,14 @@ class LazyProxy:
 
 
 class LazyDeserialization(Medley):
-    @ovld(priority=PRIO_HIGHER)
+    @ovld(priority=PRIO_HIGHER - 1)
     def deserialize(self, t: type[Lazy], value: object, ctx: Context):
         def evaluate():
             return recurse(Lazy.strip(t), value, ctx)
 
         return LazyProxy(evaluate, type=t)
 
-    @ovld(priority=PRIO_HIGHER)
+    @ovld(priority=PRIO_HIGHER - 1)
     def deserialize(self, t: type[DeepLazy], value: object, ctx: Context):
         def evaluate():
             return call_next(t, value, ctx)
