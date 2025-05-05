@@ -11,11 +11,16 @@ class Schema:
     def __init__(self, t):
         self.for_type = t
         self.data = {}
+        self.redirect = None
 
     def update(self, data):
         if isinstance(data, Schema):
             data = data.data
-        self.data.update(data)
+        if isinstance(data, dict):
+            self.data.update(data)
+        else:
+            assert not self.data
+            self.redirect = data
 
     def get(self, key, default):
         return self.data.get(key, default)
@@ -82,6 +87,8 @@ class SchemaCompiler(Medley):
         return x
 
     def __call__(self, x: Schema, pth: tuple):
+        if x.redirect:
+            return recurse(x.redirect, pth)
         is_always = self.ref_policy == RefPolicy.ALWAYS
         if x.get("type", "object") != "object" or "oneOf" in x:
             return call_next(x.data, pth)
@@ -107,4 +114,4 @@ class SchemaCompiler(Medley):
 
     def __call__(self, x: AnnotatedSchema, pth: tuple):
         rval = recurse(x.parent, pth)
-        return merge(rval, x.data)
+        return merge(rval, recurse(x.data, pth))

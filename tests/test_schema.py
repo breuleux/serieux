@@ -6,7 +6,7 @@ import pytest
 
 from serieux import schema as _schema
 from serieux.model import Extensible
-from serieux.schema import Schema
+from serieux.schema import AnnotatedSchema, Schema
 
 from .common import has_312_features
 from .definitions import Color, Defaults, LTHolder, Pig, Point
@@ -347,5 +347,28 @@ def test_schema_recursive_ltholder():
             },
         },
         "required": ["lt"],
+        "additionalProperties": False,
+    }
+
+
+class AdditivePoint(Point):
+    @classmethod
+    def serieux_schema(cls, ctx, call_next):
+        return AnnotatedSchema(
+            parent=call_next(Point, ctx),
+            properties={"more": {"type": "string"}},
+            required=["more"],
+        )
+
+
+def test_schema_additive_point():
+    assert schema(AdditivePoint) == {
+        "type": "object",
+        "properties": {
+            "x": {"type": "integer"},
+            "y": {"type": "integer"},
+            "more": {"type": "string"},
+        },
+        "required": ["x", "y", "more"],
         "additionalProperties": False,
     }
