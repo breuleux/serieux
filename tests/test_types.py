@@ -70,6 +70,10 @@ def test_deserialize_datetime():
     ]
 
 
+def test_deserialize_datetime_timestamp():
+    assert deserialize(datetime, 1746471553) == datetime(2025, 5, 5, 14, 59, 13)
+
+
 def test_schema_datetime():
     assert schema(datetime) == {"type": "string", "format": "date-time"}
 

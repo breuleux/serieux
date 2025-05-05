@@ -600,6 +600,10 @@ class BaseImplementation(Medley):
     # Implementations: Dates #
     ##########################
 
+    @code_generator_wrap_error(priority=PRIO_DEFAULT)
+    def deserialize(cls, t: type[datetime], obj: int | float, ctx: Context, /):
+        return Lambda(Code("$fromtimestamp($obj)", fromtimestamp=datetime.fromtimestamp))
+
     # We specify schemas explicitly because they have special formats
     # The serialization/deserializable is taken care of by their model()
 

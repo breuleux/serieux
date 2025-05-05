@@ -106,7 +106,6 @@ __all__ = [
     "RefPolicy",
     "schema",
     "Schema",
-    "Schema",
     "serialize",
     "serieux",
     "Serieux",
