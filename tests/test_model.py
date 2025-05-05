@@ -1,4 +1,6 @@
+from dataclasses import dataclass
 from numbers import Number
+from typing import Literal
 
 from serieux.model import field_at, model
 
@@ -40,6 +42,21 @@ def test_model_none_default():
     assert m.fields[0].type is str
     assert m.fields[1].name == "job"
     assert m.fields[1].type == Job | None
+
+
+@dataclass
+class ColorBox:
+    color: Literal["red", "green", "blue"]
+    intensity: int = 100
+
+
+def test_model_literal():
+    m = model(ColorBox)
+    assert len(m.fields) == 2
+    assert m.fields[0].name == "color"
+    assert m.fields[0].type == Literal["red", "green", "blue"]
+    assert m.fields[1].name == "intensity"
+    assert m.fields[1].type is int
 
 
 def test_field_descriptions():

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from types import NoneType
+from typing import Literal
 
 import pytest
 
@@ -41,6 +42,10 @@ def test_schema_None():
 
 def test_schema_enum():
     assert schema(Color) == {"enum": ["red", "green", "blue"]}
+
+
+def test_schema_literal():
+    assert schema(Literal["red", "green", "blue"]) == {"enum": ["red", "green", "blue"]}
 
 
 def test_schema_list():

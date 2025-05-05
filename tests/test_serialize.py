@@ -1,4 +1,5 @@
 import inspect
+from typing import Literal
 
 import pytest
 from ovld import Medley
@@ -157,6 +158,15 @@ def test_serialize_enum():
 def test_serialize_enum_int():
     assert serialize(Level, Level.MED) == 1
     assert serialize(list[Level], [Level.HI, Level.LO, Level.HI]) == [2, 0, 2]
+
+
+def test_serialize_literal_enum():
+    assert serialize(Literal["red", "green", "blue"], "red") == "red"
+    with pytest.raises(
+        ValidationError,
+        match=r"'yellow' is not a valid option for typing.Literal\['red', 'green', 'blue'\]",
+    ):
+        serialize(Literal["red", "green", "blue"], "yellow")
 
 
 ###############

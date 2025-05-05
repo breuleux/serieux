@@ -38,6 +38,7 @@ from .utils import (
     PRIO_LOW,
     PRIO_TOP,
     Indirect,
+    IsLiteral,
     TypeAliasType,
     UnionAlias,
     basic_type,
@@ -584,17 +585,39 @@ class BaseImplementation(Medley):
     ##########################
 
     @code_generator_wrap_error(priority=PRIO_DEFAULT + 0.125)
-    def serialize(self, t: type[Enum], obj: Enum, ctx: Context, /):
+    def serialize(cls, t: type[Enum], obj: Enum, ctx: Context, /):
         return Lambda(Code("$obj.value"))
 
     @code_generator_wrap_error(priority=PRIO_DEFAULT + 0.125)
-    def deserialize(self, t: type[Enum], obj: Any, ctx: Context, /):
+    def deserialize(cls, t: type[Enum], obj: Any, ctx: Context, /):
         (t,) = get_args(t)
         return Lambda(Code("$t($obj)", t=t))
 
     @ovld(priority=PRIO_DEFAULT + 0.125)
     def schema(self, t: type[Enum], ctx: Context, /):
         return {"enum": [e.value for e in t]}
+
+    ##################################
+    # Implementations: Literal Enums #
+    ##################################
+
+    @ovld(priority=PRIO_DEFAULT)
+    def serialize(self, t: type[IsLiteral], obj: Any, ctx: Context, /):
+        options = get_args(t)
+        if obj not in options:
+            raise ValidationError(f"'{obj}' is not a valid option for {t}", ctx=ctx)
+        return obj
+
+    @ovld(priority=PRIO_DEFAULT)
+    def deserialize(self, t: type[IsLiteral], obj: Any, ctx: Context, /):
+        options = get_args(t)
+        if obj not in options:
+            raise ValidationError(f"'{obj}' is not a valid option for {t}", ctx=ctx)
+        return obj
+
+    @ovld(priority=PRIO_DEFAULT)
+    def schema(self, t: type[IsLiteral], ctx: Context, /):
+        return {"enum": list(get_args(t))}
 
     ##########################
     # Implementations: Dates #

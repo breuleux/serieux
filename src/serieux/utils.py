@@ -3,7 +3,9 @@ import sys
 import typing
 from types import GenericAlias, NoneType, UnionType
 from typing import (
+    Annotated,
     ForwardRef,
+    Literal,
     TypeVar,
     Union,
     _GenericAlias,
@@ -98,7 +100,11 @@ def evaluate_hint(typ, ctx=None, lcl=None, typesub=None, seen=None):
 
     elif isinstance(typ, (UnionType, GenericAlias, _GenericAlias)):
         origin = get_origin(typ)
+        if origin is Literal:
+            return typ
         args = get_args(typ)
+        if origin is Annotated:  # pragma: no cover
+            return args[0]
         if origin is UnionType:
             origin = Union
         new_args = [evaluate_hint(arg, ctx, lcl, typesub, seen) for arg in args]
@@ -142,3 +148,8 @@ def _json_type_check(t, bound=object):
 
 
 JSONType = parametrized_class_check(_json_type_check)
+
+
+@class_check
+def IsLiteral(t):
+    return get_origin(t) is Literal

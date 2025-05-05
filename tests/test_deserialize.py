@@ -1,6 +1,7 @@
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -137,6 +138,15 @@ def test_deserialize_enum():
 def test_deserialize_enum_int():
     assert deserialize(Level, 1) == Level.MED
     assert deserialize(list[Level], [2, 0, 2]) == [Level.HI, Level.LO, Level.HI]
+
+
+def test_deserialize_literal_enum():
+    assert deserialize(Literal["red", "green", "blue"], "red") == "red"
+    with pytest.raises(
+        ValidationError,
+        match=r"'yellow' is not a valid option for typing.Literal\['red', 'green', 'blue'\]",
+    ):
+        deserialize(Literal["red", "green", "blue"], "yellow")
 
 
 ###############
