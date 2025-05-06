@@ -140,6 +140,9 @@ class LazyProxy:
     def __abs__(self):
         return abs(self._obj)
 
+    def __call__(self, *args, **kwargs):
+        return self._obj(*args, **kwargs)
+
 
 ###################
 # Implementations #

@@ -127,3 +127,24 @@ def test_lazy_partial():
     assert result.pt.x == 1
     assert result.pt.y == 18
     assert type(result.pt.y) is int
+
+
+def test_lazy_callable():
+    def add(a, b):
+        return a + b
+
+    lazy_func = LazyProxy(lambda: add)
+
+    assert lazy_func(1, 2) == 3
+    assert lazy_func(a=1, b=2) == 3
+
+    # Test with a class that implements __call__
+    class Adder:
+        def __init__(self, base):
+            self.base = base
+
+        def __call__(self, x):
+            return self.base + x
+
+    lazy_adder = LazyProxy(lambda: Adder(10))
+    assert lazy_adder(5) == 15
