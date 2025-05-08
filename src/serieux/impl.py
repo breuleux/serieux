@@ -303,7 +303,9 @@ class BaseImplementation(Medley):
 
     def schema(self, t: type[list], ctx: Context, /):
         (lt,) = get_args(t)
-        return {"type": "array", "items": recurse(lt, ctx)}
+        follow = hasattr(ctx, "follow")
+        fctx = ctx.follow(t, None, "*") if follow else ctx
+        return {"type": "array", "items": recurse(lt, fctx)}
 
     ##########################
     # Implementations: dicts #
@@ -332,7 +334,13 @@ class BaseImplementation(Medley):
 
     def schema(self, t: type[dict], ctx: Context, /):
         kt, vt = get_args(t)
-        return {"type": "object", "additionalProperties": recurse(vt, ctx)}
+        if kt is not str:
+            raise Exception(
+                f"Cannot create a schema for dicts with non-string keys (found key type: `{kt}`)"
+            )
+        follow = hasattr(ctx, "follow")
+        fctx = ctx.follow(t, None, "*") if follow else ctx
+        return {"type": "object", "additionalProperties": recurse(vt, fctx)}
 
     #####################################
     # Implementations: FieldModelizable #
@@ -489,13 +497,15 @@ class BaseImplementation(Medley):
         m = model(t)
 
         f_schema, s_schema = None, None
+        follow = hasattr(ctx, "follow")
 
         if m.fields is not None:
             properties = {}
             required = []
 
             for f in m.fields:
-                fsch = recurse(f.type, ctx)
+                fctx = ctx.follow(t, None, f.name) if follow else ctx
+                fsch = recurse(f.type, fctx)
                 extra = {}
                 if f.description:
                     extra["description"] = f.description

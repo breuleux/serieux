@@ -59,6 +59,11 @@ def test_schema_dict():
     }
 
 
+def test_schema_dict_non_str_keys():
+    with pytest.raises(Exception, match="Cannot create a schema for dicts with non-string keys"):
+        schema(dict[int, str])
+
+
 def test_schema_nested():
     assert schema(dict[str, list[int]]) == {
         "type": "object",
