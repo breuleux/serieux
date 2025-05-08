@@ -27,6 +27,16 @@ def _compose(dest, new_part):
     return f"{dest}.{new_part}" if dest else new_part
 
 
+def _soft_conversion(t):
+    def filter(x):
+        try:
+            return t(x)
+        except (ValueError, TypeError):
+            return x
+
+    return filter
+
+
 @dataclass
 class CommandLineArguments:
     arguments: list[str]
@@ -58,7 +68,7 @@ def make_argument(t: type[str], partial: dict, model_field: Field):
 
 @ovld
 def make_argument(t: type[int] | type[float], partial: dict, model_field: Field):
-    return {**partial, "type": t}
+    return {**partial, "type": _soft_conversion(t)}
 
 
 @ovld
@@ -74,7 +84,7 @@ def make_argument(t: type[list], partial: dict, model_field: Field):
     if partial.get("action", None) == "append":
         return {"type": lt, **partial}
     else:
-        return {"nargs": "*", "type": lt, **partial}
+        return {"nargs": "*", "type": _soft_conversion(lt), **partial}
 
 
 @ovld(priority=1)
