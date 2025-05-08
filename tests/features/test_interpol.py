@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from types import NoneType
 from unittest import mock
 
 import pytest
@@ -123,15 +124,24 @@ def test_env_types():
             "LIST": "a,b,c",
             "BOOL_FALSE": "no",
             "DICT": '{"a": 1, "b": 2}',
+            "EMPTY": "",
+            "NULL": "null",
+            "NONE": "NONE",
         }
     )
 
     assert deserialize(bool, "${env:BOOL}", vars) is True
     assert deserialize(int, "${env:INT}", vars) == 42
+    assert deserialize(int | None, "${env:INT}", vars) == 42
+    assert deserialize(int | None, "${env:EMPTY}", vars) is None
     assert deserialize(float, "${env:FLOAT}", vars) == 3.14
     assert deserialize(str, "${env:STR}", vars) == "hello"
     assert deserialize(list[str], "${env:LIST}", vars) == ["a", "b", "c"]
     assert deserialize(bool, "${env:BOOL_FALSE}", vars) is False
+    assert deserialize(bool, "${env:EMPTY}", vars) is False
+    assert deserialize(NoneType, "${env:EMPTY}", vars) is None
+    assert deserialize(NoneType, "${env:NULL}", vars) is None
+    assert deserialize(NoneType, "${env:NONE}", vars) is None
     assert deserialize(dict[str, int], "${env:DICT}", vars) == {"a": 1, "b": 2}
 
 
@@ -145,7 +155,17 @@ def test_env_custom_deser():
 
 def test_invalid_boolean():
     with pytest.raises(ValidationError, match="Cannot convert 'invalid' to boolean"):
-        deserialize(bool, "${env:INVALID_BOOL}", Variables(environ={"INVALID_BOOL": "invalid"}))
+        deserialize(bool, "${env:INVALID}", Variables(environ={"INVALID": "invalid"}))
+
+
+def test_invalid_null():
+    with pytest.raises(ValidationError, match="Cannot convert 'invalid' to None"):
+        deserialize(NoneType, "${env:INVALID}", Variables(environ={"INVALID": "invalid"}))
+
+
+def test_invalid_union():
+    with pytest.raises(ValidationError, match="Cannot convert 'invalid' to boolean"):
+        deserialize(int | bool, "${env:INVALID}", Variables(environ={"INVALID": "invalid"}))
 
 
 def test_unsupported_resolver():

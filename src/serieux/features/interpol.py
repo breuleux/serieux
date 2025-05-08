@@ -3,6 +3,7 @@ import os
 import re
 from dataclasses import field
 from pathlib import Path
+from types import NoneType
 from typing import Any, Literal, get_args
 
 from ovld import Medley, call_next, ovld, recurse
@@ -11,7 +12,7 @@ from ovld.dependent import Regexp
 from ..ctx import AccessPath
 from ..exc import NotGivenError, ValidationError
 from ..instructions import strip_all
-from ..utils import PRIO_HIGH
+from ..utils import PRIO_HIGH, UnionAlias
 from .lazy import LazyProxy
 from .partial import Sources
 
@@ -22,11 +23,20 @@ def decode_string(t: type[int] | type[float] | type[str], value: str):
 
 
 @ovld
+def decode_string(t: type[NoneType], value: str):
+    val = value.lower()
+    if val in ("", "null", "none"):
+        return None
+    else:
+        raise ValidationError(f"Cannot convert '{value}' to None")
+
+
+@ovld
 def decode_string(t: type[bool], value: str):
-    val = str(value).lower()
+    val = value.lower()
     if val in ("true", "1", "yes", "on"):
         return True
-    elif val in ("false", "0", "no", "off"):
+    elif val in ("false", "0", "no", "off", ""):
         return False
     else:
         raise ValidationError(f"Cannot convert '{value}' to boolean")
@@ -38,6 +48,17 @@ def decode_string(t: type[object], value: str):
         return json.loads(value)
     except json.JSONDecodeError:
         return value
+
+
+@ovld
+def decode_string(t: type[UnionAlias], value: str):
+    err = None
+    for opt in get_args(t):
+        try:
+            return decode_string(opt, value)
+        except Exception as exc:
+            err = exc
+    raise err
 
 
 @ovld
