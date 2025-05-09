@@ -96,7 +96,7 @@ class PartialBuilding(Medley):
         except SerieuxError as exc:
             return exc
 
-    @ovld(priority=PRIO_HIGH + 1)
+    @ovld(priority=PRIO_HIGH + 1.25)
     def deserialize(self, t: Any, obj: Sources, ctx: Context, /):
         parts = []
         for src in obj.sources:
