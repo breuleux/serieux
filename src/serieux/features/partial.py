@@ -186,7 +186,9 @@ def merge(x: PartialBase, y: object):
         raise ValidationError(
             f"Cannot merge sources because of incompatible constructors: '{xc}', '{type(y)}'."
         )
-    return recurse(x, type(x)(**vars(y)))
+    props = x._model.property_names
+    kwargs = {k: v for k, v in vars(y).items() if k in props}
+    return recurse(x, type(x)(**kwargs))
 
 
 @ovld
@@ -195,7 +197,9 @@ def merge(x: object, y: PartialBase):
         raise ValidationError(
             f"Cannot merge sources because of incompatible constructors: '{type(x)}', '{yc}'."
         )
-    return recurse(type(y)(**vars(x)), y)
+    props = y._model.property_names
+    kwargs = {k: v for k, v in vars(x).items() if k in props}
+    return recurse(type(y)(**kwargs), y)
 
 
 @ovld

@@ -1,6 +1,7 @@
 import re
 from dataclasses import MISSING, dataclass, field, fields, is_dataclass, replace
 from datetime import date, datetime, timedelta
+from functools import cached_property
 from typing import Any, Callable, Optional, get_args, get_origin
 from zoneinfo import ZoneInfo
 
@@ -93,6 +94,10 @@ class Model:
 
     def __str__(self):
         return f"Model({clsstring(self.original_type)})"
+
+    @cached_property
+    def property_names(self):
+        return {f.property_name for f in self.fields}
 
     __repr__ = __str__
 
