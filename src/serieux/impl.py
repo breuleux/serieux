@@ -94,7 +94,7 @@ class BaseImplementation(Medley):
         if dest:
             assert dest.suffix == ".yaml"  # TODO: support other formats
             dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(yaml.safe_dump(serialized))
+            dest.write_text(yaml.safe_dump(serialized, sort_keys=False))
         else:
             return serialized
 
