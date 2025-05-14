@@ -118,6 +118,11 @@ def make_argument(t: type[object], partial: dict, model_field: Field):
 
 
 @ovld
+def make_argument(t: type[Tagged], partial: dict, model_field: Field):
+    return "subparser"
+
+
+@ovld
 def make_argument(t: type[UnionAlias], partial: dict, model_field: Field):
     if any(issubclass(o, (Modelizable, Tagged)) for o in get_args(t)):
         return "subparser"

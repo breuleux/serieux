@@ -234,6 +234,26 @@ def test_sub_subcommands():
 
 
 @dataclass
+class Eater:
+    command: TaggedUnion[Eat]
+
+    def text(self):
+        return self.command.do() + " only"
+
+
+def test_one_sub_subcommands():
+    def text(*args):
+        result = deserialize(
+            TaggedUnion[Eater],
+            CommandLineArguments(args),
+            Context(),
+        )
+        return result.text()
+
+    assert text("eater", "eat", "--food", "jam") == "I eat jam only"
+
+
+@dataclass
 class Word:
     word: str = field(metadata={"argparse": {"positional": True}})
 
