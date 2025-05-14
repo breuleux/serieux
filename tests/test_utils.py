@@ -2,7 +2,7 @@ from dataclasses import fields
 from numbers import Number
 from typing import TypeVar, Union
 
-from serieux.utils import JSONType, evaluate_hint as eh
+from serieux.utils import JSON, evaluate_hint as eh
 
 from .common import has_312_features, one_test_per_assert
 from .definitions import Point
@@ -45,8 +45,8 @@ def test_evaluate_hint_tree_parametric():
 
 
 def test_json_type_check():
-    J = JSONType[object]
-    JL = JSONType[list]
+    J = JSON[object]
+    JL = JSON[list]
     for yes in [int, float, str, list[float], dict[str, str], dict[str, str | int]]:
         assert issubclass(yes, J)
     for no in [object, Point, dict[int, str], list]:

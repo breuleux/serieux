@@ -1,13 +1,13 @@
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import pytest
 
 from serieux import deserialize
 from serieux.ctx import AccessPath
-from serieux.exc import ValidationError
+from serieux.exc import SchemaError, ValidationError
 
 from .common import has_312_features, one_test_per_assert
 from .definitions import Color, Defaults, DIDHolder, Level, LTHolder, Point, Point3D
@@ -29,6 +29,13 @@ def test_deserialize_scalars():
 @one_test_per_assert
 def test_deserialize_scalars_conversion():
     assert deserialize(float, 10) == 10.0
+
+
+@one_test_per_assert
+def test_deserialize_object():
+    assert deserialize(object, 10) == 10
+    assert deserialize(Any, 10) == 10
+    assert deserialize(object, {"a": 3}) == {"a": 3}
 
 
 def test_deserialize_dict():
@@ -63,6 +70,14 @@ def test_deserialize_union():
     assert deserialize(str | int, 3) == 3
     assert deserialize(str | int, "wow") == "wow"
     assert deserialize(Point | int, 3) == 3
+
+
+def test_deserialize_union_untellable():
+    class Bob:
+        pass
+
+    with pytest.raises(SchemaError, match="Cannot deserialize union type"):
+        deserialize(int | Bob, 3)
 
 
 @dataclass

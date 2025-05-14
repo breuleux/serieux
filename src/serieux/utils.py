@@ -147,7 +147,7 @@ def _json_type_check(t, bound=object):
     return False
 
 
-JSONType = parametrized_class_check(_json_type_check)
+JSON = parametrized_class_check(_json_type_check)
 
 
 @class_check

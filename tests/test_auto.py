@@ -4,7 +4,7 @@ import pytest
 
 from serieux import deserialize, serialize
 from serieux.auto import Auto
-from serieux.exc import ValidationError
+from serieux.exc import SchemaError
 
 from .definitions import Point
 
@@ -35,7 +35,7 @@ def test_auto_callable():
 
 
 def test_auto_not_serializable():
-    with pytest.raises(ValidationError, match="does not specify how to serialize"):
+    with pytest.raises(SchemaError, match="does not specify how to serialize"):
         serialize(Auto[Funky], Funky(x=3, y=True))
 
 

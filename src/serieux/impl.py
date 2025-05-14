@@ -24,9 +24,10 @@ from ovld import (
 from ovld.codegen import Function
 from ovld.medley import KeepLast, use_combiner
 from ovld.types import All
+from ovld.utils import ResolutionError
 
 from .ctx import AccessPath, Context
-from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
+from .exc import SchemaError, SerieuxError, ValidationError, ValidationExceptionGroup
 from .features.fromfile import WorkingDirectory
 from .instructions import InstructionType
 from .model import FieldModelizable, Modelizable, StringModelizable, model
@@ -184,7 +185,7 @@ class BaseImplementation(Medley):
     def deserialize(self, t: Any, obj: Any, ctx: Context, /):
         try:
             # Pass through if the object happens to already be the right type
-            if isinstance(obj, t):
+            if t is Any or isinstance(obj, t):
                 return obj
         except TypeError:  # pragma: no cover
             pass
@@ -335,7 +336,7 @@ class BaseImplementation(Medley):
     def schema(self, t: type[dict], ctx: Context, /):
         kt, vt = get_args(t)
         if kt is not str:
-            raise Exception(
+            raise SchemaError(
                 f"Cannot create a schema for dicts with non-string keys (found key type: `{kt}`)"
             )
         follow = hasattr(ctx, "follow")
@@ -356,7 +357,7 @@ class BaseImplementation(Medley):
         follow = hasattr(ctx, "follow")
         for i, f in enumerate(t.fields):
             if f.property_name is None:
-                raise ValidationError(
+                raise SchemaError(
                     f"Cannot serialize '{clsstring(t)}' because its model does not specify how to serialize property '{f.name}'"
                 )
             ctx_expr = (
@@ -560,7 +561,13 @@ class BaseImplementation(Medley):
         (t,) = get_args(t)
         options = get_args(t)
 
-        tells = [get_tells(o) for o in options]
+        try:
+            tells = [get_tells(opt := o) for o in options]
+        except ResolutionError as exc:
+            raise SchemaError(
+                f"Cannot deserialize union type `{t}`, because no rule is defined to discriminate `{opt}` from other types.",
+                exc=exc,
+            )
         elim = set()
         for tl1, tl2 in pairwise(tells):
             elim |= tl1 & tl2
@@ -568,7 +575,7 @@ class BaseImplementation(Medley):
             tls -= elim
 
         if sum(not tl for tl in tells) > 1:
-            raise Exception(f"Cannot differentiate the possible union members in type '{t}'")
+            raise SchemaError(f"Cannot differentiate the possible union members in type '{t}'")
 
         options = list(zip(tells, options))
         options.sort(key=lambda x: len(x[0]))

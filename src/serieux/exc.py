@@ -140,3 +140,11 @@ class ValidationError(IndividualSerieuxError):
             message = f"{type(exc).__name__}: {exc}"
         super().__init__(message=message, ctx=ctx)
         self.exc = exc
+
+
+class SchemaError(IndividualSerieuxError):
+    def __init__(self, message=None, *, exc=None, ctx=None):
+        if message is None:  # pragma: no cover
+            message = f"{type(exc).__name__}: {exc}"
+        super().__init__(message=message, ctx=ctx)
+        self.exc = exc

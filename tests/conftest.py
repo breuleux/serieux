@@ -5,14 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from serieux.exc import ValidationError, ValidationExceptionGroup
+from serieux.exc import SerieuxError
 
 datapath = Path(__file__).parent / "data"
 
 
 @pytest.hookimpl()
 def pytest_exception_interact(node, call, report):
-    if call.excinfo.type == ValidationExceptionGroup or call.excinfo.type == ValidationError:
+    if issubclass(call.excinfo.type, SerieuxError):
         exc = call.excinfo.value
         io = StringIO()
         exc.display(file=io)
@@ -26,7 +26,7 @@ def pytest_exception_interact(node, call, report):
 @pytest.fixture
 def check_error_display(capsys, file_regression):
     @contextmanager
-    def check(message="", exc_type=(ValidationError, ValidationExceptionGroup)):
+    def check(message="", exc_type=SerieuxError):
         with pytest.raises(exc_type, match=message) as exc:
             yield
 
