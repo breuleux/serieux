@@ -1,5 +1,6 @@
 import inspect
 from dataclasses import MISSING
+from functools import partial
 
 from ovld import call_next
 
@@ -8,16 +9,22 @@ from .instructions import NewInstruction
 from .model import Field, Model, model
 from .utils import evaluate_hint
 
+Call = NewInstruction["Call", -1, True]
 Auto = NewInstruction["Auto", -1, True]
 
 
-def model_from_callable(t):
-    sig = inspect.signature(t)
+def model_from_callable(t, call=False):
+    if isinstance(t, type) and call:
+        raise TypeError("Call[...] should only wrap callables")
+    try:
+        sig = inspect.signature(t)
+    except ValueError:
+        return None
     fields = []
     docs = get_variable_data(t)
     for param in sig.parameters.values():
         if param.annotation is inspect._empty:
-            raise Exception(f"Missing type annotation for argument '{param.name}'.")
+            return None
         field = Field(
             name=param.name,
             description=docs.get(param.name, param.name),
@@ -27,10 +34,19 @@ def model_from_callable(t):
             property_name=None,
         )
         fields.append(field)
+
+    if not isinstance(t, type) and not call:
+
+        def build(*args, **kwargs):
+            return partial(t, *args, **kwargs)
+
+    else:
+        build = t
+
     return Model(
         original_type=t,
         fields=fields,
-        constructor=t,
+        constructor=build,
     )
 
 
@@ -38,7 +54,9 @@ def model_from_callable(t):
 def _(t: type[Auto]):
     if (normal := call_next(t)) is not None:
         return normal
-    try:
-        return model_from_callable(Auto.strip(t))
-    except Exception:
-        return None
+    return model_from_callable(Auto.strip(t))
+
+
+@model.register(priority=-1)
+def _(t: type[Call]):
+    return model_from_callable(Call.strip(t), True)
