@@ -332,6 +332,7 @@ def test_parse_cli():
             "job.yearly_pay": "--yar",
         },
         argv=["-n", "Gunther", "--tit", "Inspector", "--yar", "35000"],
+        description="W O R K",
     )
     worker = deserialize(Worker, result, Context())
     assert worker == Worker(name="Gunther", job=Job(title="Inspector", yearly_pay=35000))

@@ -216,11 +216,17 @@ class CLIDefinition:
     root_type: type = None
     mapping: dict[str, str | dict[str, Any]] = field(default_factory=lambda: {"": {"auto": True}})
     argparser: argparse.ArgumentParser = None
+    description: str = None
 
     def __post_init__(self):
         if self.argparser is None:
-            description = self.root_type.__doc__ or f"Arguments for {clsstring(self.root_type)}"
-            self.argparser = argparse.ArgumentParser(description=description)
+            if self.description is None:
+                description = (
+                    self.root_type.__doc__ or f"Arguments for {clsstring(self.root_type)}"
+                )
+            else:
+                description = self.description
+        self.argparser = argparse.ArgumentParser(description=description)
         for k, v in self.mapping.items():
             fld = field_at(self.root_type, k)
             if isinstance(v, str):
@@ -241,10 +247,10 @@ class CLIDefinition:
         return vals
 
 
-def parse_cli(root_type, argv=None, mapping=None):
+def parse_cli(root_type, argv=None, mapping=None, description=None):
     mapping = {"": {"auto": True}} if mapping is None else mapping
     argv = sys.argv[1:] if argv is None else argv
-    parser = CLIDefinition(root_type=root_type, mapping=mapping)
+    parser = CLIDefinition(root_type=root_type, mapping=mapping, description=description)
     return parser(argv)
 
 
