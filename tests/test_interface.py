@@ -1,11 +1,9 @@
-
-from ovld import Medley
 import pytest
-import serieux
-from serieux import Serieux, deserializer, schema_definition, serialize, serializer
+from ovld import Medley
+
+from serieux import deserializer, schema_definition, serializer
 from serieux.ctx import Context
 from serieux.exc import ValidationError
-from serieux.features.dotted import DottedNotation
 
 
 class Beep:
@@ -46,7 +44,6 @@ def test_custom_deserializer(fresh_serieux):
     assert fresh_serieux.deserialize(list[Beep], [1, 2, 3]) == [Beep(1), Beep(2), Beep(3)]
 
 
-
 def test_custom_schema(fresh_serieux):
     with pytest.raises(Exception):
         fresh_serieux.schema(Beep)
@@ -62,14 +59,12 @@ def test_custom_schema(fresh_serieux):
     assert fresh_serieux.schema(Beep).compile(root=False) == {"type": "integer"}
 
 
-
 class Kustom(Medley):
     def deserialize(self, t: type[Beep], obj: str, ctx: Context):
         return Beep(int(obj))
 
 
 def test_inherits(fresh_serieux):
-
     srx = fresh_serieux + Kustom()
 
     with pytest.raises(ValidationError):

@@ -2,9 +2,6 @@ import importlib
 from pathlib import Path
 
 import pytest
-from ovld import Medley
-
-from serieux import Serieux
 
 examples = Path(__file__).parent / "../examples"
 

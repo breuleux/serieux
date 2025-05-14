@@ -3,7 +3,6 @@ from contextlib import contextmanager
 from io import StringIO
 from pathlib import Path
 
-from ovld import Medley
 import pytest
 
 from serieux import Serieux
