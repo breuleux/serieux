@@ -163,7 +163,7 @@ def add_argument_from_field(parser, fdest, overrides, field: Field):
         if alias := args.pop("alias", None):
             if not isinstance(alias, list):
                 alias = [alias]
-            pos.extend(alias)
+            pos.extend([a for a in alias if a not in pos])
         parser.add_argument(*pos, **args)
 
 
@@ -195,9 +195,8 @@ def add_arguments(options: list, parser: argparse.ArgumentParser, dest: str, par
         else:
             raise ValidationError("All Union members must be Tagged to make a cli")
 
-    subparsers = parser.add_subparsers(dest=_compose(dest, "class"))
+    subparsers = parser.add_subparsers(dest=_compose(dest, "class"), required=True)
     for opt in options:
-        subparsers.required = True
         subparser = subparsers.add_parser(opt.tag, help=f"{strip_all(opt.cls).__doc__ or opt.tag}")
         recurse(opt.cls, subparser, dest, partial)
 
