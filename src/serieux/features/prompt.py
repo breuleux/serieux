@@ -4,7 +4,7 @@ from ovld import ovld
 
 from ..ctx import Patcher
 from ..model import field_at
-from .interpol import Variables, decode_string
+from .interpol import Environment, decode_string
 
 
 def default_prompt(ctx, prompt):  # pragma: no cover
@@ -13,7 +13,7 @@ def default_prompt(ctx, prompt):  # pragma: no cover
     )
 
 
-class Promptable(Variables):
+class Promptable(Environment):
     prompt_function: Callable[[str], str] = default_prompt
 
     @ovld

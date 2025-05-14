@@ -8,7 +8,7 @@ from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
 from .features.clargs import CLIDefinition, CommandLineArguments, parse_cli
 from .features.dotted import DottedNotation
 from .features.fromfile import FromFileExtra, WorkingDirectory
-from .features.interpol import Variables
+from .features.interpol import Environment
 from .features.lazy import DeepLazy, Lazy, LazyProxy
 from .features.partial import Partial, Sources
 from .features.tagged import Tagged, TaggedUnion
@@ -88,6 +88,7 @@ __all__ = [
     "deserialize",
     "DottedNotation",
     "dump",
+    "Environment",
     "Extensible",
     "FromFileExtra",
     "InstructionType",
@@ -117,6 +118,5 @@ __all__ = [
     "TaggedSubclass",
     "ValidationError",
     "ValidationExceptionGroup",
-    "Variables",
     "WorkingDirectory",
 ]

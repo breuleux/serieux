@@ -10,7 +10,7 @@ from serieux.ctx import Context
 from serieux.exc import ValidationError
 from serieux.features.clargs import CommandLineArguments, parse_cli
 from serieux.features.fromfile import FromFileExtra, WorkingDirectory
-from serieux.features.interpol import Variables
+from serieux.features.interpol import Environment
 from serieux.features.tagged import Tagged, TaggedUnion
 
 from ..definitions import Defaults, Job, Point, Worker
@@ -66,7 +66,7 @@ def test_variables():
     result = deserialize(
         Person,
         CommandLineArguments(["--name", "Jon", "--age", "${env:AGE}"]),
-        Variables(environ={"AGE": "33"}),
+        Environment(environ={"AGE": "33"}),
     )
     assert result == Person(name="Jon", age=33)
 

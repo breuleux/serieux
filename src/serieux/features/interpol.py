@@ -67,7 +67,7 @@ def decode_string(t: type[list], value: str):
     return [recurse(element_type, item.strip()) for item in str(value).split(",")]
 
 
-class Variables(AccessPath):
+class Environment(AccessPath):
     refs: dict[tuple[str, ...], object] = field(default_factory=dict, repr=False)
     environ: dict = field(default_factory=lambda: os.environ, repr=False)
 
@@ -121,13 +121,13 @@ class Variables(AccessPath):
 
 class Interpolation(Medley):
     @ovld(priority=PRIO_HIGH + 0.3)
-    def deserialize(self, t: Any, obj: object, ctx: Variables):
+    def deserialize(self, t: Any, obj: object, ctx: Environment):
         rval = call_next(t, obj, ctx)
         ctx.refs[ctx.access_path] = rval
         return rval
 
     @ovld(priority=PRIO_HIGH + 0.2)
-    def deserialize(self, t: Any, obj: Regexp[r"^\$\{[^}]+\}$"], ctx: Variables):
+    def deserialize(self, t: Any, obj: Regexp[r"^\$\{[^}]+\}$"], ctx: Environment):
         expr = obj.lstrip("${").rstrip("}")
         obj = ctx.resolve_variable(strip_all(t), expr)
         if isinstance(obj, LazyProxy):
@@ -140,7 +140,7 @@ class Interpolation(Medley):
             return recurse(t, obj, ctx)
 
     @ovld(priority=PRIO_HIGH + 0.1)
-    def deserialize(self, t: Any, obj: Regexp[r"\$\{[^}]+\}"], ctx: Variables):
+    def deserialize(self, t: Any, obj: Regexp[r"\$\{[^}]+\}"], ctx: Environment):
         def interpolate():
             def repl(match):
                 return str(ctx.resolve_variable(str, match.group(1)))
