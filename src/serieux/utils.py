@@ -1,4 +1,5 @@
 import importlib
+import inspect
 import sys
 import typing
 from types import GenericAlias, NoneType, UnionType
@@ -130,6 +131,11 @@ def evaluate_hint(typ, ctx=None, lcl=None, typesub=None, seen=None):
         raise TypeError("Cannot evaluate hint:", typ, type(typ))
 
 
+####################
+# Other type stuff #
+####################
+
+
 def _json_type_check(t, bound=object):
     origin = get_origin(t)
     if origin is typing.Union or origin is UnionType:
@@ -153,3 +159,18 @@ JSON = parametrized_class_check(_json_type_check)
 @class_check
 def IsLiteral(t):
     return get_origin(t) is Literal
+
+
+########
+# Misc #
+########
+
+
+def check_signature(fn, flavor, expected):
+    params = list(inspect.signature(fn).parameters.keys())
+    nexpected = len(expected)
+    expected = ", ".join(expected)
+    if params[0] != "self" or len(params) != nexpected:  # pragma: no cover
+        raise TypeError(
+            f"{flavor} '{fn}' must define {nexpected} arguments: ({expected}). The first argument *must* be named 'self'."
+        )

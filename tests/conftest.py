@@ -3,8 +3,10 @@ from contextlib import contextmanager
 from io import StringIO
 from pathlib import Path
 
+from ovld import Medley
 import pytest
 
+from serieux import Serieux
 from serieux.exc import SerieuxError
 
 datapath = Path(__file__).parent / "data"
@@ -37,3 +39,19 @@ def check_error_display(capsys, file_regression):
         file_regression.check("\n".join([out, "=" * 80, err]))
 
     yield check
+
+
+@pytest.fixture
+def fresh_serieux(monkeypatch):
+    """Fixture that monkeypatches serieux module components for testing."""
+
+    class NewSerieux(Serieux):
+        pass
+
+    new_serieux = NewSerieux()
+
+    monkeypatch.setattr("serieux.serieux", new_serieux)
+    monkeypatch.setattr("serieux.Serieux", NewSerieux)
+    monkeypatch.setattr("serieux.deserialize", new_serieux.deserialize)
+    monkeypatch.setattr("serieux.serialize", new_serieux.serialize)
+    return new_serieux

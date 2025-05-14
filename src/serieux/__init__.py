@@ -1,4 +1,5 @@
 import importlib
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -17,6 +18,7 @@ from .impl import BaseImplementation
 from .instructions import InstructionType, NewInstruction
 from .model import Extensible, FieldModelizable, Model, Modelizable, StringModelizable
 from .schema import RefPolicy, Schema
+from .utils import check_signature
 from .version import version as __version__
 
 
@@ -75,6 +77,34 @@ deserialize = serieux.deserialize
 schema = serieux.schema
 load = serieux.load
 dump = serieux.dump
+
+
+def serializer(fn=None, priority=0):
+    if fn is None:
+        return partial(serializer, priority=priority)
+
+    check_signature(fn, "serializer", ("self", "t: type[T1]", "obj: T2", "ctx: T3>Context"))
+    Serieux.serialize.register(fn, priority=priority)
+    return fn
+
+
+def deserializer(fn=None, priority=0):
+    if fn is None:
+        return partial(deserializer, priority=priority)
+
+    check_signature(fn, "deserializer", ("self", "t: type[T1]", "obj: T2", "ctx: T3>Context"))
+    Serieux.deserialize.register(fn, priority=priority)
+    return fn
+
+
+def schema_definition(fn=None, priority=0):
+    if fn is None:
+        return partial(schema_definition, priority=priority)
+
+    check_signature(fn, "schema definition", ("self", "t: type[T1]", "ctx: T2>Context"))
+    Serieux.schema.register(fn, priority=priority)
+    return fn
+
 
 __all__ = [
     "__version__",

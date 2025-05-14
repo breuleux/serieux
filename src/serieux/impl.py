@@ -220,7 +220,11 @@ class BaseImplementation(Medley):
     def schema(self, t: Any, ctx: Context, /):
         if t not in self._schema_cache:
             self._schema_cache[t] = holder = Schema(t)
-            result = call_next(t, ctx)
+            try:
+                result = call_next(t, ctx)
+            except Exception:
+                del self._schema_cache[t]
+                raise
             holder.update(result)
         return self._schema_cache[t]
 

@@ -9,7 +9,7 @@ import pytest
 
 from serieux import Serieux
 from serieux.exc import NotGivenError, ValidationError
-from serieux.features.interpol import Interpolation, Environment
+from serieux.features.interpol import Environment, Interpolation
 from serieux.features.partial import Sources
 from tests.definitions import Country
 
