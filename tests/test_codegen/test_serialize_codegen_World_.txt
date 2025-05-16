@@ -1,8 +1,7 @@
 def __GENERATED__(self, t, obj, ctx, /):
     try:
-        v_0 = serialize(self, int, obj.x, ctx)
-        v_1 = serialize(self, int, obj.y, ctx)
-        return {'x': v_0,'y': v_1}
+        v_0 = method_map[t_dict, type(OBJ := obj.countries), Context](self, dict1, OBJ, ctx)
+        return {'countries': v_0}
     except SerieuxError:
         raise
     except Exception as exc:

@@ -1,4 +1,3 @@
-import inspect
 from typing import Literal
 
 import pytest
@@ -31,22 +30,6 @@ def test_serialize_scalars_conversion():
 def test_serialize_point():
     pt = Point(1, 2)
     assert serialize(Point, pt) == {"x": 1, "y": 2}
-
-
-SEP = """
-======
-"""
-
-
-def getcodes(fn, *sigs):
-    sigs = [(sig if isinstance(sig, tuple) else (sig,)) for sig in sigs]
-    codes = [inspect.getsource(fn.resolve(*sig)) for sig in sigs]
-    return SEP.join(codes)
-
-
-def test_point_codegen(file_regression):
-    code = getcodes(serialize, (type[Point], Point, Context))
-    file_regression.check(code)
 
 
 def test_serialize_list_of_points():
@@ -104,12 +87,6 @@ def test_override():
     assert ss.serialize(list[int], [1, "2", 3]) == [10, "22", 30]
     assert ss.serialize(Point, Point(8, 9)) == {"x": 80, "y": 90}
     assert ss.serialize(3) == 30
-
-
-def test_special_serializer_codegen(file_regression):
-    custom = (Serieux + Special)()
-    code = getcodes(custom.serialize, (type[Point], Point, Context))
-    file_regression.check(code)
 
 
 class quirkint(int):

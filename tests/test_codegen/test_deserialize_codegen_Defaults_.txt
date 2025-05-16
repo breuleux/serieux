@@ -1,0 +1,16 @@
+def __GENERATED__(self, t, obj, ctx, /):
+    try:
+        v_0 = obj['name'] if isinstance((__checked := obj['name']), str) else deserialize(self, str, __checked, ctx)
+        if 'aliases' in obj:
+            v_1 = method_map[t_list, type(OBJ := obj['aliases']), Context](self, list1, OBJ, ctx)
+        else:
+            v_1 = list()
+        if 'cool' in obj:
+            v_2 = obj['cool'] if isinstance((__checked := obj['cool']), bool) else deserialize(self, bool, __checked, ctx)
+        else:
+            v_2 = dflt
+        return Defaults(v_0,v_1,cool=v_2)
+    except SerieuxError:
+        raise
+    except Exception as exc:
+        raise ValidationError(exc=exc, ctx=ctx)

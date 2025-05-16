@@ -1,0 +1,9 @@
+def __GENERATED__(self, t, obj, ctx, /):
+    try:
+        v_0 = obj['x'] if isinstance((__checked := obj['x']), int) else deserialize(self, int, __checked, ctx)
+        v_1 = obj['y'] if isinstance((__checked := obj['y']), int) else deserialize(self, int, __checked, ctx)
+        return Point(v_0,v_1)
+    except SerieuxError:
+        raise
+    except Exception as exc:
+        raise ValidationError(exc=exc, ctx=ctx)

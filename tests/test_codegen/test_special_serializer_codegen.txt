@@ -1,7 +1,7 @@
 def __GENERATED__(self, t, obj, ctx, /):
     try:
-        v_0 = obj.x if isinstance(obj.x, int) else serialize(self, int, obj.x, ctx)
-        v_1 = obj.y if isinstance(obj.y, int) else serialize(self, int, obj.y, ctx)
+        v_0 = method_map[t_int, type(OBJ := obj.x), Context](self, int, OBJ, ctx)
+        v_1 = method_map[t_int1, type(OBJ := obj.y), Context](self, int, OBJ, ctx)
         return {'x': v_0,'y': v_1}
     except SerieuxError:
         raise

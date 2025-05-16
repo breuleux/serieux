@@ -24,7 +24,7 @@ from ovld import (
 from ovld.codegen import Function
 from ovld.medley import KeepLast, use_combiner
 from ovld.types import All
-from ovld.utils import ResolutionError
+from ovld.utils import ResolutionError, subtler_type
 
 from .ctx import AccessPath, Context
 from .exc import SchemaError, SerieuxError, ValidationError, ValidationExceptionGroup
@@ -124,7 +124,7 @@ class BaseImplementation(Medley):
                         return Code(body)
                     else:
                         return Code(
-                            "$body if isinstance($accessor, $t) else $recurse($self, $t, $accessor, $ctx_expr)",
+                            "$body if isinstance((__checked := $accessor), $t) else $recurse($self, $t, __checked, $ctx_expr)",
                             body=Code(body),
                             accessor=accessor,
                             t=ot,
@@ -137,10 +137,12 @@ class BaseImplementation(Medley):
                 # We currently never do that.
                 pass
         return Code(
-            "$recurse($self, $t, $accessor, $ctx_expr)",
+            "$method_map[$tt, type(OBJ := $accessor), $ctxt]($self, $t, OBJ, $ctx_expr)",
+            tt=subtler_type(t),
+            ctxt=ctx_t,
             t=t,
             accessor=accessor,
-            recurse=method,
+            method_map=method.map,
             ctx_expr=ctx_expr,
         )
 
@@ -402,32 +404,45 @@ class BaseImplementation(Medley):
                 if follow
                 else Code("$ctx")
             )
-            processed = cls.subcode(
-                "deserialize",
-                f.type,
-                Code("$obj[$pname]", pname=f.serialized_name),
-                ctx,
-                ctx_expr=ctx_expr,
-            )
             if f.metavar:
                 expr = Code(f.metavar)
-            elif f.required:
-                expr = processed
+            else:
+                expr = cls.subcode(
+                    "deserialize",
+                    f.type,
+                    Code("$obj[$pname]", pname=f.serialized_name),
+                    ctx,
+                    ctx_expr=ctx_expr,
+                )
+
+            stmt = Code([f"v_{i} = $expr"], expr=expr)
+
+            if f.required or f.metavar:
+                pass
             elif f.default is not MISSING:
-                expr = Code(
-                    "($processed) if $pname in $obj else $dflt",
+                stmt = Code(
+                    [
+                        "if $pname in $obj:",
+                        ["$stmt"],
+                        "else:",
+                        [f"v_{i} = $dflt"],
+                    ],
                     dflt=f.default,
                     pname=f.serialized_name,
-                    processed=processed,
+                    stmt=stmt,
                 )
             elif f.default_factory is not MISSING:
-                expr = Code(
-                    "($processed) if $pname in $obj else $dflt()",
+                stmt = Code(
+                    [
+                        "if $pname in $obj:",
+                        ["$stmt"],
+                        "else:",
+                        [f"v_{i} = $dflt()"],
+                    ],
                     dflt=f.default_factory,
                     pname=f.serialized_name,
-                    processed=processed,
+                    stmt=stmt,
                 )
-            stmt = Code(f"v_{i} = $expr", expr=expr)
             stmts.append(stmt)
             if isinstance(f.argument_name, str):
                 arg = f"{f.argument_name}=v_{i}"
