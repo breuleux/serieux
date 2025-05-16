@@ -131,7 +131,8 @@ def get_variable_data(cls):
         elif kind == "DOC" and current_kind == "VARIABLE":
             docs[current].append(content)
         elif kind == "VARIABLE" or kind == "ARGUMENT":
-            docs[content] = for_next
+            if content not in docs:
+                docs[content] = for_next
             for_next = []
             current = content
             current_kind = kind
