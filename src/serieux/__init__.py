@@ -12,6 +12,7 @@ from .features.fromfile import FromFileExtra, WorkingDirectory
 from .features.interpol import Environment
 from .features.lazy import DeepLazy, Lazy, LazyProxy
 from .features.partial import Partial, Sources
+from .features.registered import Registered, StringMapped, singleton
 from .features.tagged import Tagged, TaggedUnion
 from .features.tsubclass import TaggedSubclass
 from .impl import BaseImplementation
@@ -135,13 +136,16 @@ __all__ = [
     "Patch",
     "Patcher",
     "RefPolicy",
+    "Registered",
     "schema",
     "Schema",
     "serialize",
     "serieux",
     "Serieux",
     "SerieuxError",
+    "singleton",
     "Sources",
+    "StringMapped",
     "StringModelizable",
     "Tagged",
     "TaggedUnion",
