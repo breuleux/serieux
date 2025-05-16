@@ -21,6 +21,7 @@ build-backend = "hatchling.build"
 dev = [
     "pytest-regressions>=2.7.0",
     "pytest>=8.3.2",
+    "pytest-benchmark>=5.1.0",
     "pytest-cov>=5.0.0",
     "cryptography>=44.0.2",
     "rich>=14.0.0",
@@ -31,7 +32,7 @@ benchmark = [
     "marshmallow>=3.23.1",
     "orjson>=3.10.12",
     "pydantic>=2.10.2",
-    "pytest-benchmark>=5.1.0",
+    "pyserde>=0.24.0",
     "mashumaro[orjson]>=3.15",
 ]
 
@@ -50,3 +51,8 @@ ignore = ["F811", "F722"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "--benchmark-columns=median"
+testpaths = ["tests"]

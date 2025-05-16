@@ -4,6 +4,9 @@ from apischema import deserialize as apischema_deserialize, serialize as apische
 from mashumaro.codecs.basic import BasicDecoder, BasicEncoder
 from mashumaro.codecs.orjson import ORJSONEncoder
 from pydantic import TypeAdapter
+from serde.de import from_dict as serde_from_dict
+from serde.json import to_json as serde_to_json
+from serde.se import to_dict as serde_to_dict
 
 from serieux import deserialize as serieux_deserialize, serialize as serieux_serialize, serieux
 from serieux.ctx import EmptyContext, empty
@@ -93,3 +96,19 @@ class MashumaroInterface:
 
 
 mashumaro = MashumaroInterface()
+
+
+class SerdeInterface:
+    __name__ = "serde"
+
+    def serializer_for_type(self, t):
+        return serde_to_dict
+
+    def json_for_type(self, t):
+        return serde_to_json
+
+    def deserializer_for_type(self, t):
+        return lambda x: serde_from_dict(t, x)
+
+
+serde = SerdeInterface()
