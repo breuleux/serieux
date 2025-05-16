@@ -5,7 +5,7 @@ from mashumaro.codecs.basic import BasicDecoder, BasicEncoder
 from mashumaro.codecs.orjson import ORJSONEncoder
 from pydantic import TypeAdapter
 
-from serieux import deserialize as serieux_deserialize, serialize as serieux_serialize
+from serieux import deserialize as serieux_deserialize, serialize as serieux_serialize, serieux
 from serieux.ctx import EmptyContext, empty
 
 
@@ -14,14 +14,15 @@ class SerieuxInterface:
 
     def serializer_for_type(self, t):
         func = serieux_serialize.resolve(type[t], t, EmptyContext)
-        return lambda x: func(serieux_serialize, t, x, empty)
+        return lambda x: func(serieux, t, x, empty)
 
     def json_for_type(self, t):
         func = serieux_serialize.resolve(type[t], t, EmptyContext)
-        return lambda x: json.dumps(func(serieux_serialize, t, x, empty))
+        return lambda x: json.dumps(func(serieux, t, x, empty))
 
     def deserializer_for_type(self, t):
-        return lambda x: serieux_deserialize(t, x, empty)
+        func = serieux_deserialize.resolve(type[t], dict, EmptyContext)
+        return lambda x: func(serieux, t, x, empty)
 
 
 serieux = SerieuxInterface()

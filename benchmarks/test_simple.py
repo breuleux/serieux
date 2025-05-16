@@ -17,6 +17,12 @@ from .interfaces import (
 
 
 @dataclass
+class Point:
+    x: int
+    y: int
+
+
+@dataclass
 class Tree:
     left: Tree | int
     right: Tree | int
@@ -40,6 +46,9 @@ class Country:
 @dataclass
 class World:
     countries: dict[str, Country]
+
+
+point = Point(x=17, y=83)
 
 
 canada = Country(
@@ -96,13 +105,13 @@ def bench(interfaces, data):
 
 @bench(
     interfaces=[
-        serieux,
         apischema,
         pydantic,
         marshmallow,
         mashumaro,
+        serieux,
     ],
-    data=[world, roboland, tree],
+    data=[point, world, roboland, tree],
 )
 def test_serialize(interface, data, benchmark):
     fn = interface.serializer_for_type(type(data))
@@ -112,11 +121,11 @@ def test_serialize(interface, data, benchmark):
 
 @bench(
     interfaces=[
-        serieux,
         apischema,
         pydantic,
         marshmallow,
         mashumaro,
+        serieux,
     ],
     data=[roboland],
 )
@@ -128,13 +137,13 @@ def test_json(interface, data, benchmark):
 
 @bench(
     interfaces=[
-        serieux,
+        marshmallow,
         apischema,
         pydantic,
-        marshmallow,
         mashumaro,
+        serieux,
     ],
-    data=[world, roboland, tree],
+    data=[point, world, roboland, tree],
 )
 def test_deserialize(interface, data, benchmark):
     data_ser = serialize(data)
