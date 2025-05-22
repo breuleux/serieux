@@ -102,9 +102,7 @@ def test_lists():
 @dataclass
 class Defaults2:
     name: str
-    aliases: list[str] = field(
-        default_factory=list, metadata={"argparse": {"option": "-a", "action": "append"}}
-    )
+    aliases: list[str] = field(default_factory=list, metadata={"option": "-a", "action": "append"})
     cool: bool = field(default=False, kw_only=True)
 
 
@@ -157,7 +155,7 @@ class Act:
     command: TaggedUnion[Eat, Sleep]  # noqa: F821
 
     # Do we do it fast?
-    fast: bool = field(default=False, metadata={"argparse": {"alias": "-f"}})
+    fast: bool = field(default=False, metadata={"alias": "-f"})
 
     def text(self):
         return self.command.do() + (" fast" if self.fast else "")
@@ -255,7 +253,7 @@ def test_one_sub_subcommands():
 
 @dataclass
 class Word:
-    word: str = field(metadata={"argparse": {"positional": True}})
+    word: str = field(metadata={"positional": True})
 
 
 def test_positional():
@@ -265,7 +263,8 @@ def test_positional():
 
 @dataclass
 class Sentence:
-    sentence: str = field(metadata={"argparse": {"nargs": "*"}})
+    # [nargs: *]
+    sentence: str
 
 
 def test_nargs_on_str():
@@ -275,7 +274,8 @@ def test_nargs_on_str():
 
 @dataclass
 class Duck:
-    quacks: int = field(metadata={"argparse": {"option": "-q"}})
+    # [option: -q]
+    quacks: int
 
 
 def test_replace_option():

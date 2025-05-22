@@ -12,7 +12,7 @@ from ovld import Medley, ovld, recurse
 from ..ctx import Context
 from ..exc import ValidationError
 from ..instructions import strip_all
-from ..model import Field, FieldModelizable, Modelizable, StringModelizable, field_at, model
+from ..model import Field, FieldModelizable, StringModelizable, field_at, model
 from ..utils import UnionAlias, clsstring
 from .dotted import unflatten
 from .partial import Sources
@@ -53,7 +53,7 @@ class ConcatenateAction(argparse.Action):
 
 class ParseStringAction(argparse.Action):
     def __call__(self, parser, namespace, value, option_string=None):
-        if re.fullmatch(string=value, pattern=r"[\[\{].*[\}\]]"):
+        if isinstance(value, str) and re.fullmatch(string=value, pattern=r"[\[\{].*[\}\]]"):
             value = json.loads(value)
         setattr(namespace, self.dest, value)
 
@@ -124,7 +124,7 @@ def make_argument(t: type[Tagged], partial: dict, model_field: Field):
 
 @ovld
 def make_argument(t: type[UnionAlias], partial: dict, model_field: Field):
-    if any(issubclass(o, (Modelizable, Tagged)) for o in get_args(t)):
+    if any(issubclass(o, (FieldModelizable, Tagged)) for o in get_args(t)):
         return "subparser"
     else:
         options = [o for o in get_args(t) if o is not NoneType]
@@ -134,11 +134,30 @@ def make_argument(t: type[UnionAlias], partial: dict, model_field: Field):
             raise TypeError("Unions of primitive/non-Modelizable types are not supported yet")
 
 
+_add_argument_argnames = [
+    "action",
+    "nargs",
+    "const",
+    "default",
+    "type",
+    "choices",
+    "required",
+    "help",
+    "metavar",
+    "dest",
+    "version",
+    "alias",
+    "option",
+    "positional",
+]
+
+
 def add_argument_from_field(parser, fdest, overrides, field: Field):
     name = field.name.replace("_", "-")
     typ = strip_all(field.type)
-    meta = dict(field.metadata.get("argparse", {}))
-    positional = meta.pop("positional", False)
+    meta = {k: v for k, v in field.metadata.items() if k in _add_argument_argnames}
+    overrides = dict(overrides)
+    positional = meta.pop("positional", False) or overrides.pop("positional", False)
     fhelp = field.description or field.name
     mvar = name.split(".")[-1].upper()
 

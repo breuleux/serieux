@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 from ovld import Dataclass, Lambda, call_next, class_check, ovld, recurse
 
-from .docstrings import get_attribute_docstrings
+from .docstrings import VariableDoc, get_attribute_docstrings
 from .exc import ValidationError
 from .instructions import InstructionType, NewInstruction, strip_all
 from .utils import UnionAlias, clsstring, evaluate_hint
@@ -148,18 +148,17 @@ def model(dc: type[Dataclass]):
         if field.default is None and not safe_isinstance(field.default, typ):
             typ = Optional[typ]
 
+        vardoc = attributes.get(field.name, None) or VariableDoc("", {})
+
         return Field(
             name=field.name,
-            description=(
-                (meta := field.metadata).get("description", None)
-                or attributes.get(field.name, None)
-            ),
+            description=((meta := field.metadata).get("description", None) or vardoc.doc),
             type=typ,
             default=field.default,
             default_factory=field.default_factory,
             flatten=meta.get("flatten", False),
             metavar=meta.get("serieux_metavar", None),
-            metadata=dict(meta),
+            metadata={**meta, **vardoc.metadata},
             argument_name=field.name if field.kw_only else i,
         )
 

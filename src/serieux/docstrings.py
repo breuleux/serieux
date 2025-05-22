@@ -1,6 +1,8 @@
 import ast
 import inspect
+import re
 import tokenize
+from dataclasses import dataclass
 from functools import partial
 from textwrap import dedent
 
@@ -98,6 +100,35 @@ def scrape_variables_and_docstrings(src: str):
 _cached_docstrings = {}
 
 
+@dataclass
+class VariableDoc:
+    doc: str
+    metadata: dict[str, object]
+
+    @staticmethod
+    def from_lines(lines):
+        metadata = {}
+        doclines = []
+        for line in lines:
+            sl = line.strip()
+            if sl.startswith("[") and sl.endswith("]"):
+                for match in re.finditer(r"\[([^:]+)(?::\s*([^\[]+))?\]", line):
+                    key, value = match.groups()
+                    if value is not None:
+                        try:
+                            value = float(value)
+                        except ValueError:
+                            pass
+                    metadata[key] = value if value is not None else True
+            else:
+                doclines.append(line)
+
+        return VariableDoc(
+            doc="\n".join(doclines),
+            metadata=metadata,
+        )
+
+
 def get_variable_data(cls):
     """Get the docstrings for individual attributes of a class.
 
@@ -141,7 +172,9 @@ def get_variable_data(cls):
             current = current_line = None
             current_kind = None
             for_next = []
-    rval = _cached_docstrings[cls] = {k: "\n".join(lines) for k, lines in docs.items()}
+    rval = _cached_docstrings[cls] = {
+        k: VariableDoc.from_lines(lines) for k, lines in docs.items()
+    }
     return rval
 
 
