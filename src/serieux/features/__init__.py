@@ -1,3 +1,4 @@
+from .autotag import AutoTagAny
 from .clargs import FromArguments
 from .dotted import DottedNotation
 from .fromfile import FromFile, FromFileExtra
@@ -8,6 +9,7 @@ from .tagged import TaggedTypes
 from .tsubclass import TaggedSubclassFeature
 
 __all__ = [
+    "AutoTagAny",
     "DottedNotation",
     "FromArguments",
     "FromFile",
