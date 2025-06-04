@@ -4,15 +4,7 @@ from ovld import Exactly, Medley, ovld, recurse
 
 from ..ctx import Context
 from ..exc import ValidationError
-from ..instructions import NewInstruction
 from ..utils import PRIO_LOW
-
-#############
-# Constants #
-#############
-
-TaggedClass = NewInstruction["TaggedClass", 1, False]
-
 
 ###################
 # Implementations #
