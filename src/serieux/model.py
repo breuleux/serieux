@@ -2,20 +2,32 @@ import re
 from dataclasses import MISSING, dataclass, field, fields, is_dataclass, replace
 from datetime import date, datetime, timedelta
 from functools import cached_property
-from typing import Any, Callable, Optional, get_args, get_origin
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Callable,
+    Optional,
+    TypeAlias,
+    get_args,
+    get_origin,
+)
 from zoneinfo import ZoneInfo
 
 from ovld import Dataclass, Lambda, call_next, class_check, ovld, recurse
 
 from .docstrings import VariableDoc, get_attribute_docstrings
 from .exc import ValidationError
-from .instructions import InstructionType, NewInstruction, strip_all
+from .instructions import InstructionType, NewInstruction, T, strip_all
 from .utils import UnionAlias, clsstring, evaluate_hint
 
 UNDEFINED = object()
 
 
-Extensible = NewInstruction["Extensible"]
+if TYPE_CHECKING:
+    Extensible: TypeAlias = Annotated[T, None]
+else:
+    Extensible = NewInstruction[T, "Extensible"]
 
 
 @class_check

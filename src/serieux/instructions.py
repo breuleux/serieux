@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from functools import cache
 from types import UnionType
-from typing import Union, get_args, get_origin
+from typing import TypeVar, Union, get_args, get_origin
 
 from ovld import subclasscheck
 from ovld.mro import Order
+
+T = TypeVar("T")
 
 
 @dataclass(frozen=True)
@@ -21,8 +23,7 @@ def make_instruction(name, priority=1, inherit=True) -> type:
 
 class NewInstruction:
     def __class_getitem__(cls, params) -> type:
-        if not isinstance(params, tuple):
-            params = (params,)
+        _, *params = params
         return make_instruction(*params)
 
 

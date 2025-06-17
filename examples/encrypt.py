@@ -10,13 +10,14 @@ from rich.pretty import pprint
 
 from serieux import Context, NewInstruction, Serieux, deserialize, serialize
 from serieux.exc import ValidationError
+from serieux.instructions import T
 
 ##################
 # Implementation #
 ##################
 
 
-Secret = NewInstruction["Secret"]
+Secret = NewInstruction[T, "Secret"]
 
 
 class EncryptionKey(Context):

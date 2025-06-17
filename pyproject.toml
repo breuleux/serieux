@@ -48,6 +48,8 @@ line-length = 99
 [tool.ruff.lint]
 extend-select = ["I"]
 ignore = ["F811", "F722"]
+# ruff complains it's using illegal syntax under 3.11, but that's fine, it's a 3.12 test
+exclude = ["tests/definitions_py312.py"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
@@ -56,3 +58,9 @@ combine-as-imports = true
 minversion = "6.0"
 addopts = "--benchmark-columns=median"
 testpaths = ["tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+]

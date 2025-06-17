@@ -19,7 +19,7 @@ from .impl import BaseImplementation
 from .instructions import InstructionType, NewInstruction
 from .model import Extensible, FieldModelizable, Model, Modelizable, StringModelizable
 from .schema import RefPolicy, Schema
-from .utils import check_signature
+from .utils import JSON, check_signature
 from .version import version as __version__
 
 

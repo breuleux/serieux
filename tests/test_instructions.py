@@ -3,16 +3,16 @@ from typing import get_args
 from ovld import ovld, recurse, subclasscheck
 
 from serieux import deserialize, schema, serialize
-from serieux.instructions import InstructionType, NewInstruction, pushdown
+from serieux.instructions import InstructionType, NewInstruction, T, pushdown
 from tests.common import one_test_per_assert
 
 from .definitions import Point
 
-Apple = NewInstruction["Apple", 1]
-Banana = NewInstruction["Banana", 2]
-Carrot = NewInstruction["Carrot", 3]
-Dog = NewInstruction["Dog", 4, False]
-Useless = NewInstruction["Useless", 1, True]
+Apple = NewInstruction[T, "Apple", 1]
+Banana = NewInstruction[T, "Banana", 2]
+Carrot = NewInstruction[T, "Carrot", 3]
+Dog = NewInstruction[T, "Dog", 4, False]
+Useless = NewInstruction[T, "Useless", 1, True]
 
 
 def test_typetag_idempotent():

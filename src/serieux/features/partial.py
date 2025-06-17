@@ -1,6 +1,6 @@
 from dataclasses import field, fields, make_dataclass
 from functools import reduce
-from typing import Any
+from typing import TYPE_CHECKING, Annotated, Any, TypeAlias
 
 from ovld import Medley, call_next, ovld, recurse
 
@@ -12,7 +12,7 @@ from ..exc import (
     ValidationExceptionGroup,
     merge_errors,
 )
-from ..instructions import NewInstruction
+from ..instructions import NewInstruction, T
 from ..model import FieldModelizable, model
 from ..utils import PRIO_HIGH
 from .lazy import LazyProxy
@@ -22,7 +22,10 @@ from .lazy import LazyProxy
 #############
 
 
-Partial = NewInstruction["Partial"]
+if TYPE_CHECKING:
+    Partial: TypeAlias = Annotated[T, None]
+else:
+    Partial = NewInstruction[T, "Partial"]
 
 
 class NOT_GIVEN_T:

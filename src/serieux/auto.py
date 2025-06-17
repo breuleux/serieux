@@ -1,16 +1,21 @@
 import inspect
 from dataclasses import MISSING
 from functools import partial
+from typing import TYPE_CHECKING, Annotated, TypeAlias
 
 from ovld import call_next
 
 from .docstrings import get_variable_data
-from .instructions import NewInstruction
+from .instructions import NewInstruction, T
 from .model import Field, Model, model
 from .utils import evaluate_hint
 
-Call = NewInstruction["Call", -1, True]
-Auto = NewInstruction["Auto", -1, True]
+if TYPE_CHECKING:
+    Call: TypeAlias = Annotated[T, None]
+    Auto: TypeAlias = Annotated[T, None]
+else:
+    Call = NewInstruction[T, "Call", -1, True]
+    Auto = NewInstruction[T, "Auto", -1, True]
 
 
 def model_from_callable(t, call=False):

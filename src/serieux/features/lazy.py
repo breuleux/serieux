@@ -1,10 +1,10 @@
 from functools import cached_property
-from typing import Any
+from typing import TYPE_CHECKING, Annotated, Any, TypeAlias
 
 from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
-from ..instructions import NewInstruction
+from ..instructions import NewInstruction, T
 from ..utils import PRIO_HIGHER
 
 #############
@@ -12,8 +12,12 @@ from ..utils import PRIO_HIGHER
 #############
 
 
-Lazy = NewInstruction["Lazy", 2, False]
-DeepLazy = NewInstruction["DeepLazy", 2]
+if TYPE_CHECKING:
+    Lazy: TypeAlias = Annotated[T, None]
+    DeepLazy: TypeAlias = Annotated[T, None]
+else:
+    Lazy = NewInstruction[T, "Lazy", 2, False]
+    DeepLazy = NewInstruction[T, "DeepLazy", 2]
 
 
 ###########

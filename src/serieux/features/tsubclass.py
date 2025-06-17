@@ -1,18 +1,23 @@
 import importlib
 from collections import deque
+from typing import TYPE_CHECKING, Annotated, TypeAlias
 
 from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
 from ..exc import ValidationError
-from ..instructions import NewInstruction, strip_all
+from ..instructions import NewInstruction, T, strip_all
 from ..schema import AnnotatedSchema
 
 #############
 # Constants #
 #############
 
-TaggedSubclass = NewInstruction["TaggedSubclass", 1, False]
+
+if TYPE_CHECKING:
+    TaggedSubclass: TypeAlias = Annotated[T, None]
+else:
+    TaggedSubclass: TypeAlias = NewInstruction[T, "TaggedSubclass", 1, False]
 
 
 ###################
