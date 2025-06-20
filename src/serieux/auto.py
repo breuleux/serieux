@@ -32,7 +32,8 @@ def model_from_callable(t, call=False):
             return None
         field = Field(
             name=param.name,
-            description=docs.get(param.name, param.name),
+            description=(docs[param.name].doc or param.name) if param.name in docs else param.name,
+            metadata=(docs[param.name].metadata or {}) if param.name in docs else {},
             type=Auto[evaluate_hint(param.annotation, None, None, None)],
             default=MISSING if param.default is inspect._empty else param.default,
             argument_name=param.name,
