@@ -13,7 +13,7 @@ from ..ctx import Context
 from ..exc import ValidationError
 from ..instructions import strip_all
 from ..model import Field, FieldModelizable, StringModelizable, field_at, model
-from ..utils import UnionAlias, clsstring
+from ..utils import IsLiteral, UnionAlias, clsstring
 from .dotted import unflatten
 from .partial import Sources
 from .tagged import Tagged
@@ -90,6 +90,11 @@ def make_argument(t: type[list], partial: dict, model_field: Field):
 @ovld(priority=1)
 def make_argument(t: type[Enum], partial: dict, model_field: Field):
     return {**partial, "type": str, "choices": [e.value for e in t]}
+
+
+@ovld
+def make_argument(t: type[IsLiteral], partial: dict, model_field: Field):
+    return {**partial, "type": str, "choices": [x for x in t.__args__]}
 
 
 def regex_checker(pattern, descr):

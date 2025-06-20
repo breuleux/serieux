@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -343,3 +344,37 @@ def test_parse_cli():
     )
     worker = deserialize(Worker, result, Context())
     assert worker == Worker(name="Gunther", job=Job(title="Inspector", yearly_pay=35000))
+
+
+@dataclass
+class Konfig:
+    mode: Literal["dev", "prod", "test"]
+    level: Literal["debug", "info", "warning", "error"]
+
+
+def test_parse_literal():
+    result = parse_cli(
+        root_type=Konfig,
+        argv=["--mode", "dev", "--level", "debug"],
+    )
+    config = deserialize(Konfig, result, Context())
+    assert config == Konfig(mode="dev", level="debug")
+
+    result = parse_cli(
+        root_type=Konfig,
+        argv=["--mode", "prod", "--level", "info"],
+    )
+    config = deserialize(Konfig, result, Context())
+    assert config == Konfig(mode="prod", level="info")
+
+    with pytest.raises(SystemExit):
+        parse_cli(
+            root_type=Konfig,
+            argv=["--mode", "invalid", "--level", "debug"],
+        )
+
+    with pytest.raises(SystemExit):
+        parse_cli(
+            root_type=Konfig,
+            argv=["--mode", "dev", "--level", "invalid"],
+        )
