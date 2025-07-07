@@ -462,7 +462,7 @@ class BaseImplementation(Medley):
     # Implementations: StringModelizable #
     ######################################
 
-    @code_generator_wrap_error(priority=PRIO_DEFAULT)
+    @code_generator_wrap_error(priority=PRIO_DEFAULT + 0.1)
     def serialize(self, t: type[StringModelizable], obj: Any, ctx: Context, /):
         (t,) = get_args(t)
         m = model(t)
@@ -473,7 +473,7 @@ class BaseImplementation(Medley):
         else:
             return Lambda("$to_string($obj)", to_string=m.to_string)
 
-    @code_generator_wrap_error(priority=PRIO_DEFAULT)
+    @code_generator_wrap_error(priority=PRIO_DEFAULT + 0.1)
     def deserialize(self, t: type[StringModelizable], obj: str, ctx: Context, /):
         (t,) = get_args(t)
         m = model(t)

@@ -43,7 +43,7 @@ class UserMethods(Medley):
             return call_next(t, ctx)
 
 
-@model.register
+@model.register(priority=1)
 def _(t: type[HasMethod["serieux_model"]]):  # noqa: F821
     def cn(t, *, from_top=False):  # pragma: no cover
         return recurse(t) if from_top else call_next(t)
