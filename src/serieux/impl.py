@@ -124,7 +124,7 @@ class BaseImplementation(Medley):
                         return Code(body)
                     else:
                         return Code(
-                            "$body if isinstance((__checked := $accessor), $t) else $recurse($self, $t, __checked, $ctx_expr)",
+                            "$body if type(__checked := $accessor) is $t else $recurse($self, $t, __checked, $ctx_expr)",
                             body=Code(body),
                             accessor=accessor,
                             t=ot,

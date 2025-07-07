@@ -1,7 +1,7 @@
 def __GENERATED__(self, t, obj, ctx, /):
     try:
-        v_0 = obj.x if isinstance((__checked := obj.x), int) else serialize(self, int, __checked, ctx)
-        v_1 = obj.y if isinstance((__checked := obj.y), int) else serialize(self, int, __checked, ctx)
+        v_0 = obj.x if type(__checked := obj.x) is int else serialize(self, int, __checked, ctx)
+        v_1 = obj.y if type(__checked := obj.y) is int else serialize(self, int, __checked, ctx)
         return {'x': v_0,'y': v_1}
     except SerieuxError:
         raise
