@@ -27,7 +27,7 @@ def pytest_exception_interact(node, call, report):
 @pytest.fixture
 def check_error_display(capsys, file_regression):
     @contextmanager
-    def check(message="", exc_type=SerieuxError):
+    def check(message=None, exc_type=SerieuxError):
         with pytest.raises(exc_type, match=message) as exc:
             yield
 
