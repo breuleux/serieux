@@ -115,3 +115,8 @@ ListTree = list["Point | ListTree"]
 @dataclass
 class LTHolder:
     lt: ListTree
+
+
+class DotDict(dict):
+    def __getattr__(self, attr):
+        return self[attr]

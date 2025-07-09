@@ -8,7 +8,7 @@ from serieux.ctx import AccessPath, Context
 from serieux.exc import ValidationError
 
 from .common import has_312_features, one_test_per_assert
-from .definitions import Color, DIDHolder, Level, LTHolder, Point
+from .definitions import Color, DIDHolder, DotDict, Level, LTHolder, Point
 
 
 @one_test_per_assert
@@ -69,6 +69,21 @@ def test_serialize_tree():
         },
         "right": {"left": {"left": 6, "right": 7}, "right": 8},
     }
+
+
+def test_serialize_set():
+    nums = {1, 2, 3, 4}
+    assert serialize(set[int], nums) == [1, 2, 3, 4]
+
+
+def test_serialize_frozenset():
+    nums = frozenset({1, 2, 3, 4})
+    assert serialize(frozenset[int], nums) == [1, 2, 3, 4]
+
+
+def test_serialize_dict_subclass():
+    data = DotDict(apple=3, banana=7)
+    assert serialize(DotDict[str, int], data) == {"apple": 3, "banana": 7}
 
 
 class Special(Medley):

@@ -290,12 +290,21 @@ class BaseImplementation(Medley):
     @classmethod
     def __generic_codegen_list(cls, method, t, obj, ctx):
         (t,) = get_args(t)
+        builder = list if method == "serialize" else get_origin(t) or t
         (lt,) = get_args(t) or (object,)
+        comp = "$lbody for IDX, X in enumerate($obj)"
+        if builder is list:
+            code = f"[{comp}]"
+        elif builder is set:
+            code = f"{{{comp}}}"
+        else:
+            code = f"$builder({comp})"
         if hasattr(ctx, "follow"):
             ctx_expr = Code("$ctx.follow($objt, $obj, IDX)", objt=t)
             return Lambda(
-                "[$lbody for IDX, X in enumerate($obj)]",
+                code,
                 lbody=cls.subcode(method, lt, "X", ctx, ctx_expr=ctx_expr),
+                builder=builder,
             )
         else:
             return Lambda("[$lbody for X in $obj]", lbody=cls.subcode(method, lt, "X", ctx))
@@ -314,6 +323,30 @@ class BaseImplementation(Medley):
         fctx = ctx.follow(t, None, "*") if follow else ctx
         return {"type": "array", "items": recurse(lt, fctx)}
 
+    #########################
+    # Implementations: sets #
+    #########################
+
+    @code_generator(priority=PRIO_DEFAULT)
+    def serialize(cls, t: type[set], obj: set, ctx: Context, /):
+        return cls.__generic_codegen_list("serialize", t, obj, ctx)
+
+    @code_generator(priority=PRIO_DEFAULT)
+    def deserialize(cls, t: type[set], obj: list, ctx: Context, /):
+        return cls.__generic_codegen_list("deserialize", t, obj, ctx)
+
+    ###############################
+    # Implementations: frozensets #
+    ###############################
+
+    @code_generator(priority=PRIO_DEFAULT)
+    def serialize(cls, t: type[frozenset], obj: frozenset, ctx: Context, /):
+        return cls.__generic_codegen_list("serialize", t, obj, ctx)
+
+    @code_generator(priority=PRIO_DEFAULT)
+    def deserialize(cls, t: type[frozenset], obj: list, ctx: Context, /):
+        return cls.__generic_codegen_list("deserialize", t, obj, ctx)
+
     ##########################
     # Implementations: dicts #
     ##########################
@@ -321,14 +354,19 @@ class BaseImplementation(Medley):
     @classmethod
     def __generic_codegen_dict(cls, method, t: type[dict], obj: dict, ctx: Context, /):
         (t,) = get_args(t)
+        builder = dict if method == "serialize" else get_origin(t) or t
         kt, vt = get_args(t) or (object, object)
         ctx_expr = (
             Code("$ctx.follow($objt, $obj, K)", objt=t) if hasattr(ctx, "follow") else Code("$ctx")
         )
+        code = "{$kbody: $vbody for K, V in $obj.items()}"
+        if builder is not dict:
+            code = f"$builder({code})"
         return Lambda(
-            "{$kbody: $vbody for K, V in $obj.items()}",
+            code,
             kbody=cls.subcode(method, kt, "K", ctx, ctx_expr=ctx_expr),
             vbody=cls.subcode(method, vt, "V", ctx, ctx_expr=ctx_expr),
+            builder=builder,
         )
 
     @code_generator(priority=PRIO_DEFAULT)

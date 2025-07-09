@@ -10,7 +10,7 @@ from serieux.ctx import AccessPath
 from serieux.exc import SchemaError, ValidationError
 
 from .common import has_312_features, one_test_per_assert
-from .definitions import Color, Defaults, DIDHolder, Level, LTHolder, Point, Point3D
+from .definitions import Color, Defaults, DIDHolder, DotDict, Level, LTHolder, Point, Point3D
 
 here = Path(__file__).parent
 
@@ -63,6 +63,23 @@ def test_deserialize_dict_of_points():
         "pt1": Point(1, 2),
         "pt2": Point(3, 4),
     }
+
+
+def test_deserialize_set():
+    nums = [1, 4, 2, 3, 3, 4]
+    assert deserialize(set[int], nums) == {1, 2, 3, 4}
+
+
+def test_deserialize_frozenset():
+    nums = [1, 4, 2, 3, 3, 4]
+    assert deserialize(frozenset[int], nums) == frozenset({1, 2, 3, 4})
+
+
+def test_deserialize_dict_subclass():
+    data = {"apple": 3, "banana": 7}
+    deser = deserialize(DotDict[str, int], data)
+    assert deser.apple == 3
+    assert deser.banana == 7
 
 
 @one_test_per_assert
