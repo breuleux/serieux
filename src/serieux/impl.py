@@ -245,15 +245,59 @@ class BaseImplementation(Medley):
     # Implementations: basic types #
     ################################
 
-    for T in (str, bool, int, float, NoneType):
+    # str
 
-        @code_generator(priority=PRIO_DEFAULT)
-        def serialize(cls, t: type[T], obj: T, ctx: Context, /):
-            return Lambda(Code("$obj"))
+    @code_generator(priority=PRIO_DEFAULT)
+    def serialize(cls, t: type[str], obj: str, ctx: Context, /):
+        return Lambda(Code("$obj"))
 
-        @code_generator(priority=PRIO_DEFAULT)
-        def deserialize(cls, t: type[T], obj: T, ctx: Context, /):
-            return Lambda(Code("$obj"))
+    @code_generator(priority=PRIO_DEFAULT)
+    def deserialize(cls, t: type[str], obj: str, ctx: Context, /):
+        return Lambda(Code("$obj"))
+
+    @ovld(priority=PRIO_DEFAULT)
+    def schema(self, t: type[str], ctx: Context, /):
+        return {"type": "string"}
+
+    # bool
+
+    @code_generator(priority=PRIO_DEFAULT)
+    def serialize(cls, t: type[bool], obj: bool, ctx: Context, /):
+        return Lambda(Code("$obj"))
+
+    @code_generator(priority=PRIO_DEFAULT)
+    def deserialize(cls, t: type[bool], obj: bool, ctx: Context, /):
+        return Lambda(Code("$obj"))
+
+    @ovld(priority=PRIO_DEFAULT)
+    def schema(self, t: type[bool], ctx: Context, /):
+        return {"type": "boolean"}
+
+    # int
+
+    @code_generator(priority=PRIO_DEFAULT)
+    def serialize(cls, t: type[int], obj: int, ctx: Context, /):
+        return Lambda(Code("$obj"))
+
+    @code_generator(priority=PRIO_DEFAULT)
+    def deserialize(cls, t: type[int], obj: int, ctx: Context, /):
+        return Lambda(Code("$obj"))
+
+    @ovld(priority=PRIO_DEFAULT)
+    def schema(self, t: type[int], ctx: Context, /):
+        return {"type": "integer"}
+
+    # float
+
+    @code_generator(priority=PRIO_DEFAULT)
+    def serialize(cls, t: type[float], obj: float, ctx: Context, /):
+        return Lambda(Code("$obj"))
+
+    @code_generator(priority=PRIO_DEFAULT)
+    def deserialize(cls, t: type[float], obj: float, ctx: Context, /):
+        return Lambda(Code("$obj"))
+
+    # float
 
     @code_generator(priority=PRIO_DEFAULT)
     def serialize(cls, t: type[float], obj: int, ctx: Context, /):
@@ -264,20 +308,18 @@ class BaseImplementation(Medley):
         return Lambda(Code("float($obj)"))
 
     @ovld(priority=PRIO_DEFAULT)
-    def schema(self, t: type[int], ctx: Context, /):
-        return {"type": "integer"}
-
-    @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[float], ctx: Context, /):
         return {"type": "number"}
 
-    @ovld(priority=PRIO_DEFAULT)
-    def schema(self, t: type[str], ctx: Context, /):
-        return {"type": "string"}
+    # None
 
-    @ovld(priority=PRIO_DEFAULT)
-    def schema(self, t: type[bool], ctx: Context, /):
-        return {"type": "boolean"}
+    @code_generator(priority=PRIO_DEFAULT)
+    def serialize(cls, t: type[NoneType], obj: NoneType, ctx: Context, /):
+        return Lambda(Code("$obj"))
+
+    @code_generator(priority=PRIO_DEFAULT)
+    def deserialize(cls, t: type[NoneType], obj: NoneType, ctx: Context, /):
+        return Lambda(Code("$obj"))
 
     @ovld(priority=PRIO_DEFAULT)
     def schema(self, t: type[NoneType], ctx: Context, /):
