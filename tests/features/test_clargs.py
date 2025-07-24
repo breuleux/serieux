@@ -301,11 +301,37 @@ def test_recursive():
     assert result == Worker(name="Gunther", job=Job(title="Inspector", yearly_pay=35000))
 
 
-def test_mapping_with_config_file():
+def test_mapping_config_file():
     def deserialize_cli(args):
         cla = CommandLineArguments(
             args,
             mapping={"": {"auto": True, "option": "--config"}},
+        )
+        return deserialize(Worker, cla, WorkingDirectory(datapath))
+
+    result = deserialize_cli(["--config", "worker.yaml"])
+    assert result == Worker(name="Hagrid", job=Job(title="Vagrant", yearly_pay=10))
+
+    result = deserialize_cli(["--config", "worker.yaml", "--title", "Inspector"])
+    assert result == Worker(name="Hagrid", job=Job(title="Inspector", yearly_pay=10))
+
+    with pytest.raises(ValidationError, match="there was no such file"):
+        deserialize_cli(["--config", "whatever.yaml", "--title", "Inspector"])
+
+    result = deserialize_cli(
+        ["--config", '{"name":"Hagrid","job":{"title":"Vagrant","yearly_pay":10}}']
+    )
+    assert result == Worker(name="Hagrid", job=Job(title="Vagrant", yearly_pay=10))
+
+
+def test_mapping_plus_config_file():
+    def deserialize_cli(args):
+        cla = CommandLineArguments(
+            args,
+            mapping={
+                "job.title": {"option": "--title", "required": False},
+                "": {"option": "--config"},
+            },
         )
         return deserialize(Worker, cla, WorkingDirectory(datapath))
 
