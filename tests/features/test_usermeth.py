@@ -190,3 +190,70 @@ def test_clargs_bad_regexp():
     )
     with pytest.raises(SystemExit):
         deserialize(HasColor, clargs)
+
+
+@dataclass
+class RGBS:
+    red: int
+    green: int
+    blue: int
+
+    @classmethod
+    def serieux_from_string(cls, s):
+        return _rgb_from_string(s, cls)
+
+    @classmethod
+    def serieux_to_string(cls, obj):
+        return f"#{obj.red:02x}{obj.green:02x}{obj.blue:02x}"
+
+
+def test_serieux_from_string_and_to_string_dataclass():
+    rgb = deserialize(RGBS, "#ff00ff")
+    assert rgb == RGBS(red=255, green=0, blue=255)
+
+    s = serialize(RGBS, rgb)
+    assert s == "#ff00ff"
+
+    sch = schema(RGBS).compile(root=False)
+    assert sch == {
+        "oneOf": [
+            {
+                "type": "object",
+                "properties": {
+                    "red": {"type": "integer"},
+                    "green": {"type": "integer"},
+                    "blue": {"type": "integer"},
+                },
+                "required": ["red", "green", "blue"],
+                "additionalProperties": False,
+            },
+            {"type": "string"},
+        ]
+    }
+
+
+class RGBS2:
+    def __init__(self, red: int, green: int, blue: int):
+        self.red = red
+        self.green = green
+        self.blue = blue
+
+    @classmethod
+    def serieux_from_string(cls, s):
+        return _rgb_from_string(s, cls)
+
+    @classmethod
+    def serieux_to_string(cls, obj):
+        return f"#{obj.red:02x}{obj.green:02x}{obj.blue:02x}"
+
+
+def test_serieux_from_string_and_to_string():
+    rgb = deserialize(RGBS2, "#ff00ff")
+    assert isinstance(rgb, RGBS2)
+    assert (rgb.red, rgb.green, rgb.blue) == (255, 0, 255)
+
+    s = serialize(RGBS2, rgb)
+    assert s == "#ff00ff"
+
+    sch = schema(RGBS2).compile(root=False)
+    assert sch == {"type": "string"}

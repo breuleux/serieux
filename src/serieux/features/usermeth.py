@@ -1,3 +1,4 @@
+from dataclasses import replace
 from typing import Any
 
 from ovld import Medley, call_next, ovld, recurse
@@ -5,7 +6,7 @@ from ovld.types import HasMethod
 from ovld.utils import ResolutionError
 
 from ..ctx import Context
-from ..model import model
+from ..model import Model, model
 from ..utils import PRIO_DEFAULT
 
 
@@ -18,6 +19,8 @@ class UserMethods(Medley):
         try:
             return t.serieux_deserialize(obj, ctx, cn)
         except ResolutionError:
+            # If t implements serieux_deserialize with ovld and no method matches, it will
+            # throw a ResolutionError and we simply resume our search down the stack.
             return call_next(t, obj, ctx)
 
     @ovld(priority=PRIO_DEFAULT + 0.5)
@@ -38,8 +41,6 @@ class UserMethods(Medley):
         try:
             return t.serieux_schema(ctx, cn)
         except ResolutionError:  # pragma: no cover
-            # ovld isn't very useful for schema, outside of argument `t`,
-            # which is given.
             return call_next(t, ctx)
 
 
@@ -49,6 +50,18 @@ def _(t: type[HasMethod["serieux_model"]]):  # noqa: F821
         return recurse(t) if from_top else call_next(t)
 
     return t.serieux_model(cn)
+
+
+@model.register(priority=2)
+def _(t: type[HasMethod["serieux_to_string"]] | type[HasMethod["serieux_from_string"]]):  # noqa: F821
+    m = call_next(t)
+    if not m:
+        m = Model(t, fields=None)
+    if hasattr(t, "serieux_to_string"):
+        m = replace(m, to_string=t.serieux_to_string)
+    if hasattr(t, "serieux_from_string"):
+        m = replace(m, from_string=t.serieux_from_string)
+    return m
 
 
 # Add as a default feature in serieux.Serieux
