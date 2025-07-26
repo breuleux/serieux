@@ -1,4 +1,5 @@
 from typing import Annotated
+
 from serieux import deserialize, schema, serialize
 from serieux.instructions import Instruction, inherit, pushdown, strip
 from tests.common import one_test_per_assert
