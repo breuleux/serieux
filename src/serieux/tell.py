@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from pathlib import Path
 from types import NoneType
+from typing import Annotated
 
 from ovld import Code, ovld, recurse
 
-from .instructions import InstructionType
+from .instructions import pushdown
 from .model import FieldModelizable, StringModelizable, model
 from .utils import TypeAliasType, basic_type
 
@@ -88,5 +89,5 @@ def tells(typ: TypeAliasType):
 
 
 @ovld(priority=-1)
-def tells(typ: type[InstructionType]):
-    return recurse(typ.pushdown())
+def tells(typ: type[Annotated]):
+    return recurse(pushdown(typ))

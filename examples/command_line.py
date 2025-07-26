@@ -9,7 +9,7 @@ from rich.pretty import pprint
 
 from serieux import Serieux, Sources, deserialize
 from serieux.ctx import Context
-from serieux.instructions import strip_all
+from serieux.instructions import strip
 from serieux.model import FieldModelizable, model
 
 ##################
@@ -28,7 +28,7 @@ def parser_for(t: type):
     parser = argparse.ArgumentParser(description=f"Arguments for {m.original_type.__name__}")
     for field in m.fields:
         if not field.name.startswith("_"):
-            typ = strip_all(field.type)
+            typ = strip(field.type)
             if typ not in (int, float, str, bool):
                 typ = str
             parser.add_argument(

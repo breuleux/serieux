@@ -16,7 +16,7 @@ from .features.registered import Registered, StringMapped, singleton
 from .features.tagged import Tagged, TaggedUnion
 from .features.tsubclass import TaggedSubclass
 from .impl import BaseImplementation
-from .instructions import InstructionType, NewInstruction
+from .instructions import Instruction
 from .model import Extensible, FieldModelizable, Model, Modelizable, StringModelizable
 from .schema import RefPolicy, Schema
 from .utils import JSON, check_signature
@@ -122,7 +122,6 @@ __all__ = [
     "Environment",
     "Extensible",
     "FromFileExtra",
-    "InstructionType",
     "JSON",
     "Lazy",
     "LazyProxy",
@@ -130,7 +129,7 @@ __all__ = [
     "Model",
     "FieldModelizable",
     "Modelizable",
-    "NewInstruction",
+    "Instruction",
     "parse_cli",
     "Partial",
     "Patch",

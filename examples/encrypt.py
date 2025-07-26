@@ -2,22 +2,23 @@ import base64
 import json
 from dataclasses import dataclass
 from hashlib import sha256
+from typing import Any
 
 from cryptography.fernet import Fernet
 from ovld import Medley, call_next
 from ovld.dependent import Regexp
 from rich.pretty import pprint
 
-from serieux import Context, NewInstruction, Serieux, deserialize, serialize
+from serieux import Context, Serieux, deserialize, serialize
 from serieux.exc import ValidationError
-from serieux.instructions import T
+from serieux.instructions import Instruction
 
 ##################
 # Implementation #
 ##################
 
 
-Secret = NewInstruction[T, "Secret"]
+Secret = Instruction("Secret")
 
 
 class EncryptionKey(Context):
@@ -38,11 +39,11 @@ class EncryptionKey(Context):
 
 @Serieux.extend
 class Encrypt(Medley):
-    def serialize(self, t: type[Secret], obj: object, ctx: EncryptionKey):
+    def serialize(self, t: type[Any @ Secret], obj: object, ctx: EncryptionKey):
         result = call_next(Secret.strip(t), obj, ctx - EncryptionKey)
         return ctx.encrypt(result)
 
-    def deserialize(self, t: type[Secret], obj: Regexp[r"^~CRYPT~.*"], ctx: EncryptionKey):
+    def deserialize(self, t: type[Any @ Secret], obj: Regexp[r"^~CRYPT~.*"], ctx: EncryptionKey):
         obj = ctx.decrypt(obj)
         return call_next(Secret.strip(t), obj, ctx - EncryptionKey)
 

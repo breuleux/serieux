@@ -5,7 +5,7 @@ from functools import wraps
 from itertools import pairwise
 from pathlib import Path
 from types import NoneType, UnionType
-from typing import Any, get_args, get_origin
+from typing import Annotated, Any, get_args, get_origin
 
 import yaml
 from ovld import (
@@ -29,7 +29,7 @@ from ovld.utils import ResolutionError, subtler_type
 from .ctx import AccessPath, Context
 from .exc import SchemaError, SerieuxError, ValidationError, ValidationExceptionGroup
 from .features.fromfile import WorkingDirectory
-from .instructions import InstructionType
+from .instructions import pushdown
 from .model import FieldModelizable, Modelizable, StringModelizable, model
 from .schema import AnnotatedSchema, Schema
 from .tell import tells as get_tells
@@ -168,8 +168,8 @@ class BaseImplementation(Medley):
         return recurse(t.__value__, obj, ctx)
 
     @ovld(priority=PRIO_LOW)
-    def serialize(self, t: type[InstructionType], obj: Any, ctx: Context, /):
-        return recurse(t.pushdown(), obj, ctx)
+    def serialize(self, t: type[Annotated], obj: Any, ctx: Context, /):
+        return recurse(pushdown(t), obj, ctx)
 
     def serialize(self, obj: Any, /):
         return recurse(type(obj), obj, self.default_context)
@@ -208,8 +208,8 @@ class BaseImplementation(Medley):
         return recurse(t.__value__, obj, ctx)
 
     @ovld(priority=PRIO_LOW)
-    def deserialize(self, t: type[InstructionType], obj: Any, ctx: Context, /):
-        return recurse(t.pushdown(), obj, ctx)
+    def deserialize(self, t: type[Annotated], obj: Any, ctx: Context, /):
+        return recurse(pushdown(t), obj, ctx)
 
     def deserialize(self, t: Any, obj: Any, /):
         return recurse(t, obj, self.default_context)
@@ -235,8 +235,8 @@ class BaseImplementation(Medley):
         return recurse(t.__value__, ctx)
 
     @ovld(priority=PRIO_LOW)
-    def schema(self, t: type[InstructionType], ctx: Context, /):
-        return recurse(t.pushdown(), ctx)
+    def schema(self, t: type[Annotated], ctx: Context, /):
+        return recurse(pushdown(t), ctx)
 
     def schema(self, t: Any, /):
         return recurse(t, self.default_context)

@@ -12,7 +12,7 @@ from ..exc import (
     ValidationExceptionGroup,
     merge_errors,
 )
-from ..instructions import NewInstruction, T
+from ..instructions import Instruction, T, pushdown
 from ..model import FieldModelizable, model
 from ..utils import PRIO_HIGH
 from .lazy import LazyProxy
@@ -25,7 +25,7 @@ from .lazy import LazyProxy
 if TYPE_CHECKING:
     Partial: TypeAlias = Annotated[T, None]
 else:
-    Partial = NewInstruction[T, "Partial"]
+    Partial = Instruction("Partial", annotation_priority=1, inherit=True)
 
 
 class NOT_GIVEN_T:
@@ -93,7 +93,7 @@ def partialize(t: object):
 
 class PartialBuilding(Medley):
     @ovld(priority=PRIO_HIGH + 1)
-    def deserialize(self, t: type[Partial], obj: object, ctx: Context, /):
+    def deserialize(self, t: type[Any @ Partial], obj: object, ctx: Context, /):
         try:
             return call_next(t, obj, ctx)
         except SerieuxError as exc:
@@ -114,8 +114,8 @@ class PartialBuilding(Medley):
 
 
 @model.register
-def _(p: type[Partial[object]]):
-    return call_next(partialize(p.pushdown()))
+def _(p: type[Any @ Partial]):
+    return call_next(partialize(pushdown(p)))
 
 
 ######################

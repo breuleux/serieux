@@ -11,7 +11,7 @@ from ovld import Medley, ovld, recurse
 
 from ..ctx import Context
 from ..exc import ValidationError
-from ..instructions import strip_all
+from ..instructions import strip
 from ..model import Field, FieldModelizable, StringModelizable, field_at, model
 from ..utils import IsLiteral, UnionAlias, clsstring
 from .dotted import unflatten
@@ -159,7 +159,7 @@ _add_argument_argnames = [
 
 def add_argument_from_field(parser, fdest, overrides, field: Field):
     name = field.name.replace("_", "-")
-    typ = strip_all(field.type)
+    typ = strip(field.type)
     meta = {k: v for k, v in field.metadata.items() if k in _add_argument_argnames}
     overrides = dict(overrides)
     positional = meta.pop("positional", False) or overrides.pop("positional", False)
@@ -226,7 +226,7 @@ def add_arguments(options: list, parser: argparse.ArgumentParser, dest: str, par
 
     subparsers = parser.add_subparsers(dest=_compose(dest, "class"), required=True)
     for opt in options:
-        subparser = subparsers.add_parser(opt.tag, help=f"{strip_all(opt.cls).__doc__ or opt.tag}")
+        subparser = subparsers.add_parser(opt.tag, help=f"{strip(opt.cls).__doc__ or opt.tag}")
         recurse(opt.cls, subparser, dest, partial)
 
 

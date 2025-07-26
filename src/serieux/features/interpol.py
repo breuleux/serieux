@@ -11,7 +11,7 @@ from ovld.dependent import Regexp
 
 from ..ctx import AccessPath
 from ..exc import NotGivenError, ValidationError
-from ..instructions import strip_all
+from ..instructions import strip
 from ..utils import PRIO_HIGH, UnionAlias
 from .lazy import LazyProxy
 from .partial import Sources
@@ -129,7 +129,7 @@ class Interpolation(Medley):
     @ovld(priority=PRIO_HIGH + 0.2)
     def deserialize(self, t: Any, obj: Regexp[r"^\$\{[^}]+\}$"], ctx: Environment):
         expr = obj.lstrip("${").rstrip("}")
-        obj = ctx.resolve_variable(strip_all(t), expr)
+        obj = ctx.resolve_variable(strip(t), expr)
         if isinstance(obj, LazyProxy):
 
             def interpolate():

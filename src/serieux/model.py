@@ -18,7 +18,7 @@ from ovld import Dataclass, Lambda, call_next, class_check, ovld, recurse
 
 from .docstrings import VariableDoc, get_attribute_docstrings
 from .exc import ValidationError
-from .instructions import InstructionType, NewInstruction, T, strip_all
+from .instructions import Instruction, T, inherit, strip
 from .utils import UnionAlias, clsstring, evaluate_hint
 
 UNDEFINED = object()
@@ -27,7 +27,7 @@ UNDEFINED = object()
 if TYPE_CHECKING:
     Extensible: TypeAlias = Annotated[T, None]
 else:
-    Extensible = NewInstruction[T, "Extensible"]
+    Extensible = Instruction("Extensible", annotation_priority=1, inherit=True)
 
 
 @class_check
@@ -37,7 +37,7 @@ def Modelizable(t):
 
 @class_check
 def StringModelizable(t):
-    return strip_all(t) is t and isinstance(m := model(t), Model) and m.from_string is not None
+    return strip(t) is t and isinstance(m := model(t), Model) and m.from_string is not None
 
 
 @class_check
@@ -129,7 +129,7 @@ def _take_premade(t):
 
 
 @ovld(priority=100)
-def model(t: type[object]):
+def model(t: type[Any]):
     t = evaluate_hint(t)
     if t not in _model_cache:
         _premade[t] = Model(
@@ -189,18 +189,18 @@ def model(dc: type[Dataclass]):
 
 
 @ovld
-def model(t: type[Extensible]):
-    m = call_next(t.strip(t))
-    return replace(m, extensible=True)
+def model(t: type[Any @ Extensible]):
+    m = call_next(strip(t, Extensible))
+    return m and replace(m, extensible=True)
 
 
 @ovld(priority=-1)
-def model(t: type[InstructionType]):
-    m = call_next(t.strip(t))
+def model(t: type[Annotated]):
+    m = call_next(strip(t))
     if m and m.fields is not None:
         return Model(
             original_type=m.original_type,
-            fields=[replace(field, type=t.inherit(field.type)) for field in m.fields],
+            fields=[replace(field, type=inherit(t, field.type)) for field in m.fields],
             constructor=m.constructor,
         )
     else:

@@ -6,7 +6,7 @@ from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
 from ..exc import ValidationError
-from ..instructions import strip_all
+from ..instructions import strip
 from ..tell import KeyValueTell, TypeTell, tells
 from ..utils import PRIO_HIGH, clsstring
 
@@ -30,7 +30,7 @@ else:
                 cls, tag = args
             else:
                 cls = args
-                clsn = strip_all(cls)
+                clsn = strip(cls)
                 tag = getattr(clsn, "__tag__", None) or clsn.__name__.lower()
             return Tagged(
                 f"{tag}::{clsstring(cls)}",

@@ -1,12 +1,12 @@
 import importlib
 from collections import deque
-from typing import TYPE_CHECKING, Annotated, TypeAlias
+from typing import TYPE_CHECKING, Annotated, Any, TypeAlias
 
 from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
 from ..exc import ValidationError
-from ..instructions import NewInstruction, T, strip_all
+from ..instructions import Instruction, T, annotate, pushdown, strip
 from ..schema import AnnotatedSchema
 
 #############
@@ -17,7 +17,7 @@ from ..schema import AnnotatedSchema
 if TYPE_CHECKING:
     TaggedSubclass: TypeAlias = Annotated[T, None]
 else:
-    TaggedSubclass: TypeAlias = NewInstruction[T, "TaggedSubclass", 1, False]
+    TaggedSubclass = Instruction("TaggedSubclass", annotation_priority=1, inherit=False)
 
 
 ###################
@@ -45,8 +45,8 @@ def _resolve(ref, base, ctx):
 
 class TaggedSubclassFeature(Medley):
     @ovld(priority=10)
-    def serialize(self, t: type[TaggedSubclass], obj: object, ctx: Context, /):
-        base = t.pushdown()
+    def serialize(self, t: type[Any @ TaggedSubclass], obj: object, ctx: Context, /):
+        base = pushdown(t)
         if not isinstance(obj, base):
             raise ValidationError(f"'{obj}' is not a subclass of '{base}'", ctx=ctx)
         objt = type(obj)
@@ -58,8 +58,8 @@ class TaggedSubclassFeature(Medley):
         rval["class"] = f"{mod}:{qn}"
         return rval
 
-    def deserialize(self, t: type[TaggedSubclass], obj: dict, ctx: Context, /):
-        base = t.pushdown()
+    def deserialize(self, t: type[Any @ TaggedSubclass], obj: dict, ctx: Context, /):
+        base = pushdown(t)
         obj = dict(obj)
         cls_name = obj.pop("class", None)
         if cls_name is not None:
@@ -67,10 +67,10 @@ class TaggedSubclassFeature(Medley):
         actual_class = _resolve(cls_name, base, ctx)
         if not issubclass(actual_class, base):
             raise ValidationError(f"'{actual_class}' is not a subclass of '{base}'", ctx=ctx)
-        return recurse(TaggedSubclass.strip(t[actual_class]), obj, ctx)
+        return recurse(strip(annotate(actual_class, t), TaggedSubclass), obj, ctx)
 
-    def schema(self, t: type[TaggedSubclass], ctx: Context):
-        base = strip_all(t)
+    def schema(self, t: type[Any @ TaggedSubclass], ctx: Context):
+        base = strip(t)
         subschemas = []
         base_mod = base.__module__
         queue = deque([base])
@@ -79,7 +79,7 @@ class TaggedSubclassFeature(Medley):
             queue.extend(sc.__subclasses__())
             sc_mod = sc.__module__
             sc_name = sc.__name__
-            subsch = recurse(TaggedSubclass.strip(t[sc]))
+            subsch = recurse(strip(annotate(sc, t), TaggedSubclass))
             subsch = AnnotatedSchema(
                 parent=subsch,
                 properties={

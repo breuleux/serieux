@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Annotated, Any, TypeAlias
 from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
-from ..instructions import NewInstruction, T
+from ..instructions import Instruction, T
 from ..utils import PRIO_HIGHER
 
 #############
@@ -16,8 +16,8 @@ if TYPE_CHECKING:
     Lazy: TypeAlias = Annotated[T, None]
     DeepLazy: TypeAlias = Annotated[T, None]
 else:
-    Lazy = NewInstruction[T, "Lazy", 2, False]
-    DeepLazy = NewInstruction[T, "DeepLazy", 2]
+    Lazy = Instruction("Lazy", annotation_priority=2, inherit=False)
+    DeepLazy = Instruction("DeepLazy", annotation_priority=2, inherit=True)
 
 
 ###########
@@ -155,14 +155,14 @@ class LazyProxy:
 
 class LazyDeserialization(Medley):
     @ovld(priority=PRIO_HIGHER - 1)
-    def deserialize(self, t: type[Lazy], value: object, ctx: Context):
+    def deserialize(self, t: type[Any @ Lazy], value: object, ctx: Context):
         def evaluate():
             return recurse(Lazy.strip(t), value, ctx)
 
         return LazyProxy(evaluate, type=t)
 
     @ovld(priority=PRIO_HIGHER - 1)
-    def deserialize(self, t: type[DeepLazy], value: object, ctx: Context):
+    def deserialize(self, t: type[Any @ DeepLazy], value: object, ctx: Context):
         def evaluate():
             return call_next(t, value, ctx)
 

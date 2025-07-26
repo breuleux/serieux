@@ -16,7 +16,7 @@ from typing import (
 
 from ovld import class_check, parametrized_class_check
 
-from .instructions import strip_all
+from .instructions import strip
 
 try:
     from typing import TypeAliasType
@@ -54,7 +54,7 @@ def clsstring(cls):
 
 
 def basic_type(t):
-    return get_origin(bt := strip_all(t)) or bt
+    return get_origin(bt := strip(t)) or bt
 
 
 #################
@@ -104,8 +104,12 @@ def evaluate_hint(typ, ctx=None, lcl=None, typesub=None, seen=None):
         if origin is Literal:
             return typ
         args = get_args(typ)
-        if origin is Annotated:  # pragma: no cover
-            return args[0]
+        if origin is Annotated:
+            try:
+                ot = evaluate_hint(args[0])
+            except TypeError:
+                ot = args[0]
+            return Annotated[(ot, *args[1:])]
         if origin is UnionType:
             origin = Union
         new_args = [evaluate_hint(arg, ctx, lcl, typesub, seen) for arg in args]
