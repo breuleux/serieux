@@ -1,9 +1,12 @@
 from dataclasses import dataclass
 
+import pytest
+
 from serieux import Serieux, deserialize
 from serieux.auto import Auto
 from serieux.ctx import Context
-from serieux.features.tagset import Tagged, TaggedUnion, TagSet, TagSetFeature
+from serieux.exc import ValidationError
+from serieux.features.tagset import LoneTag, Tagged, TaggedUnion, TagSet, TagSetFeature
 
 from ..definitions import Player, Point
 
@@ -98,3 +101,18 @@ def test_tagged_union_identical_fields():
 
     assert deserialize(U, data_blonde) == blonde
     assert deserialize(U, data_redhead) == redhead
+
+
+def test_lonetag_validationerrors():
+    lt = LoneTag("foo", Blonde)
+
+    with pytest.raises(ValidationError, match="Tag 'foo' is required"):
+        lt.get_type(None, ctx=None)
+
+    with pytest.raises(ValidationError, match="Tag 'bar' does not match expected tag 'foo'"):
+        lt.get_type("bar", ctx=None)
+
+    with pytest.raises(
+        ValidationError, match="Type '.*' does not match expected class '.*Blonde.*'"
+    ):
+        lt.get_tag(Redhead, ctx=None)

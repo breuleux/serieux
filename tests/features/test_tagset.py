@@ -1,13 +1,13 @@
 import json
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Any
 
 import pytest
 
 from serieux import Serieux, schema
 from serieux.exc import ValidationError
 from serieux.features.partial import Sources
-from serieux.features.tagset import TagDict, TaggedSubclass, TagSetFeature
+from serieux.features.tagset import Referenced, TagDict, TaggedSubclass, TagSetFeature
 
 featured = (Serieux + TagSetFeature)()
 serialize = featured.serialize
@@ -121,6 +121,18 @@ def test_tagdict_ser_deser2(chalou):
     }
     deser_wolf = deserialize(Annotated[Animal, chalou], ser_wolf)
     assert deser_wolf == wolf
+
+
+def test_tagdict_default():
+    td = TagDict({"default": Cat, "loup": Wolf})
+    cat = Cat(name="Kitty", selfishness=3)
+    ser_cat = serialize(Annotated[Animal, td], cat)
+    assert ser_cat == {
+        "name": "Kitty",
+        "selfishness": 3,
+    }
+    deser_cat = deserialize(Annotated[Animal, td], ser_cat)
+    assert deser_cat == cat
 
 
 def test_tagdict_schema(file_regression, chalou):
@@ -313,3 +325,13 @@ def test_tagged_subclass_partial_merge_subclass_right():
 def test_tagged_subclass_schema(file_regression):
     sch = schema(TaggedSubclass[Animal])
     file_regression.check(json.dumps(sch.compile(), indent=4))
+
+
+def test_tagged_subclass_schema_fully_qualified(file_regression):
+    sch = schema(Annotated[Animal, Referenced])
+    file_regression.check(json.dumps(sch.compile(), indent=4))
+
+
+def test_open_schema():
+    sch = schema(Annotated[Any, Referenced])
+    assert sch.compile(root=False) == {"type": "object", "additionalProperties": True}

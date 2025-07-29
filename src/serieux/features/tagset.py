@@ -13,7 +13,6 @@ from ..schema import AnnotatedSchema
 from ..tell import KeyValueTell, TypeTell, tells
 
 
-@dataclass(frozen=True)
 class TagSet(BaseInstruction):  # pragma: no cover
     def get_type(self, tag: str | None, ctx: Context = None) -> type:
         raise NotImplementedError()
@@ -60,7 +59,7 @@ class TagDict(TagSet):
     def get_tag(self, t: type, ctx: Context = None) -> str | None:
         for tag, cls in self.possibilities.items():
             if cls is t:
-                return tag
+                return None if tag == "default" else tag
         raise ValidationError(f"No tag is registered for type '{t}'", ctx=ctx)
 
     def iterate(self, base: type, ctx: Context = None) -> Iterable[tuple[str | None, type]]:
@@ -109,7 +108,7 @@ class TaggedUnion(type):
         return Union[tuple(Tagged[arg] for arg in args)]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True)  # pragma: no cover
 class FromEntryPoint(TagSet):
     entry_point: str
 
@@ -196,7 +195,7 @@ class ReferencedClass(TagSet):
             elif sc_mod is self.default_module:
                 tag = sc_name
             else:
-                tag = f"{sc_name}:{sc_mod}"
+                tag = f"{sc_mod}:{sc_name}"
             yield tag, sc
             queue.extend(sc.__subclasses__())
 
@@ -264,7 +263,8 @@ class TagSetFeature(Medley):
         rval = call_next(objt, obj, ctx)
         if not isinstance(rval, dict):
             rval = {"return": rval}
-        rval["class"] = tag
+        if tag is not None:
+            rval["class"] = tag
         return rval
 
     def deserialize(self, t: type[Any @ TagSet], obj: dict, ctx: Context, /):
@@ -284,7 +284,7 @@ class TagSetFeature(Medley):
         base, ts = decompose(t)
         subschemas = []
         for tag, sc in ts.iterate(base, ctx):
-            if not issubclass(sc, base):
+            if not issubclass(sc, base):  # pragma: no cover
                 continue
             subsch = recurse(strip(annotate(sc, t), TagSet))
             if tag is not None:

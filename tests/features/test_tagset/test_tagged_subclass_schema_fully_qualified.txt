@@ -1,0 +1,88 @@
+{
+    "oneOf": [
+        {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "class": {
+                    "description": "Reference to the class to instantiate",
+                    "const": "tests.features.test_tagset:Animal"
+                }
+            },
+            "required": [
+                "name",
+                "class"
+            ],
+            "additionalProperties": false
+        },
+        {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "selfishness": {
+                    "type": "integer"
+                },
+                "class": {
+                    "description": "Reference to the class to instantiate",
+                    "const": "tests.features.test_tagset:Cat"
+                }
+            },
+            "required": [
+                "name",
+                "selfishness",
+                "class"
+            ],
+            "additionalProperties": false
+        },
+        {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "class": {
+                    "description": "Reference to the class to instantiate",
+                    "const": "tests.features.test_tagset:Wolf"
+                }
+            },
+            "required": [
+                "name",
+                "size",
+                "class"
+            ],
+            "additionalProperties": false
+        },
+        {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "selfishness": {
+                    "type": "integer"
+                },
+                "cute": {
+                    "type": "boolean"
+                },
+                "class": {
+                    "description": "Reference to the class to instantiate",
+                    "const": "tests.features.test_tagset:HouseCat"
+                }
+            },
+            "required": [
+                "name",
+                "selfishness",
+                "class"
+            ],
+            "additionalProperties": false
+        }
+    ],
+    "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
