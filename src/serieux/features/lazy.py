@@ -43,7 +43,3 @@ class LazyDeserialization(Medley):
     @ovld  # pragma: no cover
     def deserialize(self, t: Any, value: LazyProxy, ctx: Context):
         return recurse(t, value._obj, ctx)
-
-
-# Add as a default feature in serieux.Serieux
-__default_features__ = LazyDeserialization

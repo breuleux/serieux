@@ -64,3 +64,19 @@ exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
 ]
+
+[project.entry-points."serieux.default_features"]
+clargs = "serieux.features.clargs:FromArguments"
+comment = "serieux.features.comment:CommentedObjects"
+fromfile = "serieux.features.fromfile:FromFile"
+interpol = "serieux.features.interpol:Interpolation"
+lazy = "serieux.features.lazy:LazyDeserialization"
+partial = "serieux.features.partial:PartialBuilding"
+registered = "serieux.features.registered:RegisteredHandler"
+tagset = "serieux.features.tagset:TagSetFeature"
+usermeth = "serieux.features.usermeth:UserMethods"
+
+[project.entry-points."serieux.optional_features"]
+autotag = "serieux.features.autotag:AutoTagAny"
+dotted = "serieux.features.dotted:DottedNotation"
+fromfile_extra = "serieux.features.fromfile:FromFileExtra"

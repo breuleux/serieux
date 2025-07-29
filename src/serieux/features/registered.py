@@ -91,7 +91,3 @@ class RegisteredHandler(Medley):
     @ovld(priority=PRIO_HIGH + 1)
     def schema(self, t: type[SMBase], ctx: Context, /):
         return {"type": "string", "enum": list(t._registered_mapping.keys())}
-
-
-# Add as a default feature in serieux.Serieux
-__default_features__ = RegisteredHandler

@@ -1,4 +1,7 @@
 import importlib
+import importlib.metadata
+import logging
+import traceback
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -22,18 +25,29 @@ from .schema import RefPolicy, Schema
 from .utils import JSON, check_signature
 from .version import version as __version__
 
+logger = logging.getLogger("serieux")
+
 
 def _default_features():
-    # Collect features declared in the __default_features__ global variables of the features
-    # in features/. To see which ones this is on a cloned repo, you can run:
-    # $ git grep __default_features__
-    here = Path(__file__).parent
     features = []
-    for name in (here / "features").glob("*.py"):
-        if not name.stem.startswith("_"):
-            mod = importlib.import_module(f"{__spec__.name}.features.{name.stem}")
-            if feat := getattr(mod, "__default_features__", None):
-                features.append(feat)
+    eps = importlib.metadata.entry_points()
+    group = eps.select(group="serieux.default_features")
+    for ep in group:
+        try:
+            feature = ep.load()
+        except ImportError:  # pragma: no cover
+            # Some features may be dependent on what packages are installed.
+            # That is fine.
+            continue
+        except Exception:  # pragma: no cover
+            logger.warning(
+                "Default serieux feature %r (%s) failed to load:\n%s",
+                ep.name,
+                ep.value,
+                traceback.format_exc(),
+            )
+        else:
+            features.append(feature)
     features.sort(key=lambda t: -len(t.mro()))
     return features
 

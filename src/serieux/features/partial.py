@@ -287,7 +287,3 @@ def instantiate(x: LazyProxy):
 @ovld
 def instantiate(x: object):
     return x
-
-
-# Add as a default feature in serieux.Serieux
-__default_features__ = PartialBuilding

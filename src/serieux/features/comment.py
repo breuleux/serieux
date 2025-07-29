@@ -89,7 +89,3 @@ class CommentedObjects(Medley):
             properties={comment_field: comment_schema},
             required=[comment_field] if instr.required else [],
         )
-
-
-# Add as a default feature in serieux.Serieux
-__default_features__ = CommentedObjects

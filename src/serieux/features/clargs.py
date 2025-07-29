@@ -293,7 +293,3 @@ class FromArguments(Medley):
     def deserialize(self, t: Any, obj: CommandLineArguments, ctx: Context):
         vals = obj.parse(t, obj.arguments)
         return recurse(t, vals, ctx)
-
-
-# Add as a default feature in serieux.Serieux
-__default_features__ = FromArguments

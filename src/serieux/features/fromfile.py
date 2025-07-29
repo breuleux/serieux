@@ -166,8 +166,3 @@ class FromFileExtra(FromFile):
                 f" to deserialize into object of type {clsstring(t)},"
                 " but there was no such file."
             )
-
-
-# Add as a default feature in serieux.Serieux
-# But we do not have FromFileExtra by default
-__default_features__ = FromFile

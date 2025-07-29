@@ -17,7 +17,3 @@ class AutoTagAny(Medley):
     @ovld(priority=PRIO_LOW)
     def deserialize(self, t: type[Exactly[object]], obj: dict, ctx: Context, /):
         return recurse(t @ Referenced, obj, ctx)
-
-
-# Not a default feature
-__default_features__ = None

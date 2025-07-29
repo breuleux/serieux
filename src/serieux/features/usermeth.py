@@ -62,7 +62,3 @@ def _(t: type[HasMethod["serieux_to_string"]] | type[HasMethod["serieux_from_str
     if hasattr(t, "serieux_from_string"):
         m = replace(m, from_string=t.serieux_from_string)
     return m
-
-
-# Add as a default feature in serieux.Serieux
-__default_features__ = UserMethods

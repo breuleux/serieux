@@ -149,7 +149,3 @@ class Interpolation(Medley):
             return recurse(t, subbed, ctx)
 
         return LazyProxy(interpolate)
-
-
-# Add as a default feature in serieux.Serieux
-__default_features__ = Interpolation

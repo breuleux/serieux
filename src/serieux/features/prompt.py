@@ -26,6 +26,3 @@ class Promptable(Environment):
         if isinstance(self, Patcher):
             self.declare_patch(value)
         return value
-
-
-__default_features__ = None

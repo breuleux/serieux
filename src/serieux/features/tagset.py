@@ -319,7 +319,3 @@ def tells(typ: type[Any @ TagSet]):
 class TaggedSubclass:
     def __class_getitem__(cls, item):
         return Annotated[item, Referenced(default=item, default_module=item.__module__)]
-
-
-# Add as a default feature in serieux.Serieux
-__default_features__ = TagSetFeature

@@ -24,7 +24,3 @@ class DottedNotation(Medley):
         if issubclass(t, FieldModelizable) and any("." in k for k in obj.keys()):
             return call_next(t, unflatten(obj), ctx)
         return call_next(t, obj, ctx)
-
-
-# Not a default feature because it is disruptive
-__default_features__ = None
