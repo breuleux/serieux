@@ -37,8 +37,7 @@ class Comment(BaseInstruction):
 class CommentedObjects(Medley):
     @ovld(priority=PRIO_HIGHER - 1)
     def serialize(self, t: type[Any @ Comment], obj: CommentProxy, ctx: Context):
-        instr = Comment.extract(t)
-        base = instr.strip(t)
+        base, instr = Comment.decompose(t)
         rval = recurse(base, obj._obj, ctx)
         comment = recurse(instr.comment_type, obj._, ctx)
         if not isinstance(rval, dict):
@@ -55,8 +54,7 @@ class CommentedObjects(Medley):
 
     @ovld(priority=PRIO_HIGHER - 1)
     def deserialize(self, t: type[Any @ Comment], obj: dict, ctx: Context):
-        instr = Comment.extract(t)
-        base = instr.strip(t)
+        base, instr = Comment.decompose(t)
         if comment_field not in obj:
             if instr.required:
                 raise ValidationError(
@@ -83,8 +81,7 @@ class CommentedObjects(Medley):
 
     @ovld
     def schema(self, t: type[Any @ Comment], ctx: Context):
-        instr = Comment.extract(t)
-        base = instr.strip(t)
+        base, instr = Comment.decompose(t)
         base_schema = recurse(base, ctx)
         comment_schema = recurse(instr.comment_type, ctx)
         return AnnotatedSchema(

@@ -9,6 +9,10 @@ class InstructionMC(type):
     def __rmatmul__(cls, t):
         return Annotated[t, cls]
 
+    def decompose(cls, t, all=False):
+        method = cls.extract_all if all else cls.extract
+        return strip(t, cls), method(t)
+
     def extract(cls, t):
         for x in cls.extract_all(t):
             return x
