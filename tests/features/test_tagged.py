@@ -11,11 +11,6 @@ deserialize = tu_serieux.deserialize
 serialize = tu_serieux.serialize
 
 
-def test_isinstance():
-    assert isinstance(1, Tagged[int, "bob"])
-    assert issubclass(int, Tagged[int, "bob"])
-
-
 def test_tagged_serialize():
     data = {"class": "point", "x": 1, "y": 2}
     assert serialize(Tagged[Point, "point"], Point(1, 2)) == data
@@ -52,8 +47,8 @@ def test_tagged_default_tag():
     def f():
         pass
 
-    assert Tagged[Point].tag == "point"
-    assert Tagged[Auto[f]].tag == "f"
+    assert Tagged.extract(Tagged[Point]).tag == "point"
+    assert Tagged.extract(Tagged[Auto[f]]).tag == "f"
 
 
 def test_tagged_union():

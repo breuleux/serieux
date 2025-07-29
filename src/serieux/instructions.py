@@ -5,19 +5,42 @@ from typing import Annotated, TypeVar, Union, get_args, get_origin
 T = TypeVar("T")
 
 
+class InstructionMC(type):
+    def __rmatmul__(cls, t):
+        return Annotated[t, cls]
+
+    def extract(cls, t):
+        for x in cls.extract_all(t):
+            return x
+        return None
+
+    def extract_all(cls, t):
+        if get_origin(t) is not Annotated:
+            return
+        for x in t.__metadata__:
+            if isinstance(x, cls):
+                yield x
+
+    @property
+    def annotation_priority(cls):
+        return 1
+
+
+class BaseInstruction(metaclass=InstructionMC):
+    def strip(self, t):
+        return strip(t, self)
+
+    def __rmatmul__(self, t):
+        return Annotated[t, self]
+
+
 @dataclass(frozen=True)
-class Instruction:
+class Instruction(BaseInstruction):
     name: str
     annotation_priority: int = 1
     inherit: bool = True
 
-    def strip(self, t):
-        return strip(t, self)
-
     def __getitem__(self, t):
-        return Annotated[t, self]
-
-    def __rmatmul__(self, t):
         return Annotated[t, self]
 
     def __str__(self):
@@ -36,9 +59,17 @@ def annotate(cls, annotations):
 
 
 def strip(cls, to_remove=None):
+    def should_remove(a):
+        if to_remove is None:
+            return True
+        if isinstance(to_remove, type):
+            return isinstance(a, to_remove)
+        else:
+            return a == to_remove
+
     if get_origin(cls) is not Annotated:
         return cls
-    anns = [a for a in cls.__metadata__ if to_remove and a is not to_remove]
+    anns = [a for a in cls.__metadata__ if not should_remove(a)]
     return annotate(get_args(cls)[0], anns)
 
 

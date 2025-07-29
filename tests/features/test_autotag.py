@@ -79,14 +79,14 @@ def test_deserialize_without_class():
     ctx = Context()
     data = {"x": 13, "y": 14}
 
-    with pytest.raises(ValidationError, match="There must be a class reference to resolve"):
+    with pytest.raises(ValidationError, match="No default class is defined"):
         deserialize(object, data, ctx)
 
 
 def test_deserialize_vague_class():
     ctx = Context()
     data = {"class": "Point", "x": 13, "y": 14}
-    with pytest.raises(ValidationError, match="Class reference must include module"):
+    with pytest.raises(ValidationError, match="no default module is defined"):
         deserialize(object, data, ctx)
 
 

@@ -14,7 +14,7 @@ from .features.lazy import DeepLazy, Lazy, LazyProxy
 from .features.partial import Partial, Sources
 from .features.registered import Registered, StringMapped, singleton
 from .features.tagged import Tagged, TaggedUnion
-from .features.tsubclass import TaggedSubclass
+from .features.tagset import TaggedSubclass
 from .impl import BaseImplementation
 from .instructions import Instruction
 from .model import Extensible, FieldModelizable, Model, Modelizable, StringModelizable

@@ -5,10 +5,6 @@
             "properties": {
                 "name": {
                     "type": "string"
-                },
-                "class": {
-                    "description": "Reference to the class to instantiate",
-                    "const": "Animal"
                 }
             },
             "required": [

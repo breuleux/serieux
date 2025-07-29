@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import pytest
 
@@ -13,6 +13,7 @@ from serieux.features.clargs import CommandLineArguments, parse_cli
 from serieux.features.fromfile import FromFileExtra, WorkingDirectory
 from serieux.features.interpol import Environment
 from serieux.features.tagged import Tagged, TaggedUnion
+from serieux.features.tagset import TagDict
 
 from ..definitions import Defaults, Job, Point, Worker
 
@@ -404,3 +405,23 @@ def test_parse_literal():
             root_type=Konfig,
             argv=["--mode", "dev", "--level", "invalid"],
         )
+
+
+def test_subcommands_tagset():
+    doables = TagDict(
+        {
+            "nom": Eat,
+            "zzz": Sleep,
+        }
+    )
+
+    def do(*args):
+        result = deserialize(
+            Any @ doables,
+            CommandLineArguments(args),
+            Context(),
+        )
+        return result.do()
+
+    assert do("nom", "--food", "jam") == "I eat jam"
+    assert do("zzz", "--hours", "8") == "I sleep 8 hours"

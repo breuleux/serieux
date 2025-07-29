@@ -10,13 +10,13 @@ from typing import Any, get_args
 from ovld import Medley, ovld, recurse
 
 from ..ctx import Context
-from ..exc import ValidationError
 from ..instructions import strip
 from ..model import Field, FieldModelizable, StringModelizable, field_at, model
 from ..utils import IsLiteral, UnionAlias, clsstring
 from .dotted import unflatten
 from .partial import Sources
 from .tagged import Tagged
+from .tagset import TagSet, decompose
 
 ##################
 # Implementation #
@@ -122,14 +122,17 @@ def make_argument(t: type[object], partial: dict, model_field: Field):
     return {**partial, "action": ParseStringAction}
 
 
-@ovld
-def make_argument(t: type[Tagged], partial: dict, model_field: Field):
+@ovld(priority=1)
+def make_argument(t: type[Any @ Tagged] | type[Any @ TagSet], partial: dict, model_field: Field):
     return "subparser"
 
 
 @ovld
 def make_argument(t: type[UnionAlias], partial: dict, model_field: Field):
-    if any(issubclass(o, (FieldModelizable, Tagged)) for o in get_args(t)):
+    if any(
+        issubclass(o, FieldModelizable) or Tagged.extract(o) or TagSet.extract(o)
+        for o in get_args(t)
+    ):
         return "subparser"
     else:
         options = [o for o in get_args(t) if o is not NoneType]
@@ -159,7 +162,6 @@ _add_argument_argnames = [
 
 def add_argument_from_field(parser, fdest, overrides, field: Field):
     name = field.name.replace("_", "-")
-    typ = strip(field.type)
     meta = {k: v for k, v in field.metadata.items() if k in _add_argument_argnames}
     overrides = dict(overrides)
     positional = meta.pop("positional", False) or overrides.pop("positional", False)
@@ -179,10 +181,9 @@ def add_argument_from_field(parser, fdest, overrides, field: Field):
             **meta,
             **overrides,
         }
-
-    args = make_argument(typ, args, field)
+    args = make_argument(field.type, args, field)
     if args == "subparser":
-        add_arguments(typ, parser, fdest, overrides.get("required", None) is False)
+        add_arguments(field.type, parser, fdest, overrides.get("required", None) is False)
     else:
         pos = args.pop("__args__")
         if opt := args.pop("option", None):
@@ -211,28 +212,51 @@ def add_arguments(
 
 
 @ovld
+def derive_options(t: type[Any @ Tagged]):
+    cls = get_args(t)[0]
+    tag = Tagged.extract(t)
+    return [(tag.tag, cls)]
+
+
+@ovld
+def derive_options(t: type[Any @ TagSet]):
+    base, ts = decompose(t)
+    return list(ts.iterate(base))
+
+
+@ovld
+def derive_options(li: list):
+    opts = []
+    for o in li:
+        opts.extend(recurse(o))
+    return opts
+
+
+@ovld
 def add_arguments(t: type[UnionAlias], parser: argparse.ArgumentParser, dest: str, partial: bool):
-    options = [o for o in get_args(t) if o is not NoneType]
-    recurse(options, parser, dest, partial)
+    opts = [o for o in get_args(t) if o is not NoneType]
+    if len(opts) == 1:
+        recurse(opts[0], parser, dest, partial)
+    else:
+        recurse(derive_options(opts), parser, dest, partial)
+
+
+@ovld(priority=1)
+def add_arguments(
+    t: type[Any @ Tagged] | type[Any @ TagSet],
+    parser: argparse.ArgumentParser,
+    dest: str,
+    partial: bool,
+):
+    recurse(derive_options(t), parser, dest, partial)
 
 
 @ovld
 def add_arguments(options: list, parser: argparse.ArgumentParser, dest: str, partial: bool):
-    if any(not issubclass(option, Tagged) for option in options):  # pragma: no cover
-        if len(options) == 1:
-            return recurse(options[0], parser, dest, partial)
-        else:
-            raise ValidationError("All Union members must be Tagged to make a cli")
-
     subparsers = parser.add_subparsers(dest=_compose(dest, "class"), required=True)
-    for opt in options:
-        subparser = subparsers.add_parser(opt.tag, help=f"{strip(opt.cls).__doc__ or opt.tag}")
-        recurse(opt.cls, subparser, dest, partial)
-
-
-@ovld
-def add_arguments(t: type[Tagged], parser: argparse.ArgumentParser, dest: str, partial: bool):
-    recurse([t], parser, dest, partial)
+    for tag, cls in options:
+        subparser = subparsers.add_parser(tag, help=f"{strip(cls).__doc__ or tag}")
+        recurse(cls, subparser, dest, partial)
 
 
 @dataclass

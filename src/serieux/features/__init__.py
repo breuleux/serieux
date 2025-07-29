@@ -6,7 +6,7 @@ from .interpol import Interpolation
 from .lazy import LazyDeserialization
 from .partial import PartialBuilding
 from .tagged import TaggedTypes
-from .tsubclass import TaggedSubclassFeature
+from .tagset import TagSetFeature
 
 __all__ = [
     "AutoTagAny",
@@ -17,6 +17,7 @@ __all__ = [
     "Interpolation",
     "LazyDeserialization",
     "PartialBuilding",
+    "TagSetFeature",
     "TaggedSubclassFeature",
     "TaggedTypes",
 ]

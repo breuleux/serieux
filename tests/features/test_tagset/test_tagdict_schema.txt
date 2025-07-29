@@ -1,0 +1,47 @@
+{
+    "oneOf": [
+        {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "selfishness": {
+                    "type": "integer"
+                },
+                "class": {
+                    "description": "Reference to the class to instantiate",
+                    "const": "chat"
+                }
+            },
+            "required": [
+                "name",
+                "selfishness",
+                "class"
+            ],
+            "additionalProperties": false
+        },
+        {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "class": {
+                    "description": "Reference to the class to instantiate",
+                    "const": "loup"
+                }
+            },
+            "required": [
+                "name",
+                "size",
+                "class"
+            ],
+            "additionalProperties": false
+        }
+    ],
+    "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
