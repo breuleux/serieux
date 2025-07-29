@@ -15,7 +15,7 @@ from ..model import Field, FieldModelizable, StringModelizable, field_at, model
 from ..utils import IsLiteral, UnionAlias, clsstring
 from .dotted import unflatten
 from .partial import Sources
-from .tagset import TagSet, decompose
+from .tagset import TagSet, decompose, tag_field
 
 ##################
 # Implementation #
@@ -239,7 +239,7 @@ def add_arguments(
 
 @ovld
 def add_arguments(options: list, parser: argparse.ArgumentParser, dest: str, partial: bool):
-    subparsers = parser.add_subparsers(dest=_compose(dest, "class"), required=True)
+    subparsers = parser.add_subparsers(dest=_compose(dest, tag_field), required=True)
     for tag, cls in options:
         subparser = subparsers.add_parser(tag, help=f"{strip(cls).__doc__ or tag}")
         recurse(cls, subparser, dest, partial)
