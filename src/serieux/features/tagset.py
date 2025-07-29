@@ -12,6 +12,9 @@ from ..instructions import BaseInstruction, annotate, pushdown, strip
 from ..schema import AnnotatedSchema
 from ..tell import KeyValueTell, TypeTell, tells
 
+tag_field = "class"
+value_field = "return"
+
 
 class TagSet(BaseInstruction):  # pragma: no cover
     def get_type(self, tag: str | None, ctx: Context = None) -> type:
@@ -262,16 +265,16 @@ class TagSetFeature(Medley):
         tag = ts.get_tag(objt, ctx)
         rval = call_next(objt, obj, ctx)
         if not isinstance(rval, dict):
-            rval = {"return": rval}
+            rval = {value_field: rval}
         if tag is not None:
-            rval["class"] = tag
+            rval[tag_field] = tag
         return rval
 
     def deserialize(self, t: type[Any @ TagSet], obj: dict, ctx: Context, /):
         base, ts = decompose(t)
         obj = dict(obj)
-        tag = obj.pop("class", None)
-        obj = obj.pop("return", obj)
+        tag = obj.pop(tag_field, None)
+        obj = obj.pop(value_field, obj)
         if tag is not None:
             tag = recurse(str, tag, ctx)
         actual_class = ts.get_type(tag, ctx)
@@ -291,12 +294,12 @@ class TagSetFeature(Medley):
                 subsch = AnnotatedSchema(
                     parent=subsch,
                     properties={
-                        "class": {
+                        tag_field: {
                             "description": "Reference to the class to instantiate",
                             "const": tag,
                         }
                     },
-                    required=["class"],
+                    required=[tag_field],
                 )
             subschemas.append(subsch)
         if not ts.closed(base):
@@ -310,7 +313,7 @@ class TagSetFeature(Medley):
 @tells.register(priority=1)
 def tells(typ: type[Any @ TagSet]):
     base, ts = decompose(typ)
-    kvt = [KeyValueTell("class", tag) for tag, _ in ts.iterate(base)]
+    kvt = [KeyValueTell(tag_field, tag) for tag, _ in ts.iterate(base)]
     return {TypeTell(dict), *kvt}
 
 
