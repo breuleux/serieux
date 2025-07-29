@@ -5,7 +5,6 @@ from .fromfile import FromFile, FromFileExtra
 from .interpol import Interpolation
 from .lazy import LazyDeserialization
 from .partial import PartialBuilding
-from .tagged import TaggedTypes
 from .tagset import TagSetFeature
 
 __all__ = [
@@ -18,6 +17,4 @@ __all__ = [
     "LazyDeserialization",
     "PartialBuilding",
     "TagSetFeature",
-    "TaggedSubclassFeature",
-    "TaggedTypes",
 ]

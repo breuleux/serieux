@@ -2,7 +2,7 @@ import importlib
 import importlib.metadata
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Annotated, Any, Iterable
+from typing import Annotated, Any, Iterable, Union
 
 from ovld import Medley, call_next, ovld, recurse
 
@@ -10,6 +10,7 @@ from ..ctx import Context
 from ..exc import ValidationError
 from ..instructions import BaseInstruction, annotate, pushdown, strip
 from ..schema import AnnotatedSchema
+from ..tell import KeyValueTell, TypeTell, tells
 
 
 @dataclass(frozen=True)
@@ -64,6 +65,48 @@ class TagDict(TagSet):
 
     def iterate(self, base: type, ctx: Context = None) -> Iterable[tuple[str | None, type]]:
         yield from self.possibilities.items()
+
+
+@dataclass(frozen=True)
+class LoneTag(TagSet):
+    tag: str
+    cls: type
+
+    def get_type(self, tag: str | None, ctx: Context = None) -> type:
+        if tag is None:
+            raise ValidationError(f"Tag '{self.tag}' is required", ctx=ctx)
+        if tag == self.tag:
+            return self.cls
+        raise ValidationError(f"Tag '{tag}' does not match expected tag '{self.tag}'", ctx=ctx)
+
+    def get_tag(self, t: type, ctx: Context = None) -> str | None:
+        if t is self.cls:
+            return self.tag
+        raise ValidationError(f"Type '{t}' does not match expected class '{self.cls}'", ctx=ctx)
+
+    def iterate(self, base: type, ctx: Context = None) -> Iterable[tuple[str | None, type]]:
+        assert issubclass(self.cls, base)
+        yield (self.tag, self.cls)
+
+
+class Tagged(type):
+    def __class_getitem__(cls, arg):
+        match arg:
+            case (t, name):
+                return Annotated[t, LoneTag(name, t)]
+            case t:
+                t = strip(t)
+                tag = getattr(t, "__tag__", None) or t.__name__.lower()
+                return Annotated[t, LoneTag(tag, t)]
+
+
+class TaggedUnion(type):
+    def __class_getitem__(cls, args):
+        if isinstance(args, dict):
+            return Union[tuple(Tagged[v, k] for k, v in args.items())]
+        elif not isinstance(args, (list, tuple)):
+            return Tagged[args]
+        return Union[tuple(Tagged[arg] for arg in args)]
 
 
 @dataclass(frozen=True)
@@ -262,6 +305,13 @@ class TagSetFeature(Medley):
             return subschemas[0]
         else:
             return {"oneOf": subschemas}
+
+
+@tells.register(priority=1)
+def tells(typ: type[Any @ TagSet]):
+    base, ts = decompose(typ)
+    kvt = [KeyValueTell("class", tag) for tag, _ in ts.iterate(base)]
+    return {TypeTell(dict), *kvt}
 
 
 class TaggedSubclass:

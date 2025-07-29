@@ -12,8 +12,7 @@ from serieux.exc import ValidationError
 from serieux.features.clargs import CommandLineArguments, parse_cli
 from serieux.features.fromfile import FromFileExtra, WorkingDirectory
 from serieux.features.interpol import Environment
-from serieux.features.tagged import Tagged, TaggedUnion
-from serieux.features.tagset import TagDict
+from serieux.features.tagset import TagDict, Tagged, TaggedUnion
 
 from ..definitions import Defaults, Job, Point, Worker
 

@@ -13,8 +13,7 @@ from .features.interpol import Environment
 from .features.lazy import DeepLazy, Lazy, LazyProxy
 from .features.partial import Partial, Sources
 from .features.registered import Registered, StringMapped, singleton
-from .features.tagged import Tagged, TaggedUnion
-from .features.tagset import TaggedSubclass
+from .features.tagset import Tagged, TaggedSubclass, TaggedUnion
 from .impl import BaseImplementation
 from .instructions import Instruction
 from .model import Extensible, FieldModelizable, Model, Modelizable, StringModelizable

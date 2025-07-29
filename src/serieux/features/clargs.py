@@ -15,7 +15,6 @@ from ..model import Field, FieldModelizable, StringModelizable, field_at, model
 from ..utils import IsLiteral, UnionAlias, clsstring
 from .dotted import unflatten
 from .partial import Sources
-from .tagged import Tagged
 from .tagset import TagSet, decompose
 
 ##################
@@ -123,16 +122,13 @@ def make_argument(t: type[object], partial: dict, model_field: Field):
 
 
 @ovld(priority=1)
-def make_argument(t: type[Any @ Tagged] | type[Any @ TagSet], partial: dict, model_field: Field):
+def make_argument(t: type[Any @ TagSet], partial: dict, model_field: Field):
     return "subparser"
 
 
 @ovld
 def make_argument(t: type[UnionAlias], partial: dict, model_field: Field):
-    if any(
-        issubclass(o, FieldModelizable) or Tagged.extract(o) or TagSet.extract(o)
-        for o in get_args(t)
-    ):
+    if any(issubclass(o, FieldModelizable) or TagSet.extract(o) for o in get_args(t)):
         return "subparser"
     else:
         options = [o for o in get_args(t) if o is not NoneType]
@@ -212,13 +208,6 @@ def add_arguments(
 
 
 @ovld
-def derive_options(t: type[Any @ Tagged]):
-    cls = get_args(t)[0]
-    tag = Tagged.extract(t)
-    return [(tag.tag, cls)]
-
-
-@ovld
 def derive_options(t: type[Any @ TagSet]):
     base, ts = decompose(t)
     return list(ts.iterate(base))
@@ -243,10 +232,7 @@ def add_arguments(t: type[UnionAlias], parser: argparse.ArgumentParser, dest: st
 
 @ovld(priority=1)
 def add_arguments(
-    t: type[Any @ Tagged] | type[Any @ TagSet],
-    parser: argparse.ArgumentParser,
-    dest: str,
-    partial: bool,
+    t: type[Any @ TagSet], parser: argparse.ArgumentParser, dest: str, partial: bool
 ):
     recurse(derive_options(t), parser, dest, partial)
 
