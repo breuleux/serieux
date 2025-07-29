@@ -30,9 +30,8 @@ logger = logging.getLogger("serieux")
 
 def _default_features():
     features = []
-    eps = importlib.metadata.entry_points()
-    group = eps.select(group="serieux.default_features")
-    for ep in group:
+    eps = importlib.metadata.entry_points(group="serieux.default_features")
+    for ep in eps:
         try:
             feature = ep.load()
         except ImportError:  # pragma: no cover

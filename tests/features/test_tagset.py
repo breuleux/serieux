@@ -6,8 +6,15 @@ import pytest
 
 from serieux import Serieux, schema
 from serieux.exc import ValidationError
+from serieux.features.dotted import DottedNotation
 from serieux.features.partial import Sources
-from serieux.features.tagset import Referenced, TagDict, TaggedSubclass, TagSetFeature
+from serieux.features.tagset import (
+    FromEntryPoint,
+    Referenced,
+    TagDict,
+    TaggedSubclass,
+    TagSetFeature,
+)
 
 featured = (Serieux + TagSetFeature)()
 serialize = featured.serialize
@@ -335,3 +342,60 @@ def test_tagged_subclass_schema_fully_qualified(file_regression):
 def test_open_schema():
     sch = schema(Annotated[Any, Referenced])
     assert sch.compile(root=False) == {"type": "object", "additionalProperties": True}
+
+
+def test_from_entry_points():
+    # NOTE: serieux needs to be properly installed, e.g. with pip install or uv sync,
+    # for the entry points to be registered
+    OptF = Annotated[Any, FromEntryPoint("serieux.optional_features")]
+    ser = serialize(OptF, DottedNotation())
+    assert ser == {"class": "dotted"}
+    assert deserialize(OptF, ser) == DottedNotation()
+    sch = schema(OptF).compile(root=False)
+    possibilities = {x["properties"]["class"]["const"] for x in sch["oneOf"]}
+    assert "dotted" in possibilities
+    assert "autotag" in possibilities
+    assert "fromfile_extra" in possibilities
+
+
+def test_from_entry_points_with_default():
+    # NOTE: serieux needs to be properly installed, e.g. with pip install or uv sync,
+    # for the entry points to be registered
+    OptF = Annotated[Any, FromEntryPoint("serieux.optional_features", default=DottedNotation)]
+    ser = serialize(OptF, DottedNotation())
+    assert ser == {}
+    assert deserialize(OptF, {}) == DottedNotation()
+    assert deserialize(OptF, {"class": "dotted"}) == DottedNotation()
+    sch = schema(OptF).compile(root=False)
+    assert any(
+        (("class" not in x.get("properties", {})) or x.get("required") == []) for x in sch["oneOf"]
+    )
+    possibilities = {
+        x["properties"]["class"]["const"]
+        for x in sch["oneOf"]
+        if "class" in x.get("properties", {})
+    }
+    assert "dotted" in possibilities
+    assert "autotag" in possibilities
+    assert "fromfile_extra" in possibilities
+
+
+def test_from_entry_points_errors():
+    # NOTE: serieux needs to be properly installed, e.g. with pip install or uv sync,
+    # for the entry points to be registered
+
+    OptF = Annotated[Any, FromEntryPoint("serieux.optional_features")]
+
+    with pytest.raises(ValidationError, match="No tag provided for entry point lookup"):
+        deserialize(OptF, {})
+
+    with pytest.raises(ValidationError, match="is not registered in entry point group"):
+        deserialize(OptF, {"class": "not_a_real_entry_point"})
+
+    fe = FromEntryPoint("serieux.optional_features")
+
+    class NotRegistered:
+        pass
+
+    with pytest.raises(ValidationError, match="No entry point tag is registered for type"):
+        fe.get_tag(NotRegistered, ctx=None)

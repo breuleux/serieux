@@ -2,6 +2,7 @@ import importlib
 import importlib.metadata
 from collections import deque
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Annotated, Any, Iterable, Union
 
 from ovld import Medley, call_next, ovld, recurse
@@ -111,18 +112,21 @@ class TaggedUnion(type):
         return Union[tuple(Tagged[arg] for arg in args)]
 
 
-@dataclass(frozen=True)  # pragma: no cover
+@dataclass(frozen=True)
 class FromEntryPoint(TagSet):
     entry_point: str
+    default: type = None
 
-    def _load_entry_points(self):
-        eps = importlib.metadata.entry_points()
-        group_eps = eps.select(group=self.entry_point)
-        return {ep.name: ep.load() for ep in group_eps}
+    @cached_property
+    def elements(self):
+        eps = importlib.metadata.entry_points(group=self.entry_point)
+        return {ep.name: ep.load() for ep in eps}
 
     def get_type(self, tag: str | None, ctx: Context) -> type:
-        eps = self._load_entry_points()
+        eps = self.elements
         if tag is None:
+            if self.default is not None:
+                return self.default
             raise ValidationError("No tag provided for entry point lookup", ctx=ctx)
         try:
             return eps[tag]
@@ -132,8 +136,9 @@ class FromEntryPoint(TagSet):
             )
 
     def get_tag(self, t: type, ctx: Context) -> str | None:
-        eps = self._load_entry_points()
-        for name, cls in eps.items():
+        if t is self.default:
+            return None
+        for name, cls in self.elements.items():
             if cls is t:
                 return name
         raise ValidationError(
@@ -142,10 +147,11 @@ class FromEntryPoint(TagSet):
         )
 
     def iterate(self, base: type, ctx: Context) -> Iterable[tuple[str | None, type]]:
-        eps = self._load_entry_points()
-        for name, cls in eps.items():
-            if issubclass(cls, base):
+        for name, cls in self.elements.items():
+            if base is Any or issubclass(cls, base):
                 yield (name, cls)
+        if self.default is not None and (base is Any or issubclass(self.default, base)):
+            yield (None, self.default)
 
 
 @dataclass(frozen=True)
@@ -286,7 +292,7 @@ class TagSetFeature(Medley):
         base, ts = decompose(t)
         subschemas = []
         for tag, sc in ts.iterate(base, ctx):
-            if not issubclass(sc, base):  # pragma: no cover
+            if base is not Any and not issubclass(sc, base):  # pragma: no cover
                 continue
             subsch = recurse(strip(annotate(sc, t), TagSet))
             if tag is not None:
