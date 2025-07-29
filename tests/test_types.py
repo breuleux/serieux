@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -182,3 +183,59 @@ def test_schema_zoneinfo():
 
 def test_tells_zoneinfo():
     assert tells(ZoneInfo) == {TypeTell(str)}
+
+
+###################
+# Test re.Pattern #
+###################
+
+
+def test_serialize_pattern():
+    pattern = re.compile(r"\d+")
+    assert serialize(re.Pattern, pattern) == r"\d+"
+
+    pattern_with_flags = re.compile(r"hello", re.IGNORECASE)
+    assert serialize(re.Pattern, pattern_with_flags) == "hello"
+
+
+def test_deserialize_pattern():
+    pattern = deserialize(re.Pattern, r"\d+")
+    assert isinstance(pattern, re.Pattern)
+    assert pattern.pattern == r"\d+"
+    assert pattern.match("123") is not None
+    assert pattern.match("abc") is None
+
+
+def test_deserialize_complex_pattern():
+    complex_pattern = deserialize(re.Pattern, r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+    assert complex_pattern.pattern == r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    assert complex_pattern.match("test@example.com") is not None
+    assert complex_pattern.match("invalid-email") is None
+
+
+def test_deserialize_pattern_invalid():
+    with pytest.raises(ValidationError, match="bad character range"):
+        deserialize(re.Pattern, r"[z-a]")  # Invalid character range
+
+
+def test_serialize_deserialize_dict_pattern_str():
+    pattern1 = re.compile(r"\d+")
+    pattern2 = re.compile(r"hello")
+    d = {pattern1: "numbers", pattern2: "greeting"}
+
+    serialized = serialize(dict[re.Pattern, str], d)
+    assert serialized == {r"\d+": "numbers", "hello": "greeting"}
+
+    deserialized = deserialize(
+        dict[re.Pattern, str],
+        {r"\d+": "numbers", "hello": "greeting"},
+    )
+    assert deserialized == d
+
+
+def test_schema_pattern():
+    assert schema(re.Pattern) == {"type": "string"}
+
+
+def test_tells_pattern():
+    assert tells(re.Pattern) == {TypeTell(str)}

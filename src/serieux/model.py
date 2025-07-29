@@ -273,6 +273,15 @@ def model(t: type[timedelta]):
     )
 
 
+@ovld
+def model(t: type[re.Pattern]):
+    return Model(
+        original_type=t,
+        from_string=re.compile,
+        to_string=Lambda("$obj.pattern"),
+    )
+
+
 @ovld(priority=-1)
 def model(t: object):
     return None
