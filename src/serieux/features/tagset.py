@@ -280,7 +280,6 @@ class TagSetFeature(Medley):
         actual_class = ts.get_type(tag, ctx)
         if base is not Any and not issubclass(actual_class, base):
             raise ValidationError(f"'{actual_class}' is not a subclass of '{base}'", ctx=ctx)
-        print(strip(annotate(actual_class, t), TagSet))
         return recurse(strip(annotate(actual_class, t), TagSet), obj, ctx)
 
     def schema(self, t: type[Any @ TagSet], ctx: Context):

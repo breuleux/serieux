@@ -1,5 +1,6 @@
 from .autotag import AutoTagAny
 from .clargs import FromArguments
+from .comment import CommentedObjects
 from .dotted import DottedNotation
 from .fromfile import FromFile, FromFileExtra
 from .interpol import Interpolation
@@ -9,6 +10,7 @@ from .tagset import TagSetFeature
 
 __all__ = [
     "AutoTagAny",
+    "CommentedObjects",
     "DottedNotation",
     "FromArguments",
     "FromFile",

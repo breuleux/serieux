@@ -1,0 +1,21 @@
+{
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "age": {
+            "type": "integer"
+        },
+        "_": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "name",
+        "age",
+        "_"
+    ],
+    "additionalProperties": false,
+    "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
