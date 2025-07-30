@@ -6,7 +6,7 @@ from serieux import Serieux, deserialize
 from serieux.auto import Auto
 from serieux.ctx import Context
 from serieux.exc import ValidationError
-from serieux.features.tagset import LoneTag, Tagged, TaggedUnion, TagSet, TagSetFeature
+from serieux.features.tagset import Tag, Tagged, TaggedUnion, TagSet, TagSetFeature
 
 from ..definitions import Player, Point
 
@@ -103,8 +103,8 @@ def test_tagged_union_identical_fields():
     assert deserialize(U, data_redhead) == redhead
 
 
-def test_lonetag_validationerrors():
-    lt = LoneTag("foo", Blonde)
+def test_tag_validationerrors():
+    lt = Tag("foo", Blonde)
 
     with pytest.raises(ValidationError, match="Tag 'foo' is required"):
         lt.get_type(None, ctx=None)

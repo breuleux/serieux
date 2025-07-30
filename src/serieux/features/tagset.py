@@ -72,7 +72,7 @@ class TagDict(TagSet):
 
 
 @dataclass(frozen=True)
-class LoneTag(TagSet):
+class Tag(TagSet):
     tag: str
     cls: type
 
@@ -98,11 +98,11 @@ class Tagged(type):
     def __class_getitem__(cls, arg):
         match arg:
             case (t, name):
-                return Annotated[t, LoneTag(name, t)]
+                return Annotated[t, Tag(name, t)]
             case t:
                 st = strip(t)
                 tag = getattr(st, "serieux_tag", None) or st.__name__.lower()
-                return Annotated[t, LoneTag(tag, t)]
+                return Annotated[t, Tag(tag, t)]
 
 
 class TaggedUnion(type):
