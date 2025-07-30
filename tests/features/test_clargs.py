@@ -2,11 +2,12 @@ from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import pytest
 
 from serieux import Serieux
+from serieux.auto import Auto, Call
 from serieux.ctx import Context
 from serieux.exc import ValidationError
 from serieux.features.clargs import CommandLineArguments, parse_cli
@@ -424,3 +425,43 @@ def test_subcommands_tagset():
 
     assert do("nom", "--food", "jam") == "I eat jam"
     assert do("zzz", "--hours", "8") == "I sleep 8 hours"
+
+
+def add_them(x: int, y: int) -> int:
+    return x + y
+
+
+def mul_them(x: int, y: int) -> int:
+    return x * y
+
+
+def test_clargs_call():
+    def do(*args):
+        return deserialize(Call[add_them], CommandLineArguments(args))
+
+    assert do("-x", "3", "-y", "4") == 7
+
+
+def test_clargs_auto():
+    def do(*args):
+        return deserialize(Auto[add_them], CommandLineArguments(args))
+
+    assert do("-x", "3", "-y", "4")() == 7
+
+
+def test_clargs_auto_union():
+    def do(*args):
+        return deserialize(TaggedUnion[Call[add_them], Call[mul_them]], CommandLineArguments(args))
+
+    assert do("add_them", "-x", "3", "-y", "4") == 7
+    assert do("mul_them", "-x", "3", "-y", "4") == 12
+
+
+def test_clargs_tagset():
+    ts = TagDict({"+": Call[add_them], "*": Call[mul_them]})
+
+    def do(*args):
+        return deserialize(Annotated[int, ts], CommandLineArguments(args))
+
+    assert do("+", "-x", "3", "-y", "4") == 7
+    assert do("*", "-x", "3", "-y", "4") == 12

@@ -111,7 +111,29 @@ class Model:
     def property_names(self):
         return {f.property_name for f in self.fields}
 
+    @cached_property
+    def constructed_type(self):
+        if isinstance(self.constructor, type):
+            return self.constructor
+        elif self.constructor is None:  # pragma: no cover
+            raise TypeError(f"No constructor defined for {self}.")
+        else:
+            return_type = getattr(self.constructor, "__annotations__", {}).get("return", None)
+            if return_type is None:
+                raise TypeError(
+                    f"Constructor for {self} does not have a return type annotation defined."
+                )
+            return return_type
+
     __repr__ = __str__
+
+
+def constructed_type(t):
+    match model(t):
+        case None:
+            return strip(t)
+        case Model() as m:
+            return m.constructed_type
 
 
 _model_cache = {}

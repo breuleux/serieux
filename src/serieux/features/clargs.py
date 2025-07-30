@@ -5,12 +5,12 @@ import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from types import NoneType
-from typing import Any, get_args
+from typing import Annotated, Any, get_args
 
 from ovld import Medley, ovld, recurse
 
 from ..ctx import Context
-from ..instructions import strip
+from ..instructions import pushdown, strip
 from ..model import Field, FieldModelizable, StringModelizable, field_at, model
 from ..utils import IsLiteral, UnionAlias, clsstring
 from .dotted import unflatten
@@ -94,6 +94,11 @@ def make_argument(t: type[Enum], partial: dict, model_field: Field):
 @ovld
 def make_argument(t: type[IsLiteral], partial: dict, model_field: Field):
     return {**partial, "type": str, "choices": [x for x in t.__args__]}
+
+
+@ovld(priority=-1)
+def make_argument(t: type[Annotated], partial: dict, model_field: Field):
+    return recurse(pushdown(t), partial, model_field)
 
 
 def regex_checker(pattern, descr):

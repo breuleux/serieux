@@ -10,6 +10,7 @@ from ovld import Medley, call_next, ovld, recurse
 from ..ctx import Context
 from ..exc import ValidationError
 from ..instructions import BaseInstruction, annotate, pushdown, strip
+from ..model import constructed_type
 from ..schema import AnnotatedSchema
 from ..tell import KeyValueTell, TypeTell, tells
 
@@ -88,7 +89,8 @@ class LoneTag(TagSet):
         raise ValidationError(f"Type '{t}' does not match expected class '{self.cls}'", ctx=ctx)
 
     def iterate(self, base: type, ctx: Context = None) -> Iterable[tuple[str | None, type]]:
-        assert issubclass(self.cls, base)
+        if isinstance(base, type):
+            assert issubclass(self.cls, base)
         yield (self.tag, self.cls)
 
 
@@ -98,8 +100,8 @@ class Tagged(type):
             case (t, name):
                 return Annotated[t, LoneTag(name, t)]
             case t:
-                t = strip(t)
-                tag = getattr(t, "__tag__", None) or t.__name__.lower()
+                st = strip(t)
+                tag = getattr(st, "serieux_tag", None) or st.__name__.lower()
                 return Annotated[t, LoneTag(tag, t)]
 
 
@@ -283,10 +285,12 @@ class TagSetFeature(Medley):
         obj = obj.pop(value_field, obj)
         if tag is not None:
             tag = recurse(str, tag, ctx)
-        actual_class = ts.get_type(tag, ctx)
-        if base is not Any and not issubclass(actual_class, base):
-            raise ValidationError(f"'{actual_class}' is not a subclass of '{base}'", ctx=ctx)
-        return recurse(strip(annotate(actual_class, t), TagSet), obj, ctx)
+        declared = ts.get_type(tag, ctx)
+        if base is not Any and base is not object and isinstance(base, type):
+            actual_class = constructed_type(declared)
+            if not issubclass(actual_class, base):
+                raise ValidationError(f"'{actual_class}' is not a subclass of '{base}'", ctx=ctx)
+        return recurse(strip(annotate(declared, t), TagSet), obj, ctx)
 
     def schema(self, t: type[Any @ TagSet], ctx: Context):
         base, ts = decompose(t)

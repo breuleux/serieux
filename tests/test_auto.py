@@ -4,7 +4,9 @@ import pytest
 
 from serieux import deserialize, serialize
 from serieux.auto import Auto, Call
-from serieux.exc import SchemaError
+from serieux.exc import SchemaError, ValidationError
+from serieux.features.tagset import TaggedUnion
+from serieux.model import constructed_type
 
 from .definitions import Point
 
@@ -62,3 +64,30 @@ def test_auto_inherit():
 def test_auto_no_interference():
     pt = serialize(Auto[Point], Point(1, 2))
     assert pt == {"x": 1, "y": 2}
+
+
+def add_them(x: int, y: int):
+    return x + y
+
+
+def mul_them(x: int, y: int) -> int:
+    return x * y
+
+
+def test_tagged_union():
+    tu = TaggedUnion[Call[add_them], Call[mul_them]]
+
+    result = deserialize(tu, {"class": "add_them", "x": 3, "y": 4})
+    assert result == 7
+
+    result = deserialize(tu, {"class": "mul_them", "x": 3, "y": 4})
+    assert result == 12
+
+    with pytest.raises(ValidationError, match="does not match expected tag"):
+        deserialize(tu, {"class": "div_them", "x": 3, "y": 4})
+
+
+def test_constructed_type():
+    assert constructed_type(Call[mul_them]) is int
+    with pytest.raises(TypeError, match="does not have a return type annotation"):
+        constructed_type(Call[add_them])
