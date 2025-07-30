@@ -14,6 +14,7 @@ from serieux.features.tagset import (
     TagDict,
     TaggedSubclass,
     TagSetFeature,
+    tag_field,
 )
 
 featured = (Serieux + TagSetFeature)()
@@ -101,7 +102,7 @@ def test_tagdict_serialize(chalou):
     cat = Cat(name="Kitty", selfishness=3)
     ser = serialize(Annotated[Animal, chalou], cat)
     assert ser == {
-        "class": "chat",
+        tag_field: "chat",
         "name": "Kitty",
         "selfishness": 3,
     }
@@ -109,7 +110,7 @@ def test_tagdict_serialize(chalou):
 
 def test_tagdict_deserialize(chalou):
     ser = {
-        "class": "chat",
+        tag_field: "chat",
         "name": "Kitty",
         "selfishness": 3,
     }
@@ -122,7 +123,7 @@ def test_tagdict_ser_deser2(chalou):
     wolf = Wolf(name="Wolfie", size=5)
     ser_wolf = serialize(Annotated[Animal, chalou], wolf)
     assert ser_wolf == {
-        "class": "loup",
+        tag_field: "loup",
         "name": "Wolfie",
         "size": 5,
     }
@@ -156,7 +157,7 @@ def test_merge_tagsets(file_regression):
 
     ser_cat = serialize(Annotated[Animal, cha, lou], cat)
     assert ser_cat == {
-        "class": "chat",
+        tag_field: "chat",
         "name": "Kitty",
         "selfishness": 3,
     }
@@ -165,7 +166,7 @@ def test_merge_tagsets(file_regression):
 
     ser_wolf = serialize(Annotated[Animal, cha, lou], wolf)
     assert ser_wolf == {
-        "class": "loup",
+        tag_field: "loup",
         "name": "Wolfie",
         "size": 5,
     }
@@ -183,7 +184,7 @@ def test_merge_tagsets(file_regression):
         deserialize(
             Annotated[Animal, cha, lou],
             {
-                "class": "housecat",
+                tag_field: "housecat",
                 "name": "Mimi",
                 "selfishness": 8,
             },
@@ -194,7 +195,7 @@ def test_tagged_subclass():
     orig = Wolf(name="Wolfie", size=10)
     ser = serialize(TaggedSubclass[Animal], orig)
     assert ser == {
-        "class": "tests.features.test_tagset:Wolf",
+        tag_field: "tests.features.test_tagset:Wolf",
         "name": "Wolfie",
         "size": 10,
     }
@@ -220,7 +221,7 @@ def test_serialize_wrong_class():
 
 
 def test_deserialize_wrong_class():
-    orig = {"class": "tests.features.test_tagset:Wolf", "name": "Wolfie", "size": 10}
+    orig = {tag_field: "tests.features.test_tagset:Wolf", "name": "Wolfie", "size": 10}
     with pytest.raises(ValidationError, match="Wolf.*is not a subclass of.*Cat"):
         deserialize(TaggedSubclass[Cat], orig)
 
@@ -231,19 +232,19 @@ def test_resolve_default():
 
 
 def test_resolve_same_file():
-    ser = {"class": "Cat", "name": "Katniss", "selfishness": 3}
+    ser = {tag_field: "Cat", "name": "Katniss", "selfishness": 3}
     assert deserialize(TaggedSubclass[Animal], ser) == Cat(name="Katniss", selfishness=3)
 
 
 def test_not_found():
     with pytest.raises(ValidationError, match="no attribute 'Bloop'"):
-        ser = {"class": "Bloop", "name": "Quack"}
+        ser = {tag_field: "Bloop", "name": "Quack"}
         deserialize(TaggedSubclass[Animal], ser)
 
 
 def test_bad_resolve():
     with pytest.raises(ValidationError, match="Bad format for class reference"):
-        ser = {"class": "x:y:z", "name": "Quack"}
+        ser = {tag_field: "x:y:z", "name": "Quack"}
         deserialize(TaggedSubclass[Animal], ser)
 
 
@@ -259,7 +260,7 @@ def test_tagged_subclass_partial():
         Sources(
             {
                 "alpha": {
-                    "class": "tests.features.test_tagset:Wolf",
+                    tag_field: "tests.features.test_tagset:Wolf",
                     "name": "Wolfie",
                     "size": 10,
                 },
@@ -276,13 +277,13 @@ def test_tagged_subclass_partial_merge():
         Sources(
             {
                 "alpha": {
-                    "class": "tests.features.test_tagset:Wolf",
+                    tag_field: "tests.features.test_tagset:Wolf",
                     "name": "Wolfie",
                     "size": 10,
                 },
                 "betas": [],
             },
-            {"alpha": {"class": "tests.features.test_tagset:Wolf", "size": 13}},
+            {"alpha": {tag_field: "tests.features.test_tagset:Wolf", "size": 13}},
         ),
     )
     assert isinstance(animals.alpha, Wolf)
@@ -297,7 +298,7 @@ def test_tagged_subclass_partial_merge_subclass_left():
             {"alpha": {"name": "Roar"}},
             {
                 "alpha": {
-                    "class": "tests.features.test_tagset:Wolf",
+                    tag_field: "tests.features.test_tagset:Wolf",
                     "size": 10,
                 },
                 "betas": [],
@@ -315,7 +316,7 @@ def test_tagged_subclass_partial_merge_subclass_right():
         Sources(
             {
                 "alpha": {
-                    "class": "tests.features.test_tagset:Wolf",
+                    tag_field: "tests.features.test_tagset:Wolf",
                     "name": "Wolfie",
                     "size": 10,
                 },
@@ -349,10 +350,10 @@ def test_from_entry_points():
     # for the entry points to be registered
     OptF = Annotated[Any, FromEntryPoint("serieux.optional_features")]
     ser = serialize(OptF, DottedNotation())
-    assert ser == {"class": "dotted"}
+    assert ser == {tag_field: "dotted"}
     assert deserialize(OptF, ser) == DottedNotation()
     sch = schema(OptF).compile(root=False)
-    possibilities = {x["properties"]["class"]["const"] for x in sch["oneOf"]}
+    possibilities = {x["properties"][tag_field]["const"] for x in sch["oneOf"]}
     assert "dotted" in possibilities
     assert "autotag" in possibilities
     assert "include_file" in possibilities
@@ -365,15 +366,16 @@ def test_from_entry_points_with_default():
     ser = serialize(OptF, DottedNotation())
     assert ser == {}
     assert deserialize(OptF, {}) == DottedNotation()
-    assert deserialize(OptF, {"class": "dotted"}) == DottedNotation()
+    assert deserialize(OptF, {tag_field: "dotted"}) == DottedNotation()
     sch = schema(OptF).compile(root=False)
     assert any(
-        (("class" not in x.get("properties", {})) or x.get("required") == []) for x in sch["oneOf"]
+        ((tag_field not in x.get("properties", {})) or x.get("required") == [])
+        for x in sch["oneOf"]
     )
     possibilities = {
-        x["properties"]["class"]["const"]
+        x["properties"][tag_field]["const"]
         for x in sch["oneOf"]
-        if "class" in x.get("properties", {})
+        if tag_field in x.get("properties", {})
     }
     assert "dotted" in possibilities
     assert "autotag" in possibilities
@@ -390,7 +392,7 @@ def test_from_entry_points_errors():
         deserialize(OptF, {})
 
     with pytest.raises(ValidationError, match="is not registered in entry point group"):
-        deserialize(OptF, {"class": "not_a_real_entry_point"})
+        deserialize(OptF, {tag_field: "not_a_real_entry_point"})
 
     fe = FromEntryPoint("serieux.optional_features")
 

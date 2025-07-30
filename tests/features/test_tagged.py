@@ -6,7 +6,15 @@ from serieux import Serieux, deserialize
 from serieux.auto import Auto
 from serieux.ctx import Context
 from serieux.exc import ValidationError
-from serieux.features.tagset import Tag, Tagged, TaggedUnion, TagSet, TagSetFeature
+from serieux.features.tagset import (
+    Tag,
+    Tagged,
+    TaggedUnion,
+    TagSet,
+    TagSetFeature,
+    tag_field,
+    value_field,
+)
 
 from ..definitions import Player, Point
 
@@ -17,34 +25,34 @@ serialize = tu_serieux.serialize
 
 
 def test_tagged_serialize():
-    data = {"class": "point", "x": 1, "y": 2}
+    data = {tag_field: "point", "x": 1, "y": 2}
     assert serialize(Tagged[Point, "point"], Point(1, 2)) == data
 
 
 def test_tagged_serialize_primitive():
-    data = {"class": "nombre", "return": 7}
+    data = {tag_field: "nombre", value_field: 7}
     assert serialize(Tagged[int, "nombre"], 7) == data
 
 
 def test_tagged_deserialize():
-    data = {"class": "point", "x": 1, "y": 2}
+    data = {tag_field: "point", "x": 1, "y": 2}
     assert deserialize(Tagged[Point, "point"], data) == Point(1, 2)
 
 
 def test_tagged_deserialize_primitive():
-    data = {"class": "nombre", "return": 7}
+    data = {tag_field: "nombre", value_field: 7}
     assert deserialize(Tagged[int, "nombre"], data) == 7
 
 
 def test_tunion_serialize():
     U = Tagged[Player, "player"] | Tagged[Point, "point"]
-    data = {"class": "point", "x": 1, "y": 2}
+    data = {tag_field: "point", "x": 1, "y": 2}
     assert serialize(U, Point(1, 2), Context()) == data
 
 
 def test_tunion_deserialize():
     U = Tagged[Player, "player"] | Tagged[Point, "point"]
-    data = {"class": "point", "x": 1, "y": 2}
+    data = {tag_field: "point", "x": 1, "y": 2}
     assert deserialize(U, data) == Point(1, 2)
 
 
@@ -64,13 +72,13 @@ def test_tagged_union():
     ]
     for U in us:
         pt = Point(1, 2)
-        data_point = {"class": "point", "x": 1, "y": 2}
+        data_point = {tag_field: "point", "x": 1, "y": 2}
         assert serialize(U, pt, Context()) == data_point
         assert deserialize(U, data_point) == pt
 
     for U in us[:-1]:
         ply = Player("Alice", "Smith", 0.333)
-        data_player = {"class": "player", "first": "Alice", "last": "Smith", "batting": 0.333}
+        data_player = {tag_field: "player", "first": "Alice", "last": "Smith", "batting": 0.333}
         assert serialize(U, ply, Context()) == data_player
         assert deserialize(U, data_player) == ply
 
@@ -93,8 +101,8 @@ def test_tagged_union_identical_fields():
     blonde = Blonde("Sam", 25)
     redhead = Redhead("Jack", 50)
 
-    data_blonde = {"class": "blonde", "name": "Sam", "age": 25}
-    data_redhead = {"class": "redhead", "name": "Jack", "age": 50}
+    data_blonde = {tag_field: "blonde", "name": "Sam", "age": 25}
+    data_redhead = {tag_field: "redhead", "name": "Jack", "age": 50}
 
     assert serialize(U, blonde, Context()) == data_blonde
     assert serialize(U, redhead, Context()) == data_redhead

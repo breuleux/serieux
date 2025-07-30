@@ -6,8 +6,9 @@ import pytest
 
 from serieux import Serieux, schema
 from serieux.exc import ValidationError
-from serieux.features.comment import Comment, CommentedObjects
+from serieux.features.comment import Comment, CommentedObjects, comment_field
 from serieux.features.proxy import CommentProxy
+from serieux.features.tagset import value_field
 
 featured = (Serieux + CommentedObjects)()
 serialize = featured.serialize
@@ -23,12 +24,12 @@ class Person:
 def test_comment_serialize_int():
     proxy = CommentProxy(42, "The answer")
     serialized = serialize(Comment[int, str], proxy)
-    expected = {"return": 42, "_": "The answer"}
+    expected = {value_field: 42, comment_field: "The answer"}
     assert serialized == expected
 
 
 def test_comment_deserialize_int():
-    serialized = {"return": 42, "_": "The answer"}
+    serialized = {value_field: 42, comment_field: "The answer"}
     deserialized = deserialize(Comment[int, str], serialized)
     assert isinstance(deserialized, CommentProxy)
     assert deserialized._obj == 42
@@ -39,12 +40,12 @@ def test_comment_serialize_person():
     person = Person(name="Alice", age=30)
     proxy = CommentProxy(person, "A nice person")
     serialized = serialize(Comment[Person, str], proxy)
-    expected = {"name": "Alice", "age": 30, "_": "A nice person"}
+    expected = {"name": "Alice", "age": 30, comment_field: "A nice person"}
     assert serialized == expected
 
 
 def test_comment_deserialize_person():
-    serialized = {"name": "Alice", "age": 30, "_": "A nice person"}
+    serialized = {"name": "Alice", "age": 30, comment_field: "A nice person"}
     deserialized = deserialize(Comment[Person, str], serialized)
     assert isinstance(deserialized, CommentProxy)
     assert isinstance(deserialized._obj, Person)
@@ -57,7 +58,7 @@ def test_comment_with_complex_comment_type():
     proxy = CommentProxy(100, comment_person)
 
     serialized = serialize(Comment[int, Person], proxy)
-    expected = {"return": 100, "_": {"name": "Bob", "age": 25}}
+    expected = {value_field: 100, comment_field: {"name": "Bob", "age": 25}}
     assert serialized == expected
 
     deserialized = deserialize(Comment[int, Person], serialized)

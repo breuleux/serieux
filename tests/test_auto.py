@@ -5,7 +5,7 @@ import pytest
 from serieux import deserialize, serialize
 from serieux.auto import Auto, Call
 from serieux.exc import SchemaError, ValidationError
-from serieux.features.tagset import TaggedUnion
+from serieux.features.tagset import TaggedUnion, tag_field
 from serieux.model import constructed_type
 
 from .definitions import Point
@@ -77,14 +77,14 @@ def mul_them(x: int, y: int) -> int:
 def test_tagged_union():
     tu = TaggedUnion[Call[add_them], Call[mul_them]]
 
-    result = deserialize(tu, {"class": "add_them", "x": 3, "y": 4})
+    result = deserialize(tu, {tag_field: "add_them", "x": 3, "y": 4})
     assert result == 7
 
-    result = deserialize(tu, {"class": "mul_them", "x": 3, "y": 4})
+    result = deserialize(tu, {tag_field: "mul_them", "x": 3, "y": 4})
     assert result == 12
 
     with pytest.raises(ValidationError, match="does not match expected tag"):
-        deserialize(tu, {"class": "div_them", "x": 3, "y": 4})
+        deserialize(tu, {tag_field: "div_them", "x": 3, "y": 4})
 
 
 def test_constructed_type():
