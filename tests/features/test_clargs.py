@@ -10,13 +10,13 @@ from serieux import Serieux
 from serieux.ctx import Context
 from serieux.exc import ValidationError
 from serieux.features.clargs import CommandLineArguments, parse_cli
-from serieux.features.fromfile import FromFileExtra, WorkingDirectory
+from serieux.features.fromfile import IncludeFile, WorkingDirectory
 from serieux.features.interpol import Environment
 from serieux.features.tagset import TagDict, Tagged, TaggedUnion
 
 from ..definitions import Defaults, Job, Point, Worker
 
-deserialize = (Serieux + FromFileExtra)().deserialize
+deserialize = (Serieux + IncludeFile)().deserialize
 
 datapath = Path(__file__).parent.parent / "data"
 

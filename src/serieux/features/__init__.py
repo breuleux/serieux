@@ -2,7 +2,7 @@ from .autotag import AutoTagAny
 from .clargs import FromArguments
 from .comment import CommentedObjects
 from .dotted import DottedNotation
-from .fromfile import FromFile, FromFileExtra
+from .fromfile import FromFile, IncludeFile
 from .interpol import Interpolation
 from .lazy import LazyDeserialization
 from .partial import PartialBuilding
@@ -14,7 +14,7 @@ __all__ = [
     "DottedNotation",
     "FromArguments",
     "FromFile",
-    "FromFileExtra",
+    "IncludeFile",
     "Interpolation",
     "LazyDeserialization",
     "PartialBuilding",

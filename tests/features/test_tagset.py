@@ -355,7 +355,7 @@ def test_from_entry_points():
     possibilities = {x["properties"]["class"]["const"] for x in sch["oneOf"]}
     assert "dotted" in possibilities
     assert "autotag" in possibilities
-    assert "fromfile_extra" in possibilities
+    assert "include_file" in possibilities
 
 
 def test_from_entry_points_with_default():
@@ -377,7 +377,7 @@ def test_from_entry_points_with_default():
     }
     assert "dotted" in possibilities
     assert "autotag" in possibilities
-    assert "fromfile_extra" in possibilities
+    assert "include_file" in possibilities
 
 
 def test_from_entry_points_errors():

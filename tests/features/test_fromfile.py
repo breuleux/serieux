@@ -11,12 +11,12 @@ import pytest
 from serieux import Serieux
 from serieux.ctx import AccessPath
 from serieux.exc import ValidationError
-from serieux.features.fromfile import FromFileExtra, WorkingDirectory
+from serieux.features.fromfile import IncludeFile, WorkingDirectory
 from serieux.features.partial import Sources
 
 from ..definitions import Citizen, Country, Player, Team, World
 
-deserialize = (Serieux + FromFileExtra)().deserialize
+deserialize = (Serieux + IncludeFile)().deserialize
 
 here = Path(__file__).parent
 datapath = Path(__file__).parent.parent / "data"

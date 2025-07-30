@@ -12,7 +12,7 @@ from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
 from .features.clargs import CLIDefinition, CommandLineArguments, parse_cli
 from .features.comment import Comment
 from .features.dotted import DottedNotation
-from .features.fromfile import FromFileExtra, WorkingDirectory
+from .features.fromfile import IncludeFile, WorkingDirectory
 from .features.interpol import Environment
 from .features.lazy import DeepLazy, Lazy, LazyProxy
 from .features.partial import Partial, Sources
@@ -135,7 +135,7 @@ __all__ = [
     "dump",
     "Environment",
     "Extensible",
-    "FromFileExtra",
+    "IncludeFile",
     "JSON",
     "Lazy",
     "LazyProxy",

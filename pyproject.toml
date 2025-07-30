@@ -79,4 +79,4 @@ usermeth = "serieux.features.usermeth:UserMethods"
 [project.entry-points."serieux.optional_features"]
 autotag = "serieux.features.autotag:AutoTagAny"
 dotted = "serieux.features.dotted:DottedNotation"
-fromfile_extra = "serieux.features.fromfile:FromFileExtra"
+include_file = "serieux.features.fromfile:IncludeFile"

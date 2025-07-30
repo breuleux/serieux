@@ -14,6 +14,8 @@ from ..exc import ValidationError
 from ..utils import PRIO_HIGHER, PRIO_LAST, clsstring
 from .partial import PartialBuilding, Sources
 
+include_field = "$include"
+
 
 @dependent_check
 def FileSuffix(value: Path, *suffixes):
@@ -145,11 +147,11 @@ class FromFile(PartialBuilding):
         raise ValidationError(f"Cannot deserialize YAML node of type `{obj.tag}`")
 
 
-class FromFileExtra(FromFile):
+class IncludeFile(FromFile):
     @ovld(priority=1)
-    def deserialize(self, t: type[object], obj: HasKey["$include"], ctx: Context):
+    def deserialize(self, t: type[object], obj: HasKey[include_field], ctx: Context):
         obj = dict(obj)
-        incl = recurse(str, obj.pop("$include"), ctx)
+        incl = recurse(str, obj.pop(include_field), ctx)
         return recurse(t, Sources(Path(incl), obj), ctx)
 
     @ovld(priority=PRIO_LAST)
