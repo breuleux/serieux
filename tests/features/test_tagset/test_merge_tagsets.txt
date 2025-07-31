@@ -9,7 +9,7 @@
                 "selfishness": {
                     "type": "integer"
                 },
-                "class": {
+                "$class": {
                     "description": "Reference to the class to instantiate",
                     "const": "chat"
                 }
@@ -17,7 +17,7 @@
             "required": [
                 "name",
                 "selfishness",
-                "class"
+                "$class"
             ],
             "additionalProperties": false
         },
@@ -30,7 +30,7 @@
                 "size": {
                     "type": "integer"
                 },
-                "class": {
+                "$class": {
                     "description": "Reference to the class to instantiate",
                     "const": "loup"
                 }
@@ -38,7 +38,7 @@
             "required": [
                 "name",
                 "size",
-                "class"
+                "$class"
             ],
             "additionalProperties": false
         }

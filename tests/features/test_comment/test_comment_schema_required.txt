@@ -7,14 +7,14 @@
         "age": {
             "type": "integer"
         },
-        "_": {
+        "$comment": {
             "type": "string"
         }
     },
     "required": [
         "name",
         "age",
-        "_"
+        "$comment"
     ],
     "additionalProperties": false,
     "$schema": "https://json-schema.org/draft/2020-12/schema"

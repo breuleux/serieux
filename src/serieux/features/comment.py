@@ -16,7 +16,7 @@ from .tagset import value_field
 #############
 
 
-comment_field = "_"
+comment_field = "$comment"
 
 
 @dataclass(frozen=True)

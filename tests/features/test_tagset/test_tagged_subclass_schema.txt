@@ -21,7 +21,7 @@
                 "selfishness": {
                     "type": "integer"
                 },
-                "class": {
+                "$class": {
                     "description": "Reference to the class to instantiate",
                     "const": "Cat"
                 }
@@ -29,7 +29,7 @@
             "required": [
                 "name",
                 "selfishness",
-                "class"
+                "$class"
             ],
             "additionalProperties": false
         },
@@ -42,7 +42,7 @@
                 "size": {
                     "type": "integer"
                 },
-                "class": {
+                "$class": {
                     "description": "Reference to the class to instantiate",
                     "const": "Wolf"
                 }
@@ -50,7 +50,7 @@
             "required": [
                 "name",
                 "size",
-                "class"
+                "$class"
             ],
             "additionalProperties": false
         },
@@ -66,7 +66,7 @@
                 "cute": {
                     "type": "boolean"
                 },
-                "class": {
+                "$class": {
                     "description": "Reference to the class to instantiate",
                     "const": "HouseCat"
                 }
@@ -74,7 +74,7 @@
             "required": [
                 "name",
                 "selfishness",
-                "class"
+                "$class"
             ],
             "additionalProperties": false
         }

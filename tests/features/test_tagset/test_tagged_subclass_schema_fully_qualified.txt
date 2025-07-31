@@ -6,14 +6,14 @@
                 "name": {
                     "type": "string"
                 },
-                "class": {
+                "$class": {
                     "description": "Reference to the class to instantiate",
                     "const": "tests.features.test_tagset:Animal"
                 }
             },
             "required": [
                 "name",
-                "class"
+                "$class"
             ],
             "additionalProperties": false
         },
@@ -26,7 +26,7 @@
                 "selfishness": {
                     "type": "integer"
                 },
-                "class": {
+                "$class": {
                     "description": "Reference to the class to instantiate",
                     "const": "tests.features.test_tagset:Cat"
                 }
@@ -34,7 +34,7 @@
             "required": [
                 "name",
                 "selfishness",
-                "class"
+                "$class"
             ],
             "additionalProperties": false
         },
@@ -47,7 +47,7 @@
                 "size": {
                     "type": "integer"
                 },
-                "class": {
+                "$class": {
                     "description": "Reference to the class to instantiate",
                     "const": "tests.features.test_tagset:Wolf"
                 }
@@ -55,7 +55,7 @@
             "required": [
                 "name",
                 "size",
-                "class"
+                "$class"
             ],
             "additionalProperties": false
         },
@@ -71,7 +71,7 @@
                 "cute": {
                     "type": "boolean"
                 },
-                "class": {
+                "$class": {
                     "description": "Reference to the class to instantiate",
                     "const": "tests.features.test_tagset:HouseCat"
                 }
@@ -79,7 +79,7 @@
             "required": [
                 "name",
                 "selfishness",
-                "class"
+                "$class"
             ],
             "additionalProperties": false
         }

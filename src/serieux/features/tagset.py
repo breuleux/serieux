@@ -14,8 +14,8 @@ from ..model import constructed_type
 from ..schema import AnnotatedSchema
 from ..tell import KeyValueTell, TypeTell, tells
 
-tag_field = "class"
-value_field = "return"
+tag_field = "$class"
+value_field = "$value"
 
 
 class TagSet(BaseInstruction):  # pragma: no cover
