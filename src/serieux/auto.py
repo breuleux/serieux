@@ -62,9 +62,9 @@ def model_from_callable(t, call=False):
 def _(t: type[Any @ Auto]):
     if (normal := call_next(t)) is not None:
         return normal
-    return model_from_callable(strip(t, Auto))
+    return model_from_callable(strip(t))
 
 
 @model.register(priority=-1)
 def _(t: type[Any @ Call]):
-    return model_from_callable(strip(t, Call), True)
+    return model_from_callable(strip(t), True)

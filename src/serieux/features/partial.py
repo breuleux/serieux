@@ -12,7 +12,7 @@ from ..exc import (
     ValidationExceptionGroup,
     merge_errors,
 )
-from ..instructions import Instruction, T, pushdown
+from ..instructions import Instruction, T, strip
 from ..model import FieldModelizable, model
 from ..utils import PRIO_HIGH
 from .lazy import LazyProxy
@@ -115,7 +115,7 @@ class PartialBuilding(Medley):
 
 @model.register
 def _(p: type[Any @ Partial]):
-    return call_next(partialize(pushdown(p)))
+    return call_next(partialize(strip(p, Partial)))
 
 
 ######################
