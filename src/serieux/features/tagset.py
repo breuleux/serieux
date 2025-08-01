@@ -3,13 +3,13 @@ import importlib.metadata
 from collections import deque
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Annotated, Any, Iterable, Union
+from typing import Annotated, Any, Callable, Iterable, Union
 
 from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
 from ..exc import ValidationError
-from ..instructions import BaseInstruction, annotate, pushdown, strip
+from ..instructions import BaseInstruction, Instruction, annotate, pushdown, strip
 from ..model import constructed_type
 from ..schema import AnnotatedSchema
 from ..tell import KeyValueTell, TypeTell, tells
@@ -118,11 +118,21 @@ class TaggedUnion(type):
 class FromEntryPoint(TagSet):
     entry_point: str
     default: type = None
+    wrap: Callable = None
 
     @cached_property
     def elements(self):
+        def _wrap(t):
+            match self.wrap:
+                case None:
+                    return t
+                case type() | Instruction():  # pragma: no cover
+                    return self.wrap[t]
+                case _:
+                    return self.wrap(t)
+
         eps = importlib.metadata.entry_points(group=self.entry_point)
-        return {ep.name: ep.load() for ep in eps}
+        return {ep.name: _wrap(ep.load()) for ep in eps}
 
     def get_type(self, tag: str | None, ctx: Context) -> type:
         eps = self.elements
@@ -148,7 +158,7 @@ class FromEntryPoint(TagSet):
             ctx=ctx,
         )
 
-    def iterate(self, base: type, ctx: Context) -> Iterable[tuple[str | None, type]]:
+    def iterate(self, base: type, ctx: Context = None) -> Iterable[tuple[str | None, type]]:
         for name, cls in self.elements.items():
             if base is Any or issubclass(cls, base):
                 yield (name, cls)

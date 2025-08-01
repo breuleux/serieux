@@ -17,6 +17,8 @@ from serieux.features.tagset import (
     tag_field,
 )
 
+from ..definitions import Point
+
 featured = (Serieux + TagSetFeature)()
 serialize = featured.serialize
 deserialize = featured.deserialize
@@ -380,6 +382,20 @@ def test_from_entry_points_with_default():
     assert "dotted" in possibilities
     assert "autotag" in possibilities
     assert "include_file" in possibilities
+
+
+def test_from_entry_points_with_wrap():
+    # NOTE: serieux needs to be properly installed, e.g. with pip install or uv sync,
+    # for the entry points to be registered
+
+    sub = {DottedNotation: Point}
+
+    def wrap(x):
+        return sub.get(x, x)
+
+    OptF = Annotated[Any, FromEntryPoint("serieux.optional_features", wrap=wrap)]
+    deser = deserialize(OptF, {tag_field: "dotted", "x": 1, "y": 2})
+    assert deser == Point(1, 2)
 
 
 def test_from_entry_points_errors():
