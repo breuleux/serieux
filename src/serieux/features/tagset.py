@@ -203,7 +203,7 @@ class ReferencedClass(TagSet):
         mod = t.__module__
         return f"{mod}:{qn}"
 
-    def iterate(self, base: type, ctx: Context) -> Iterable[tuple[str | None, type]]:
+    def iterate(self, base: type, ctx: Context = None) -> Iterable[tuple[str | None, type]]:
         if base is Any or base is object:
             return
         queue = deque([base])
@@ -251,7 +251,7 @@ class MultiTagSet(TagSet):
                 pass
         raise ValidationError(f"No tagset could resolve for type {t}", ctx=ctx)
 
-    def iterate(self, base, ctx):
+    def iterate(self, base, ctx=None):
         seen = set()
         for ts in self.tagsets:
             for tag, sc in ts.iterate(base, ctx):
