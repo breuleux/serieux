@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from types import UnionType
-from typing import Annotated, TypeVar, Union, get_args, get_origin
+from typing import Annotated, Literal, TypeVar, Union, get_args, get_origin
 
 T = TypeVar("T")
 
@@ -94,7 +94,7 @@ def pushdown(cls):
     new_instrs = [a for a in instrs if isinstance(a, Instruction) and a.inherit]
     if not new_instrs:
         return typ
-    if orig := get_origin(typ):
+    if (orig := get_origin(typ)) and orig is not Literal:
         args = get_args(typ)
         if orig is UnionType:
             orig = Union

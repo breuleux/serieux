@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from serieux import deserialize, schema, serialize
 from serieux.instructions import Instruction, inherit, pushdown, strip
@@ -29,6 +29,10 @@ def test_pushdown():
     assert pushdown(Apple[list[int]]) == list[Apple[int]]
     assert pushdown(Apple[Banana[list[int]]]) == list[Apple[Banana[int]]]
     assert pushdown(Apple[int | str]) == Apple[int] | Apple[str]
+
+
+def test_pushdown_literal():
+    assert pushdown(Apple[Literal[1, 2]]) == Literal[1, 2]
 
 
 @one_test_per_assert
