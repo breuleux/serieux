@@ -1,6 +1,6 @@
 [project]
 name = "serieux"
-version = "0.2.0"
+version = "0.2.1"
 description = "Extremely customizable serialization"
 authors = [
     { name = "Olivier Breuleux", email = "breuleux@gmail.com" }
