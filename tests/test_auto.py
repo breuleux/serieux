@@ -56,6 +56,14 @@ def test_auto_no_interference():
     assert pt == {"x": 1, "y": 2}
 
 
+def test_auto_func_lacks_annotations():
+    def f(x, y: int) -> int:
+        return x + y
+
+    with pytest.raises(TypeError, match="lacks a type annotation"):
+        deserialize(Auto[f], {"x": 1, "y": 2})
+
+
 def add_them(x: int, y: int):
     return x + y
 

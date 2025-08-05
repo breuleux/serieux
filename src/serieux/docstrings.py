@@ -141,6 +141,8 @@ def get_variable_data(cls):
     """
     if cls in _cached_docstrings:
         return _cached_docstrings[cls]
+    if hasattr(cls, "__variable_data__"):
+        return cls.__variable_data__
     docs = {}
     current = None
     current_line = None

@@ -35,6 +35,13 @@ class MeldedCall:
         return current
 
     @cached_property
+    def __variable_data__(self):
+        vd = {}
+        for fn, _, _ in self.steps:
+            vd.update(get_variable_data(fn))
+        return vd
+
+    @cached_property
     def __signature__(self):
         final_params = []
         seen = set()
@@ -89,7 +96,7 @@ def model_from_callable(t, call=False, embed_self=True):
             else:
                 param = param.replace(annotation=parent_class)
         if param.annotation is inspect._empty:
-            raise TypeError(f"Parameter '{param.name}' of {t} lacks a type annotation.")
+            raise TypeError(f"Cannot model {t}: '{param.name}' lacks a type annotation.")
         field = Field(
             name=param.name,
             description=(docs[param.name].doc or param.name) if param.name in docs else param.name,
