@@ -171,7 +171,9 @@ def add_argument_from_field(parser, fdest, overrides, field: Field):
 
     if positional:
         args = {"__args__": [fdest], "help": fhelp, "metavar": mvar, **overrides}
-        if "nargs" not in args and "nargs" not in meta and "nargs" not in overrides:
+        if positional is not True:
+            args["nargs"] = positional
+        elif "nargs" not in args and "nargs" not in meta and "nargs" not in overrides:
             args["nargs"] = "?" if not field.required else 1
     else:
         args = {

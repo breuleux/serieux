@@ -264,6 +264,17 @@ def test_positional():
 
 
 @dataclass
+class Wordz:
+    # [positional: ...]
+    wordz: list[str]
+
+
+def test_positional_multiple():
+    result = deserialize(Wordz, CommandLineArguments(["hello", "everyone", "--cool"]), Context())
+    assert result == Wordz(wordz=["hello", "everyone", "--cool"])
+
+
+@dataclass
 class Sentence:
     # [nargs: *]
     sentence: str
