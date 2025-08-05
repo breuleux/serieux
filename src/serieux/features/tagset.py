@@ -3,13 +3,13 @@ import importlib.metadata
 from collections import deque
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Annotated, Any, Callable, Iterable, Union
+from typing import TYPE_CHECKING, Annotated, Any, Callable, Iterable, TypeAlias, Union
 
 from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
 from ..exc import ValidationError
-from ..instructions import BaseInstruction, Instruction, annotate, pushdown, strip
+from ..instructions import BaseInstruction, Instruction, T, annotate, pushdown, strip
 from ..model import constructed_type
 from ..schema import AnnotatedSchema
 from ..tell import KeyValueTell, TypeTell, tells
@@ -92,26 +92,6 @@ class Tag(TagSet):
         if isinstance(base, type):
             assert issubclass(self.cls, base)
         yield (self.tag, self.cls)
-
-
-class Tagged(type):
-    def __class_getitem__(cls, arg):
-        match arg:
-            case (t, name):
-                return Annotated[t, Tag(name, t)]
-            case t:
-                st = strip(t)
-                tag = getattr(st, "serieux_tag", None) or st.__name__.lower()
-                return Annotated[t, Tag(tag, t)]
-
-
-class TaggedUnion(type):
-    def __class_getitem__(cls, args):
-        if isinstance(args, dict):
-            return Union[tuple(Tagged[v, k] for k, v in args.items())]
-        elif not isinstance(args, (list, tuple)):
-            return Tagged[args]
-        return Union[tuple(Tagged[arg] for arg in args)]
 
 
 @dataclass(frozen=True)
@@ -336,6 +316,31 @@ def tells(typ: type[Any @ TagSet]):
     return {TypeTell(dict), *kvt}
 
 
-class TaggedSubclass:
-    def __class_getitem__(cls, item):
-        return Annotated[item, Referenced(default=item, default_module=item.__module__)]
+if TYPE_CHECKING:
+    TaggedSubclass: TypeAlias = Annotated[T, None]
+    Tagged: TypeAlias = Annotated
+    TaggedUnion = Union
+
+else:
+
+    class TaggedSubclass:
+        def __class_getitem__(cls, item):
+            return Annotated[item, Referenced(default=item, default_module=item.__module__)]
+
+    class Tagged(type):
+        def __class_getitem__(cls, arg):
+            match arg:
+                case (t, name):
+                    return Annotated[t, Tag(name, t)]
+                case t:
+                    st = strip(t)
+                    tag = getattr(st, "serieux_tag", None) or st.__name__.lower()
+                    return Annotated[t, Tag(tag, t)]
+
+    class TaggedUnion(type):
+        def __class_getitem__(cls, args):
+            if isinstance(args, dict):
+                return Union[tuple(Tagged[v, k] for k, v in args.items())]
+            elif not isinstance(args, (list, tuple)):
+                return Tagged[args]
+            return Union[tuple(Tagged[arg] for arg in args)]
