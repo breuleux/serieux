@@ -1,7 +1,10 @@
+from dataclasses import dataclass
+from typing import Annotated
+
 import pytest
 
 from serieux import deserialize, serialize
-from serieux.auto import Auto, Call
+from serieux.auto import Auto, Call, MeldedCall
 from serieux.exc import SchemaError, ValidationError
 from serieux.features.tagset import TaggedUnion, tag_field
 from serieux.model import constructed_type
@@ -78,3 +81,30 @@ def test_constructed_type():
     assert constructed_type(Call[mul_them]) is int
     with pytest.raises(TypeError, match="does not have a return type annotation"):
         constructed_type(Call[add_them])
+
+
+@dataclass
+class Person:
+    name: str
+    ha: str
+
+    def laugh(self, n: int) -> str:
+        return self.ha * n
+
+
+def test_melded_call():
+    cp = MeldedCall(Person, Person.laugh)
+    assert cp(name="Alice", n=4, ha="ho") == "hohohoho"
+
+
+def test_auto_method():
+    hafn = deserialize(Auto[Person.laugh], {"name": "Bob", "ha": "hi", "n": 3})
+    assert hafn() == "hihihi"
+
+
+def test_auto_method_no_embed_self():
+    hafn = deserialize(
+        Annotated[Person.laugh, Call(embed_self=False)],
+        {"self": {"name": "Bob", "ha": "hu"}, "n": 3},
+    )
+    assert hafn == "huhuhu"

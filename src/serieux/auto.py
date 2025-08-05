@@ -1,6 +1,8 @@
+import importlib
 import inspect
-from dataclasses import MISSING, dataclass
-from functools import partial
+import typing
+from dataclasses import MISSING, dataclass, replace
+from functools import cached_property, partial
 from typing import Annotated, Any
 
 from ovld import call_next
@@ -11,10 +13,44 @@ from .model import Field, Model, model
 from .utils import evaluate_hint
 
 
+class MeldedCall:
+    def __init__(self, *funcs):
+        self.steps = [
+            (
+                func,
+                (params := list(inspect.signature(func).parameters.values())[min(i, 1) :]),
+                set(p.name for p in params),
+            )
+            for i, func in enumerate(funcs)
+        ]
+
+    def __call__(self, **kwargs):
+        current = inspect._empty
+        for fn, _, argnames in self.steps:
+            args = {an: kwargs[an] for an in argnames if an in kwargs}
+            if current is inspect._empty:
+                current = fn(**args)
+            else:
+                current = fn(current, **args)
+        return current
+
+    @cached_property
+    def __signature__(self):
+        final_params = []
+        seen = set()
+        for _, params, _ in self.steps:
+            for param in params:
+                if param.name not in seen:
+                    seen.add(param.name)
+                    new_param = param.replace(kind=inspect.Parameter.KEYWORD_ONLY)
+                    final_params.append(new_param)
+        return inspect.Signature(final_params)
+
+
 @dataclass(frozen=True)
 class Auto(BaseInstruction):
     call: bool = False
-    partial: bool = True
+    embed_self: bool = True
 
     @property
     def annotation_priority(self):  # pragma: no cover
@@ -26,11 +62,13 @@ class Auto(BaseInstruction):
     def __getitem__(self, t):
         return Annotated[t, self]
 
+    __call__ = replace
 
-Call = Auto(call=True, partial=False)
+
+Call = Auto(call=True)
 
 
-def model_from_callable(t, call=False):
+def model_from_callable(t, call=False, embed_self=True):
     orig_t, t = t, strip(t)
     if t is Any:
         return None
@@ -40,8 +78,18 @@ def model_from_callable(t, call=False):
     fields = []
     docs = get_variable_data(t)
     for param in sig.parameters.values():
+        if param.name == "self" and param.annotation in (inspect._empty, typing.Self):
+            parent_class = getattr(
+                importlib.import_module(t.__module__), t.__qualname__.split(".")[0]
+            )
+            if embed_self:
+                return model_from_callable(
+                    MeldedCall(parent_class, t), call=call, embed_self=False
+                )
+            else:
+                param = param.replace(annotation=parent_class)
         if param.annotation is inspect._empty:
-            return None
+            raise TypeError(f"Parameter '{param.name}' of {t} lacks a type annotation.")
         field = Field(
             name=param.name,
             description=(docs[param.name].doc or param.name) if param.name in docs else param.name,
@@ -74,4 +122,4 @@ def _(t: type[Any @ Auto]):
     aut = aut or Auto()
     if not aut.call and (normal := call_next(t)) is not None:
         return normal
-    return model_from_callable(t, call=aut.call)
+    return model_from_callable(t, call=aut.call, embed_self=aut.embed_self)
