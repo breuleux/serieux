@@ -81,7 +81,7 @@ def inherit(cls, target):
     if get_origin(cls) is not Annotated:
         return target
     _, *instrs = get_args(cls)
-    new_instrs = [a for a in instrs if isinstance(a, Instruction) and a.inherit]
+    new_instrs = [a for a in instrs if getattr(a, "inherit", False)]
     if not new_instrs:
         return target
     return Annotated[(target, *new_instrs)]
@@ -91,7 +91,7 @@ def pushdown(cls):
     if get_origin(cls) is not Annotated:
         return cls
     typ, *instrs = get_args(cls)
-    new_instrs = [a for a in instrs if isinstance(a, Instruction) and a.inherit]
+    new_instrs = [a for a in instrs if getattr(a, "inherit", False)]
     if not new_instrs:
         return typ
     if (orig := get_origin(typ)) and orig is not Literal:

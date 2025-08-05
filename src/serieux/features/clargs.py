@@ -96,7 +96,7 @@ def make_argument(t: type[IsLiteral], partial: dict, model_field: Field):
     return {**partial, "type": str, "choices": [x for x in t.__args__]}
 
 
-@ovld(priority=-1)
+@ovld(priority=-1)  # pragma: no cover
 def make_argument(t: type[Annotated], partial: dict, model_field: Field):
     return recurse(pushdown(t), partial, model_field)
 

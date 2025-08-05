@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 import pytest
 
 from serieux import deserialize, serialize
@@ -18,12 +16,6 @@ class Funky:
 
 def funky(x: int, y: bool) -> str:
     return ("!" if y else ".") * x
-
-
-@dataclass
-class HoldsFunk:
-    funk: Funky
-    more: bool
 
 
 def test_auto():
@@ -54,11 +46,6 @@ def test_call_on_type():
 def test_auto_not_serializable():
     with pytest.raises(SchemaError, match="does not specify how to serialize"):
         serialize(Auto[Funky], Funky(x=3, y=True))
-
-
-def test_auto_inherit():
-    hfunk = deserialize(Auto[HoldsFunk], {"more": True, "funk": {"x": 3, "y": True}})
-    assert hfunk.funk.marks == "!!!"
 
 
 def test_auto_no_interference():

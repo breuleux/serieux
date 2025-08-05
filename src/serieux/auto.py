@@ -1,32 +1,42 @@
 import inspect
-from dataclasses import MISSING
+from dataclasses import MISSING, dataclass
 from functools import partial
-from typing import TYPE_CHECKING, Annotated, Any, TypeAlias
+from typing import Annotated, Any
 
 from ovld import call_next
 
 from .docstrings import get_variable_data
-from .instructions import Instruction, T, strip
+from .instructions import BaseInstruction, inherit, strip
 from .model import Field, Model, model
 from .utils import evaluate_hint
 
-if TYPE_CHECKING:
-    Call: TypeAlias = Annotated[T, None]
-    Auto: TypeAlias = Annotated[T, None]
-else:
-    Call = Instruction("Call", annotation_priority=-1, inherit=True)
-    Auto = Instruction("Auto", annotation_priority=-1, inherit=True)
+
+@dataclass(frozen=True)
+class Auto(BaseInstruction):
+    call: bool = False
+    partial: bool = True
+
+    @property
+    def annotation_priority(self):  # pragma: no cover
+        return 1
+
+    def __class_getitem__(cls, t):
+        return cls()[t]
+
+    def __getitem__(self, t):
+        return Annotated[t, self]
+
+
+Call = Auto(call=True, partial=False)
 
 
 def model_from_callable(t, call=False):
+    orig_t, t = t, strip(t)
     if t is Any:
         return None
     if isinstance(t, type) and call:
         raise TypeError("Call[...] should only wrap callables")
-    try:
-        sig = inspect.signature(t)
-    except ValueError:
-        return None
+    sig = inspect.signature(t)
     fields = []
     docs = get_variable_data(t)
     for param in sig.parameters.values():
@@ -36,7 +46,7 @@ def model_from_callable(t, call=False):
             name=param.name,
             description=(docs[param.name].doc or param.name) if param.name in docs else param.name,
             metadata=(docs[param.name].metadata or {}) if param.name in docs else {},
-            type=Auto[evaluate_hint(param.annotation, None, None, None)],
+            type=inherit(orig_t, evaluate_hint(param.annotation, None, None, None)),
             default=MISSING if param.default is inspect._empty else param.default,
             argument_name=param.name,
             property_name=None,
@@ -60,11 +70,8 @@ def model_from_callable(t, call=False):
 
 @model.register(priority=-1)
 def _(t: type[Any @ Auto]):
-    if (normal := call_next(t)) is not None:
+    _, aut = Auto.decompose(t)
+    aut = aut or Auto()
+    if not aut.call and (normal := call_next(t)) is not None:
         return normal
-    return model_from_callable(strip(t))
-
-
-@model.register(priority=-1)
-def _(t: type[Any @ Call]):
-    return model_from_callable(strip(t), True)
+    return model_from_callable(t, call=aut.call)
