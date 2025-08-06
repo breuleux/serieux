@@ -6,7 +6,7 @@ import pytest
 
 from serieux import Serieux, schema
 from serieux.exc import ValidationError
-from serieux.features.comment import Comment, CommentedObjects, comment_field
+from serieux.features.comment import Comment, CommentedObjects, CommentRec, comment_field
 from serieux.features.proxy import CommentProxy
 from serieux.features.tagset import value_field
 
@@ -100,6 +100,13 @@ def test_comment_serialize_non_proxy():
     assert serialized == expected
 
 
+def test_comment_serialize_proxy_to_normal_type():
+    person = Person("David", CommentProxy(40, "v. young"))
+    serialized = serialize(Person, person)
+    expected = {"name": "David", "age": 40}
+    assert serialized == expected
+
+
 def test_comment_schema(file_regression):
     sch = schema(Comment[Person, str])
     file_regression.check(json.dumps(sch.compile(), indent=4))
@@ -108,3 +115,15 @@ def test_comment_schema(file_regression):
 def test_comment_schema_required(file_regression):
     sch = schema(Annotated[Person, Comment(str, required=True)])
     file_regression.check(json.dumps(sch.compile(), indent=4))
+
+
+def test_commentrec_serialize():
+    person = Person("David", CommentProxy(40, "v. young"))
+
+    serialized = serialize(CommentRec[Person, str], person)
+    expected = {"name": "David", "age": {value_field: 40, comment_field: "v. young"}}
+    assert serialized == expected
+
+    deserialized = deserialize(CommentRec[Person, str], expected)
+    assert deserialized == person
+    assert deserialized.age._ == "v. young"

@@ -7,7 +7,7 @@ from ..ctx import Context
 from ..exc import ValidationError
 from ..instructions import BaseInstruction
 from ..schema import AnnotatedSchema
-from ..utils import PRIO_HIGHER
+from ..utils import PRIO_DEFAULT, PRIO_HIGHER
 from .proxy import CommentProxy
 from .tagset import value_field
 
@@ -23,10 +23,16 @@ comment_field = "$comment"
 class Comment(BaseInstruction):
     comment_type: type
     required: bool = False
+    inherit: bool = False
 
     def __class_getitem__(cls, args):
         t, ct = args
-        return Annotated[t, Comment(ct)]
+        return Annotated[t, cls(ct)]
+
+
+@dataclass(frozen=True)
+class CommentRec(Comment):
+    inherit: bool = True
 
 
 ###################
@@ -51,6 +57,10 @@ class CommentedObjects(Medley):
         if instr.required:
             raise ValidationError("Comment is required but object is not a CommentProxy", ctx=ctx)
         return call_next(t, obj, ctx)
+
+    @ovld(priority=PRIO_DEFAULT)
+    def serialize(self, t: Any, obj: CommentProxy, ctx: Context):
+        return recurse(t, obj._obj, ctx)
 
     @ovld(priority=PRIO_HIGHER - 1)
     def deserialize(self, t: type[Any @ Comment], obj: dict, ctx: Context):

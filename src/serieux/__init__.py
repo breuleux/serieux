@@ -10,7 +10,7 @@ from .auto import Auto
 from .ctx import AccessPath, Context, Patch, Patcher
 from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
 from .features.clargs import CLIDefinition, CommandLineArguments, parse_cli
-from .features.comment import Comment
+from .features.comment import Comment, CommentRec
 from .features.dotted import DottedNotation
 from .features.fromfile import IncludeFile, WorkingDirectory
 from .features.interpol import Environment
@@ -128,6 +128,7 @@ __all__ = [
     "CLIDefinition",
     "CommandLineArguments",
     "Comment",
+    "CommentRec",
     "Context",
     "DeepLazy",
     "deserialize",
