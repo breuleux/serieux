@@ -112,7 +112,7 @@ class FromEntryPoint(TagSet):
                     return self.wrap(t)
 
         eps = importlib.metadata.entry_points(group=self.entry_point)
-        return {ep.name: _wrap(ep.load()) for ep in eps}
+        return {ep.name: cls for ep in eps if (cls := _wrap(ep.load())) is not None}
 
     def get_type(self, tag: str | None, ctx: Context) -> type:
         eps = self.elements
