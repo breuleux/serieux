@@ -4,7 +4,7 @@ from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
 from ..instructions import Instruction, T
-from ..utils import PRIO_HIGHER
+from ..priority import HI5
 from .proxy import LazyProxy
 
 #############
@@ -26,14 +26,14 @@ else:
 
 
 class LazyDeserialization(Medley):
-    @ovld(priority=PRIO_HIGHER - 1)
+    @ovld(priority=HI5)
     def deserialize(self, t: type[Any @ Lazy], value: object, ctx: Context):
         def evaluate():
             return recurse(Lazy.strip(t), value, ctx)
 
         return LazyProxy(evaluate, type=t)
 
-    @ovld(priority=PRIO_HIGHER - 1)
+    @ovld(priority=HI5)
     def deserialize(self, t: type[Any @ DeepLazy], value: object, ctx: Context):
         def evaluate():
             return call_next(t, value, ctx)

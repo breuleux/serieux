@@ -4,7 +4,7 @@ from ovld import Medley, call_next, ovld
 
 from ..ctx import Context
 from ..model import FieldModelizable
-from ..utils import PRIO_HIGH
+from ..priority import HI2
 
 
 def unflatten(d: dict):
@@ -19,7 +19,7 @@ def unflatten(d: dict):
 
 
 class DottedNotation(Medley):
-    @ovld(priority=PRIO_HIGH + 0.25)
+    @ovld(priority=HI2)
     def deserialize(self, t: Any, obj: dict, ctx: Context):
         if issubclass(t, FieldModelizable) and any("." in k for k in obj.keys()):
             return call_next(t, unflatten(obj), ctx)

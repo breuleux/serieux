@@ -12,7 +12,8 @@ from ovld.dependent import Regexp
 from ..ctx import AccessPath
 from ..exc import NotGivenError, ValidationError
 from ..instructions import strip
-from ..utils import PRIO_HIGH, UnionAlias
+from ..priority import HI1
+from ..utils import UnionAlias
 from .lazy import LazyProxy
 from .partial import Sources
 
@@ -120,13 +121,13 @@ class Environment(AccessPath):
 
 
 class Interpolation(Medley):
-    @ovld(priority=PRIO_HIGH + 0.3)
+    @ovld(priority=HI1(3))
     def deserialize(self, t: Any, obj: object, ctx: Environment):
         rval = call_next(t, obj, ctx)
         ctx.refs[ctx.access_path] = rval
         return rval
 
-    @ovld(priority=PRIO_HIGH + 0.2)
+    @ovld(priority=HI1(2))
     def deserialize(self, t: Any, obj: Regexp[r"^\$\{[^}]+\}$"], ctx: Environment):
         expr = obj.lstrip("${").rstrip("}")
         obj = ctx.resolve_variable(strip(t), expr)
@@ -139,7 +140,7 @@ class Interpolation(Medley):
         else:
             return recurse(t, obj, ctx)
 
-    @ovld(priority=PRIO_HIGH + 0.1)
+    @ovld(priority=HI1(1))
     def deserialize(self, t: Any, obj: Regexp[r"\$\{[^}]+\}"], ctx: Environment):
         def interpolate():
             def repl(match):

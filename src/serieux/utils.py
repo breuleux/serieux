@@ -26,14 +26,6 @@ except ImportError:  # pragma: no cover
         pass
 
 
-PRIO_LAST = -100
-PRIO_LOW = -2
-PRIO_DEFAULT = -1
-PRIO_HIGH = 10
-PRIO_HIGHER = 20
-PRIO_TOP = 1000
-
-
 @class_check
 def UnionAlias(cls):
     return get_origin(cls) in (Union, UnionType)

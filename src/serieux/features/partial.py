@@ -14,8 +14,8 @@ from ..exc import (
 )
 from ..instructions import Instruction, T, strip
 from ..model import FieldModelizable, model
-from ..utils import PRIO_HIGH
-from .lazy import LazyProxy
+from ..priority import HI4
+from .proxy import LazyProxy
 
 #############
 # Constants #
@@ -92,14 +92,14 @@ def partialize(t: object):
 
 
 class PartialBuilding(Medley):
-    @ovld(priority=PRIO_HIGH + 1)
+    @ovld(priority=HI4.next())
     def deserialize(self, t: type[Any @ Partial], obj: object, ctx: Context, /):
         try:
             return call_next(t, obj, ctx)
         except SerieuxError as exc:
             return exc
 
-    @ovld(priority=PRIO_HIGH + 1.25)
+    @ovld(priority=HI4.next())
     def deserialize(self, t: Any, obj: Sources, ctx: Context, /):
         parts = []
         for src in obj.sources:

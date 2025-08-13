@@ -4,7 +4,7 @@ from ovld import Medley, ovld
 
 from ..ctx import Context
 from ..exc import ValidationError
-from ..utils import PRIO_HIGH
+from ..priority import HI2
 
 
 class RegisteredMC(type):
@@ -68,7 +68,7 @@ class StringMapped(SMBase, metaclass=StringMappedMC):
 
 
 class RegisteredHandler(Medley):
-    @ovld(priority=PRIO_HIGH + 1)
+    @ovld(priority=HI2)
     def deserialize(self, t: type[SMBase], obj: str, ctx: Context, /):
         mapping = t._registered_mapping
         if obj in mapping:
@@ -78,7 +78,7 @@ class RegisteredHandler(Medley):
                 f"'{obj}' is not a registered option. Should be one of: {list(mapping.keys())}"
             )
 
-    @ovld(priority=PRIO_HIGH + 1)
+    @ovld(priority=HI2)
     def serialize(self, t: type[SMBase], obj: Any, ctx: Context, /):
         inv_mapping = t._registered_inverse_mapping
         if obj in inv_mapping:
@@ -88,6 +88,6 @@ class RegisteredHandler(Medley):
                 f"The value '{obj}' is not registered under any name in the mapping"
             )
 
-    @ovld(priority=PRIO_HIGH + 1)
+    @ovld(priority=HI2)
     def schema(self, t: type[SMBase], ctx: Context, /):
         return {"type": "string", "enum": list(t._registered_mapping.keys())}

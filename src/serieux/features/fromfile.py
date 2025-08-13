@@ -11,7 +11,8 @@ from ovld.dependent import HasKey
 
 from ..ctx import Context, Located, Location
 from ..exc import ValidationError
-from ..utils import PRIO_HIGHER, PRIO_LAST, clsstring
+from ..priority import HI7, MIN
+from ..utils import clsstring
 from .partial import PartialBuilding, Sources
 
 include_field = "$include"
@@ -109,40 +110,40 @@ class FromFile(PartialBuilding):
         ctx = ctx + WorkingDirectory(origin=obj, directory=obj.parent)
         return recurse(t, data, ctx)
 
-    @ovld(priority=PRIO_HIGHER)
+    @ovld(priority=HI7)
     def deserialize(self, t: Any, obj: yaml.MappingNode, ctx: Context):
         return recurse(t, {k.value: v for k, v in obj.value}, yaml_source_extract(obj, ctx))
 
-    @ovld(priority=PRIO_HIGHER)
+    @ovld(priority=HI7)
     def deserialize(self, t: Any, obj: yaml.SequenceNode, ctx: Context):
         return recurse(t, obj.value, yaml_source_extract(obj, ctx))
 
-    @ovld(priority=PRIO_HIGHER)
+    @ovld(priority=HI7)
     def deserialize(self, t: Any, obj: ScalarNode[":str"], ctx: Context):  # type: ignore
         return recurse(t, obj.value, yaml_source_extract(obj, ctx))
 
-    @ovld(priority=PRIO_HIGHER)
+    @ovld(priority=HI7)
     def deserialize(self, t: Any, obj: ScalarNode[":int"], ctx: Context):  # type: ignore
         return recurse(t, int(obj.value), yaml_source_extract(obj, ctx))
 
-    @ovld(priority=PRIO_HIGHER)
+    @ovld(priority=HI7)
     def deserialize(self, t: Any, obj: ScalarNode[":float"], ctx: Context):  # type: ignore
         return recurse(t, float(obj.value), yaml_source_extract(obj, ctx))
 
-    @ovld(priority=PRIO_HIGHER)
+    @ovld(priority=HI7)
     def deserialize(self, t: Any, obj: ScalarNode[":bool"], ctx: Context):  # type: ignore
         value = obj.value.lower() in ("yes", "on", "true")
         return recurse(t, value, yaml_source_extract(obj, ctx))
 
-    @ovld(priority=PRIO_HIGHER)
+    @ovld(priority=HI7)
     def deserialize(self, t: Any, obj: ScalarNode[":null"], ctx: Context):  # type: ignore
         return recurse(t, None, yaml_source_extract(obj, ctx))
 
-    @ovld(priority=PRIO_HIGHER)
+    @ovld(priority=HI7)
     def deserialize(self, t: Any, obj: ScalarNode[":timestamp"], ctx: Context):  # type: ignore
         return recurse(t, obj.value, yaml_source_extract(obj, ctx))
 
-    @ovld(priority=PRIO_HIGHER)
+    @ovld(priority=HI7)
     def deserialize(self, t: Any, obj: yaml.ScalarNode, ctx: Context):  # pragma: no cover
         raise ValidationError(f"Cannot deserialize YAML node of type `{obj.tag}`")
 
@@ -154,7 +155,7 @@ class IncludeFile(FromFile):
         incl = recurse(str, obj.pop(include_field), ctx)
         return recurse(t, Sources(Path(incl), obj), ctx)
 
-    @ovld(priority=PRIO_LAST)
+    @ovld(priority=MIN)
     def deserialize(self, t: type[object], obj: str, ctx: WorkingDirectory):
         if "." not in obj or obj.rsplit(".", 1)[1].isnumeric():
             return call_next(t, obj, ctx)

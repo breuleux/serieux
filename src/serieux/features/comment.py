@@ -6,8 +6,8 @@ from ovld import Medley, call_next, ovld, recurse
 from ..ctx import Context
 from ..exc import ValidationError
 from ..instructions import BaseInstruction
+from ..priority import HI6, STD
 from ..schema import AnnotatedSchema
-from ..utils import PRIO_DEFAULT, PRIO_HIGHER
 from .proxy import CommentProxy
 from .tagset import value_field
 
@@ -41,7 +41,7 @@ class CommentRec(Comment):
 
 
 class CommentedObjects(Medley):
-    @ovld(priority=PRIO_HIGHER - 1)
+    @ovld(priority=HI6)
     def serialize(self, t: type[Any @ Comment], obj: CommentProxy, ctx: Context):
         base, instr = Comment.decompose(t)
         rval = recurse(base, obj._obj, ctx)
@@ -51,18 +51,18 @@ class CommentedObjects(Medley):
         rval[comment_field] = comment
         return rval
 
-    @ovld(priority=PRIO_HIGHER - 1)
+    @ovld(priority=HI6)
     def serialize(self, t: type[Any @ Comment], obj: object, ctx: Context):
         instr = Comment.extract(t)
         if instr.required:
             raise ValidationError("Comment is required but object is not a CommentProxy", ctx=ctx)
         return call_next(t, obj, ctx)
 
-    @ovld(priority=PRIO_DEFAULT)
+    @ovld(priority=STD)
     def serialize(self, t: Any, obj: CommentProxy, ctx: Context):
         return recurse(t, obj._obj, ctx)
 
-    @ovld(priority=PRIO_HIGHER - 1)
+    @ovld(priority=HI6)
     def deserialize(self, t: type[Any @ Comment], obj: dict, ctx: Context):
         base, instr = Comment.decompose(t)
         if comment_field not in obj:
@@ -79,7 +79,7 @@ class CommentedObjects(Medley):
         comment = recurse(instr.comment_type, comment, ctx)
         return CommentProxy(main, comment)
 
-    @ovld(priority=PRIO_HIGHER - 1)
+    @ovld(priority=HI6)
     def deserialize(self, t: type[Any @ Comment], obj: object, ctx: Context):
         instr = Comment.extract(t)
         if instr.required:
