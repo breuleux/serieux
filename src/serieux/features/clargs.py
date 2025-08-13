@@ -121,7 +121,7 @@ def make_argument(t: type[StringModelizable], partial: dict, model_field: Field)
     return {**partial, "type": regex_checker(m.regexp, m.string_description) if m.regexp else str}
 
 
-@ovld
+@ovld(priority=-2)
 def make_argument(t: type[object], partial: dict, model_field: Field):
     return {**partial, "action": ParseStringAction}
 
@@ -264,7 +264,7 @@ class CLIDefinition:
         if self.argparser is None:
             if self.description is None:
                 description = (
-                    self.root_type.__doc__ or f"Arguments for {clsstring(self.root_type)}"
+                    strip(self.root_type).__doc__ or f"Arguments for {clsstring(self.root_type)}"
                 )
             else:
                 description = self.description

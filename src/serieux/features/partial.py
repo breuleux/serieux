@@ -56,7 +56,7 @@ def partialize(t: type[FieldModelizable]):
         (
             f.name,
             Partial[f.type],
-            field(default=NOT_GIVEN, metadata={"description": f.description}),
+            field(default=NOT_GIVEN, metadata={"description": f.description, **f.metadata}),
         )
         for f in m.fields
     ]
