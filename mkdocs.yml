@@ -1,0 +1,8 @@
+site_name: Serieux documentation
+theme: readthedocs
+markdown_extensions:
+  - admonition
+repo_url: https://github.com/breuleux/serieux/
+nav:
+  - index.md
+  - usage.md
