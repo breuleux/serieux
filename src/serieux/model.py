@@ -243,7 +243,7 @@ def model(t: type[date] | type[datetime]):
     return Model(
         original_type=t,
         from_string=Lambda("$t.fromisoformat($obj)"),
-        to_string=Lambda("$obj.isoformat()"),
+        to_string=Lambda("$t.isoformat($obj)"),
     )
 
 
