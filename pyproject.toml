@@ -7,7 +7,7 @@ authors = [
 ]
 dependencies = [
     "mkdocs>=1.6.1",
-    "ovld~=0.5.10",
+    "ovld~=0.5.11",
     "pyyaml>=6.0.2",
 ]
 readme = "README.md"
