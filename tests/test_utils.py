@@ -2,7 +2,7 @@ from dataclasses import fields
 from numbers import Number
 from typing import TypeVar, Union
 
-from serieux.utils import JSON, evaluate_hint as eh
+from serieux.utils import JSON, JSONLike, evaluate_hint as eh
 
 from .common import has_312_features, one_test_per_assert
 from .definitions import Point
@@ -44,11 +44,35 @@ def test_evaluate_hint_tree_parametric():
         assert eh(field.type, Tree[str]) == Union[str, Tree[str]]
 
 
-def test_json_type_check():
-    J = JSON[object]
-    JL = JSON[list]
+def test_json_like():
+    J = JSONLike[object]
+    JL = JSONLike[list]
     for yes in [int, float, str, list[float], dict[str, str], dict[str, str | int]]:
         assert issubclass(yes, J)
     for no in [object, Point, dict[int, str], list]:
         assert not issubclass(no, J)
     assert not issubclass(dict[str, str], JL)
+
+
+@one_test_per_assert
+def test_json():
+    assert isinstance(1, JSON)
+    assert isinstance(3.14, JSON)
+    assert isinstance("hello", JSON)
+    assert isinstance([1, 2, 3], JSON)
+    assert isinstance({"a": 1, "b": [2, {"z": 3}]}, JSON)
+    assert isinstance([True, False, None], JSON)
+
+
+class NotJson:
+    pass
+
+
+@one_test_per_assert
+def test_not_json():
+    assert not isinstance({"a": NotJson()}, JSON)
+    assert not isinstance([1, 2, NotJson(), 3], JSON)
+    assert not isinstance(NotJson(), JSON)
+    assert not isinstance(set([1, 2, 3]), JSON)
+    assert not isinstance((1, 2, 3), JSON)
+    assert not isinstance(object(), JSON)

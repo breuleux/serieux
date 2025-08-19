@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from serieux import deserialize, serialize
+from serieux import JSON, deserialize, serialize
 from serieux.exc import ValidationError
 from serieux.features.fromfile import WorkingDirectory
 from serieux.tell import TypeTell, tells
@@ -239,3 +239,32 @@ def test_schema_pattern():
 
 def test_tells_pattern():
     assert tells(re.Pattern) == {TypeTell(str)}
+
+
+#############
+# Test JSON #
+#############
+
+
+class NotJson:
+    pass
+
+
+def test_serialize_json():
+    data = {"a": 1, "b": [2, 3], "c": {"d": "hello"}}
+    assert serialize(JSON, data) == data
+    assert serialize(list[JSON], [data, 42, "foo"]) == [data, 42, "foo"]
+    with pytest.raises(ValidationError):
+        serialize(JSON, NotJson())
+
+
+def test_deserialize_json():
+    data = {"a": 1, "b": [2, 3], "c": {"d": "hello"}}
+    assert deserialize(JSON, data) == data
+    assert deserialize(list[JSON], [data, 42, "foo"]) == [data, 42, "foo"]
+    with pytest.raises(ValidationError):
+        deserialize(JSON, NotJson())
+
+
+def test_schema_json():
+    assert schema(JSON) == {}

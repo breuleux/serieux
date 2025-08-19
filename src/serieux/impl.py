@@ -23,7 +23,7 @@ from ovld import (
 )
 from ovld.codegen import Function
 from ovld.medley import KeepLast, use_combiner
-from ovld.types import All
+from ovld.types import All, Exactly
 from ovld.utils import ResolutionError, subtler_type
 
 from .ctx import AccessPath, Context
@@ -35,6 +35,7 @@ from .priority import LOW, MAX, MIN, STD, STD2, STD3
 from .schema import AnnotatedSchema, Schema
 from .tell import tells as get_tells
 from .utils import (
+    JSON,
     Indirect,
     IsLiteral,
     TypeAliasType,
@@ -692,6 +693,34 @@ class BaseImplementation(Medley):
     def schema(self, t: type[UnionAlias], ctx: Context, /):
         options = get_args(t)
         return {"oneOf": [recurse(opt, ctx) for opt in options]}
+
+    #########################
+    # Implementations: JSON #
+    #########################
+
+    @ovld(priority=STD)
+    def serialize(self, t: type[Exactly[JSON]], obj: object, ctx: Context, /):
+        if isinstance(obj, dict):
+            obj = {recurse(str, k, ctx): recurse(JSON, v, ctx) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            obj = [recurse(JSON, v, ctx) for v in obj]
+        elif not isinstance(obj, JSON):
+            raise ValidationError(f"Object {obj!r} is not valid JSON", ctx=ctx)
+        return obj
+
+    @ovld(priority=STD)
+    def deserialize(self, t: type[Exactly[JSON]], obj: object, ctx: Context, /):
+        if isinstance(obj, dict):
+            obj = {recurse(str, k, ctx): recurse(JSON, v, ctx) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            obj = [recurse(JSON, v, ctx) for v in obj]
+        elif not isinstance(obj, JSON):
+            raise ValidationError(f"Object {obj!r} is not valid JSON", ctx=ctx)
+        return obj
+
+    @ovld(priority=STD)
+    def schema(self, t: type[Exactly[JSON]], ctx: Context, /):
+        return {}
 
     ##########################
     # Implementations: Enums #

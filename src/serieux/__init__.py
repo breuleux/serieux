@@ -4,7 +4,7 @@ import logging
 import traceback
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 from .auto import Auto
 from .ctx import AccessPath, Context, Patch, Patcher
@@ -59,7 +59,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
     T = TypeVar("T")
 
-    JSON = list["JSON"] | dict[str, "JSON"] | int | str | float | bool | None
+    JSON: TypeAlias = list["JSON"] | dict[str, "JSON"] | int | str | float | bool | None
 
     class _MC:
         def __add__(self, other) -> type["Serieux"]: ...

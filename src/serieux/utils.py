@@ -14,7 +14,7 @@ from typing import (
     get_origin,
 )
 
-from ovld import class_check, parametrized_class_check
+from ovld import class_check, dependent_check, parametrized_class_check
 
 from .instructions import strip
 
@@ -132,29 +132,40 @@ def evaluate_hint(typ, ctx=None, lcl=None, typesub=None, seen=None):
 ####################
 
 
-def _json_type_check(t, bound=object):
-    origin = get_origin(t)
-    if origin is typing.Union or origin is UnionType:
-        return all(_json_type_check(t2) for t2 in get_args(t))
-    if not isinstance(origin or t, type) or not issubclass(origin or t, bound):
+@parametrized_class_check
+def JSONLike(t, bound=object):
+    def _f(t, bound=object):
+        origin = get_origin(t)
+        if origin is typing.Union or origin is UnionType:
+            return all(_f(t2) for t2 in get_args(t))
+        if not isinstance(origin or t, type) or not issubclass(origin or t, bound):
+            return False
+        if t in (int, float, str, bool, NoneType):
+            return True
+        if origin is list:
+            (et,) = get_args(t)
+            return _f(et)
+        if origin is dict:
+            kt, vt = get_args(t)
+            return (kt is str) and _f(vt)
         return False
-    if t in (int, float, str, bool, NoneType):
-        return True
-    if origin is list:
-        (et,) = get_args(t)
-        return _json_type_check(et)
-    if origin is dict:
-        kt, vt = get_args(t)
-        return (kt is str) and _json_type_check(vt)
-    return False
 
-
-JSON = parametrized_class_check(_json_type_check)
+    return _f(t, bound=bound)
 
 
 @class_check
 def IsLiteral(t):
     return get_origin(t) is Literal
+
+
+@dependent_check
+def JSON(obj: dict | list | str | int | float | None):
+    if isinstance(obj, dict):
+        return all(isinstance(k, str) and isinstance(v, JSON) for k, v in obj.items())
+    elif isinstance(obj, list):
+        return all(isinstance(v, JSON) for v in obj)
+    else:
+        return True
 
 
 ########
