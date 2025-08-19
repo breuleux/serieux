@@ -1,3 +1,4 @@
+import json
 import sys
 from contextlib import contextmanager
 from io import StringIO
@@ -54,3 +55,22 @@ def fresh_serieux(monkeypatch):
     monkeypatch.setattr("serieux.deserialize", new_serieux.deserialize)
     monkeypatch.setattr("serieux.serialize", new_serieux.serialize)
     return new_serieux
+
+
+@pytest.fixture
+def schematest(file_regression):
+    ABSENT = object()
+
+    def check(type, value=ABSENT):
+        import jsonschema
+
+        from serieux import schema, serialize
+
+        sch = schema(type)
+        sch_value = sch.compile()
+        if value is not ABSENT:
+            jsonschema.validate(serialize(type, value), sch_value)
+
+        file_regression.check(json.dumps(sch_value, indent=4))
+
+    yield check

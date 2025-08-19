@@ -1,10 +1,9 @@
-import json
 from dataclasses import dataclass
 from typing import Annotated
 
 import pytest
 
-from serieux import Serieux, schema
+from serieux import Serieux
 from serieux.exc import ValidationError
 from serieux.features.comment import Comment, CommentedObjects, CommentRec, comment_field
 from serieux.features.proxy import CommentProxy
@@ -107,14 +106,25 @@ def test_comment_serialize_proxy_to_normal_type():
     assert serialized == expected
 
 
-def test_comment_schema(file_regression):
-    sch = schema(Comment[Person, str])
-    file_regression.check(json.dumps(sch.compile(), indent=4))
+def test_comment_schema(schematest):
+    schematest(
+        type=Comment[Person, str],
+        value=CommentProxy(Person("Alice", 30), "note"),
+    )
 
 
-def test_comment_schema_required(file_regression):
-    sch = schema(Annotated[Person, Comment(str, required=True)])
-    file_regression.check(json.dumps(sch.compile(), indent=4))
+def test_comment_schema_required(schematest):
+    schematest(
+        type=Annotated[Person, Comment(str, required=True)],
+        value=CommentProxy(Person("Bob", 25), "required comment"),
+    )
+
+
+def test_comment_schema_primitive(schematest):
+    schematest(
+        type=Annotated[str, Comment(str, required=True)],
+        value=CommentProxy("hello", "world"),
+    )
 
 
 def test_commentrec_serialize():

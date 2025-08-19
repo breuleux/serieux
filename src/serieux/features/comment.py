@@ -94,8 +94,21 @@ class CommentedObjects(Medley):
         base, instr = Comment.decompose(t)
         base_schema = recurse(base, ctx)
         comment_schema = recurse(instr.comment_type, ctx)
-        return AnnotatedSchema(
-            base_schema,
-            properties={comment_field: comment_schema},
-            required=[comment_field] if instr.required else [],
-        )
+        if base_schema.get("type", None) == "object":
+            return AnnotatedSchema(
+                base_schema,
+                properties={comment_field: comment_schema},
+                required=[comment_field] if instr.required else [],
+            )
+        else:
+            required = [value_field]
+            if instr.required:
+                required.append(comment_field)
+            return {
+                "type": "object",
+                "properties": {
+                    value_field: base_schema,
+                    comment_field: comment_schema,
+                },
+                "required": required,
+            }
