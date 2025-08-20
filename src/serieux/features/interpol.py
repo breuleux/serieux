@@ -7,7 +7,6 @@ from types import NoneType
 from typing import Any, Literal, get_args
 
 from ovld import Medley, call_next, ovld, recurse
-from ovld.dependent import Regexp
 
 from ..ctx import AccessPath
 from ..exc import NotGivenError, ValidationError
@@ -71,6 +70,11 @@ def decode_string(t: type[list], value: str):
 class Environment(AccessPath):
     refs: dict[tuple[str, ...], object] = field(default_factory=dict, repr=False)
     environ: dict = field(default_factory=lambda: os.environ, repr=False)
+    interpolation_pattern: re.Pattern = re.compile(r"\$\{([^}]+)\}")
+
+    def __post_init__(self):
+        if isinstance(self.interpolation_pattern, str):
+            self.interpolation_pattern = re.compile(self.interpolation_pattern)
 
     def evaluate_reference(self, ref):
         def try_int(x):
@@ -119,6 +123,11 @@ class Environment(AccessPath):
             f"Cannot resolve '{method}:{expr}' because the '{method}' resolver is not defined."
         )
 
+    def __setitem__(self, pth, value):
+        if not isinstance(pth, tuple):
+            pth = (pth,)
+        self.refs[pth] = value
+
 
 class Interpolation(Medley):
     @ovld(priority=HI1(3))
@@ -128,25 +137,28 @@ class Interpolation(Medley):
         return rval
 
     @ovld(priority=HI1(2))
-    def deserialize(self, t: Any, obj: Regexp[r"^\$\{[^}]+\}$"], ctx: Environment):
-        expr = obj.lstrip("${").rstrip("}")
-        obj = ctx.resolve_variable(strip(t), expr)
-        if isinstance(obj, LazyProxy):
+    def deserialize(self, t: Any, obj: str, ctx: Environment):
+        match ctx.interpolation_pattern.split(obj):
+            case [s]:
+                return call_next(t, s, ctx)
+            case ["", expr, ""]:
+                obj = ctx.resolve_variable(strip(t), expr)
+                if isinstance(obj, LazyProxy):
 
-            def interpolate():
-                return recurse(t, obj._obj, ctx)
+                    def interpolate():
+                        return recurse(t, obj._obj, ctx)
 
-            return LazyProxy(interpolate)
-        else:
-            return recurse(t, obj, ctx)
+                    return LazyProxy(interpolate)
+                else:
+                    return recurse(t, obj, ctx)
+            case parts:
 
-    @ovld(priority=HI1(1))
-    def deserialize(self, t: Any, obj: Regexp[r"\$\{[^}]+\}"], ctx: Environment):
-        def interpolate():
-            def repl(match):
-                return str(ctx.resolve_variable(str, match.group(1)))
+                def interpolate():
+                    resolved = [
+                        p if i % 2 == 0 else ctx.resolve_variable(str, p)
+                        for i, p in enumerate(parts)
+                    ]
+                    subbed = "".join(map(str, resolved))
+                    return recurse(t, subbed, ctx)
 
-            subbed = re.sub(r"\$\{([^}]+)\}", repl, obj)
-            return recurse(t, subbed, ctx)
-
-        return LazyProxy(interpolate)
+                return LazyProxy(interpolate)

@@ -217,3 +217,19 @@ def test_resolve_envfile_two_files():
 def test_resolve_envfile_not_given():
     canada = deserialize(Country, Sources(Path(_canada), "${envfile:FILOU}"), Environment())
     assert canada.capital == "Ottawa"
+
+
+def test_populate_environment():
+    env = Environment()
+    env["exclaim"] = "wow!"
+    result = deserialize(str, "${exclaim} I like this", env)
+    assert result == "wow! I like this"
+
+
+def test_custom_interpolate_regex():
+    data = {"name": "Robert", "nickname": "~name", "number": 1}
+    assert deserialize(Player, data, Environment(interpolation_pattern=r"~([a-z]+)")) == Player(
+        name="Robert",
+        nickname="Robert",
+        number=1,
+    )
