@@ -91,6 +91,8 @@ deserialize(
 )
 ```
 
+[**Read more.**](./features/multi.md)
+
 ## Interpolation
 
 Variable interpolation is not a default feature. You need to pass `Environment()` as the third argument (the context) in order to enable it.
@@ -116,6 +118,9 @@ deserialize(
 #      jester=Person(name="Funnier than Archibald", age=23)
 #    )
 ```
+
+[**Read more.**](./features/interpol.md)
+
 
 ## Environment variables
 
@@ -178,6 +183,8 @@ print(deserialize(PoM, {"$class": "person", "name": "Alice", "age": 30}))
 print(deserialize(PoM, {"$class": "monster", "name": "Floborb", "age": 37154}))
 # => Monster(name="Floborb", age=37154)
 ```
+
+[**Read more.**](./features/tagsets.md)
 
 
 ## Schemas
