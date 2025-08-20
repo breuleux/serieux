@@ -7,4 +7,5 @@ nav:
   - index.md
   - usage.md
   - features/multi.md
+  - features/tagsets.md
   - features/comments.md
