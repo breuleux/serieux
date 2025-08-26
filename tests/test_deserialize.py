@@ -10,7 +10,17 @@ from serieux.ctx import AccessPath
 from serieux.exc import SchemaError, ValidationError
 
 from .common import has_312_features, one_test_per_assert
-from .definitions import Color, Defaults, DIDHolder, DotDict, Level, LTHolder, Point, Point3D
+from .definitions import (
+    Color,
+    Defaults,
+    DIDHolder,
+    DotDict,
+    Level,
+    LTHolder,
+    Point,
+    Point3D,
+    Pointato,
+)
 
 here = Path(__file__).parent
 
@@ -35,7 +45,6 @@ def test_deserialize_scalars_conversion():
 def test_deserialize_object():
     assert deserialize(object, 10) == 10
     assert deserialize(Any, 10) == 10
-    assert deserialize(object, {"a": 3}) == {"a": 3}
 
 
 def test_deserialize_dict():
@@ -251,3 +260,20 @@ def test_deserialize_recursive_type_py312():
     data = {"lt": [{"x": 1, "y": 1}, [{"x": 2, "y": 2}, [{"x": 3, "y": 3}], {"x": 4, "y": 4}]]}
     deser = deserialize(LTHolder, data)
     assert deser.lt == [p(1), [p(2), [p(3)], p(4)]]
+
+
+class Blooper:
+    def __init__(self, x: int, y: int, txt: str):
+        self.message = txt * (x + y)
+
+
+def test_deserialize_from_init():
+    data = {"x": 2, "y": 3, "txt": "ha"}
+    blooper = deserialize(Blooper, data)
+    assert isinstance(blooper, Blooper)
+    assert blooper.message == "hahahahaha"
+
+
+def test_deserialize_pointato():
+    with pytest.raises(ValidationError, match="Did you mean for it to be a dataclass"):
+        deserialize(Pointato, {"x": 1, "y": 2})

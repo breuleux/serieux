@@ -45,9 +45,6 @@ def test_custom_deserializer(fresh_serieux):
 
 
 def test_custom_schema(fresh_serieux):
-    with pytest.raises(Exception):
-        fresh_serieux.schema(Beep)
-
     @schema_definition
     def _sch(self, t: type[Beep], ctx: Context):
         return {"type": "integer"}

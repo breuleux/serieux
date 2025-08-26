@@ -58,6 +58,7 @@ class MeldedCall:
 class Auto(BaseInstruction):
     call: bool = False
     embed_self: bool = True
+    force: bool = False
 
     @property
     def annotation_priority(self):  # pragma: no cover
@@ -99,7 +100,7 @@ def model_from_callable(t, call=False, embed_self=True):
             raise TypeError(f"Cannot model {t}: '{param.name}' lacks a type annotation.")
         field = Field(
             name=param.name,
-            description=(docs[param.name].doc or param.name) if param.name in docs else param.name,
+            description=(docs[param.name].doc or None) if param.name in docs else None,
             metadata=(docs[param.name].metadata or {}) if param.name in docs else {},
             type=inherit(orig_t, evaluate_hint(param.annotation, None, None, None)),
             default=MISSING if param.default is inspect._empty else param.default,
@@ -127,6 +128,6 @@ def model_from_callable(t, call=False, embed_self=True):
 def _(t: type[Any @ Auto]):
     _, aut = Auto.decompose(t)
     aut = aut or Auto()
-    if not aut.call and (normal := call_next(t)) is not None:
+    if not aut.call and not aut.force and (normal := call_next(t)) is not None:
         return normal
     return model_from_callable(t, call=aut.call, embed_self=aut.embed_self)

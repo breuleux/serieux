@@ -1,4 +1,4 @@
-from dataclasses import MISSING, field
+from dataclasses import MISSING, field, is_dataclass
 from datetime import date, datetime
 from enum import Enum
 from functools import wraps
@@ -26,12 +26,13 @@ from ovld.medley import KeepLast, use_combiner
 from ovld.types import All, Exactly
 from ovld.utils import ResolutionError, subtler_type
 
+from .auto import Auto
 from .ctx import AccessPath, Context
 from .exc import SchemaError, SerieuxError, ValidationError, ValidationExceptionGroup
 from .features.fromfile import WorkingDirectory
 from .instructions import pushdown
 from .model import FieldModelizable, Modelizable, StringModelizable, model
-from .priority import LOW, MAX, MIN, STD, STD2, STD3
+from .priority import LO4, LOW, MAX, MIN, STD, STD2, STD3
 from .schema import AnnotatedSchema, Schema
 from .tell import tells as get_tells
 from .utils import (
@@ -800,3 +801,27 @@ class BaseImplementation(Medley):
     @ovld(priority=STD)
     def schema(self, t: type[Path], ctx: Context, /):
         return {"type": "string"}
+
+    ##################################
+    # Implementations: From __init__ #
+    ##################################
+
+    @ovld(priority=LO4)
+    def deserialize(self, t: type[object], obj: dict, ctx: Context):
+        if t.__init__ is object.__init__:
+            msg = f"Cannot deserialize `{obj}` to type `{clsstring(t)}.`"
+            if getattr(t, "__annotations__", None) and not is_dataclass(t):
+                msg += f" `{clsstring(t)}` appears to have type annotations on some fields, but it is not a dataclass. Did you mean for it to be a dataclass?"
+            raise ValidationError(msg, ctx=ctx)
+        # We use the Auto feature to convert __init__ to a model. force=True means we
+        # will not try to find a model for t itself.
+        return recurse(Annotated[t, Auto(call=False, embed_self=False, force=True)], obj, ctx)
+
+    @ovld(priority=LO4)
+    def schema(self, t: type[object], ctx: Context):
+        if t.__init__ is object.__init__:
+            msg = f"Cannot generate schema for type `{clsstring(t)}`."
+            if getattr(t, "__annotations__", None) and not is_dataclass(t):
+                msg += f" `{clsstring(t)}` appears to have type annotations on some fields, but it is not a dataclass. Did you mean for it to be a dataclass?"
+            raise ValidationError(msg, ctx=ctx)
+        return recurse(Annotated[t, Auto(call=False, embed_self=False, force=True)], ctx)

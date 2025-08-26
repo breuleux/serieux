@@ -5,11 +5,12 @@ from typing import Literal
 import pytest
 
 from serieux import schema as _schema
+from serieux.exc import ValidationError
 from serieux.model import Extensible
 from serieux.schema import AnnotatedSchema, Schema
 
 from .common import has_312_features
-from .definitions import Color, Defaults, LTHolder, Pig, Point
+from .definitions import Color, Defaults, LTHolder, Pig, Point, Pointato
 
 
 def schema(t, root=False, ref_policy="norepeat"):
@@ -377,3 +378,26 @@ def test_schema_additive_point():
         "required": ["x", "y", "more"],
         "additionalProperties": False,
     }
+
+
+class Blooper:
+    def __init__(self, x: int, y: int, txt: str):
+        self.message = txt * (x + y)
+
+
+def test_schema_blooper():
+    assert schema(Blooper) == {
+        "type": "object",
+        "properties": {
+            "x": {"type": "integer"},
+            "y": {"type": "integer"},
+            "txt": {"type": "string"},
+        },
+        "required": ["x", "y", "txt"],
+        "additionalProperties": False,
+    }
+
+
+def test_schema_pointato():
+    with pytest.raises(ValidationError, match="Did you mean for it to be a dataclass"):
+        schema(Pointato)

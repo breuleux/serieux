@@ -42,6 +42,12 @@ class Point3D(Point):
     z: int
 
 
+# This one is not a dataclass and useful error messages should point that out
+class Pointato:
+    x: int
+    y: int
+
+
 class Color(str, Enum):
     RED = "red"
     GREEN = "green"

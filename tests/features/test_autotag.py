@@ -8,17 +8,12 @@ from serieux.exc import ValidationError
 from serieux.features.autotag import AutoTagAny
 from serieux.features.tagset import tag_field, value_field
 
-from ..definitions import Point
+from ..definitions import Point, Pointato
 
 srx = (Serieux + AutoTagAny)()
 deserialize = srx.deserialize
 serialize = srx.serialize
 schema = srx.schema
-
-
-class Pointato:
-    x: int
-    y: int
 
 
 def test_serialize_point():
