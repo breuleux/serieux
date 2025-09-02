@@ -6,8 +6,8 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from serieux import JSON, deserialize, serialize
+from serieux.ctx import WorkingDirectory
 from serieux.exc import ValidationError
-from serieux.features.fromfile import WorkingDirectory
 from serieux.tell import TypeTell, tells
 
 from .test_schema import schema

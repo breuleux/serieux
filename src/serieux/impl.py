@@ -27,9 +27,8 @@ from ovld.utils import ResolutionError, subtler_type
 
 from . import formats
 from .auto import Auto
-from .ctx import AccessPath, Context
+from .ctx import AccessPath, Context, Sourced, WorkingDirectory
 from .exc import SchemaError, SerieuxError, ValidationError, ValidationExceptionGroup
-from .features.fromfile import WorkingDirectory
 from .instructions import pushdown
 from .model import FieldModelizable, Modelizable, StringModelizable, model
 from .priority import LO4, LOW, MAX, MIN, STD, STD2, STD3
@@ -89,7 +88,7 @@ class BaseImplementation(Medley):
         ctx = ctx or self.default_context
         if dest:
             dest = Path(dest)
-            ctx = ctx + WorkingDirectory(origin=dest)
+            ctx = ctx + Sourced(origin=dest)
         serialized = self.serialize(t, obj, ctx)
         if dest:
             formats.dump(p=dest, data=serialized, suffix=format)

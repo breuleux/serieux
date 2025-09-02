@@ -2,6 +2,9 @@ from pathlib import Path
 
 
 class FileFormat:  # pragma: no cover
+    def locate(self, f: Path, access_path: tuple[str]):
+        return None
+
     def load(self, f: Path):
         raise NotImplementedError(f"{type(self).__name__} does not implement `load`")
 

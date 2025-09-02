@@ -1,11 +1,15 @@
+import hashlib
 import json
 import logging
+import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable
 
 from ovld.medley import ChainAll, KeepLast, Medley
+
+from .formats.abc import FileFormat
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +46,59 @@ class Location:
         return self.code[self.start : self.end]
 
 
-class Located(Context):
-    location: Location = None
+class WorkingDirectory(Context):
+    directory: Path = None
+
+    def make_path_for(self, *, name=None, suffix=None, entropy=None):
+        if name is None and entropy is not None:
+            name = hashlib.md5(
+                str(entropy).encode() if isinstance(entropy, str) else entropy
+            ).hexdigest()
+        if name is None:
+            name = str(uuid.uuid4())
+        pth = self.directory / name
+        if suffix is not None:
+            pth = pth.with_suffix(suffix)
+        return pth
+
+    def save_to_file(
+        self, data: str | bytes = None, suffix=None, *, name=None, callback=None, entropy=None
+    ):
+        dest = self.make_path_for(entropy=entropy or data, suffix=suffix, name=name)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if callback:
+            callback(dest)
+        else:
+            if isinstance(data, str):
+                mode = "w"
+                encoding = "utf-8"
+            else:
+                mode = "wb"
+                encoding = None
+            with open(dest, mode=mode, encoding=encoding) as f:
+                f.write(data)
+        return str(dest.relative_to(self.directory))
+
+
+class Sourced(WorkingDirectory):
+    origin: Path = None
+    format: FileFormat = None
+
+    def __post_init__(self):
+        if self.directory is None:
+            self.directory = self.origin.parent
+
+    def compute_location(self):
+        if isinstance(self, AccessPath):
+            return self.format.locate(self.origin, self.access_path)
+        return None
+
+
+def locate(ctx):
+    if isinstance(ctx, Sourced):
+        return ctx.compute_location()
+    else:
+        return None
 
 
 @dataclass
@@ -74,22 +129,18 @@ class Patcher(Context):
             patch = Patch(patch, ctx=self)
         elif not patch.ctx:  # pragma: no cover
             patch = replace(patch, ctx=self)
-        start = patch.ctx.location.start if isinstance(patch.ctx, Located) else None
+        start = (loc := locate(patch.ctx)) and loc.start
         self.patches[start] = patch
 
     def apply_patches(self):
         codes = {}
         patches = defaultdict(list)
         for patch in self.patches.values():
-            match patch.ctx:
-                case Located(location=loc):
-                    codes[loc.source] = loc.code
-                    patches[loc.source].append((loc.start, loc.end, json.dumps(patch.compute())))
-                case _:  # pragma: no cover
-                    logger.warning(
-                        f"Cannot apply patch at a context without a location: `{patch}`"
-                    )
-
+            if loc := locate(patch.ctx):
+                codes[loc.source] = loc.code
+                patches[loc.source].append((loc.start, loc.end, json.dumps(patch.compute())))
+            else:  # pragma: no cover
+                logger.warning(f"Cannot apply patch at a context without a location: `{patch}`")
         for file, blocks in patches.items():
             code = codes[file].strip("\0")
             for start, end, content in sorted(blocks, reverse=True):

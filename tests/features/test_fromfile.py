@@ -9,9 +9,9 @@ from types import NoneType
 import pytest
 
 from serieux import Serieux
-from serieux.ctx import AccessPath
+from serieux.ctx import AccessPath, Sourced, WorkingDirectory
 from serieux.exc import ValidationError
-from serieux.features.fromfile import IncludeFile, WorkingDirectory
+from serieux.features.fromfile import IncludeFile
 from serieux.features.partial import Sources
 
 from ..definitions import Character, Citizen, Country, Player, Team, World
@@ -182,7 +182,7 @@ def test_save_callback(tmp_path):
 
 def test_wd_origin(tmp_path):
     origin = tmp_path / "xxx.yaml"
-    wd = WorkingDirectory(origin=origin)
+    wd = Sourced(origin=origin)
     assert wd.origin == origin
     assert wd.directory == tmp_path
 

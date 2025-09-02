@@ -6,13 +6,14 @@ from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeAlias
 
+from . import formats
 from .auto import Auto
-from .ctx import AccessPath, Context, Patch, Patcher
+from .ctx import AccessPath, Context, Patch, Patcher, WorkingDirectory
 from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
 from .features.clargs import CLIDefinition, CommandLineArguments, parse_cli
 from .features.comment import Comment, CommentRec
 from .features.dotted import DottedNotation
-from .features.fromfile import IncludeFile, WorkingDirectory
+from .features.fromfile import IncludeFile
 from .features.interpol import Environment
 from .features.lazy import DeepLazy, Lazy, LazyProxy
 from .features.partial import Partial, Sources
@@ -118,6 +119,9 @@ def schema_definition(fn=None, priority=0):
     check_signature(fn, "schema definition", ("self", "t: type[T1]", "ctx: T2>Context"))
     Serieux.schema.register(fn, priority=priority)
     return fn
+
+
+formats.register_entry_points()
 
 
 __all__ = [

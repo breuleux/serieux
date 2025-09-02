@@ -1,79 +1,17 @@
-import hashlib
-import uuid
 from pathlib import Path
 from typing import Any
 
-import yaml
-from ovld import call_next, dependent_check, ovld, recurse
+from ovld import call_next, ovld, recurse
 from ovld.dependent import HasKey
 
 from .. import formats
-from ..ctx import Context, Located, Location
+from ..ctx import Context, Sourced, WorkingDirectory
 from ..exc import ValidationError
-from ..priority import HI7, MIN
+from ..priority import MIN
 from ..utils import clsstring
 from .partial import PartialBuilding, Sources
 
 include_field = "$include"
-
-
-class WorkingDirectory(Context):
-    directory: Path = None
-    origin: Path = None
-
-    def __post_init__(self):
-        if self.directory is None:
-            self.directory = self.origin.parent
-
-    def make_path_for(self, *, name=None, suffix=None, entropy=None):
-        if name is None and entropy is not None:
-            name = hashlib.md5(
-                str(entropy).encode() if isinstance(entropy, str) else entropy
-            ).hexdigest()
-        if name is None:
-            name = str(uuid.uuid4())
-        pth = self.directory / name
-        if suffix is not None:
-            pth = pth.with_suffix(suffix)
-        return pth
-
-    def save_to_file(
-        self, data: str | bytes = None, suffix=None, *, name=None, callback=None, entropy=None
-    ):
-        dest = self.make_path_for(entropy=entropy or data, suffix=suffix, name=name)
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        if callback:
-            callback(dest)
-        else:
-            if isinstance(data, str):
-                mode = "w"
-                encoding = "utf-8"
-            else:
-                mode = "wb"
-                encoding = None
-            with open(dest, mode=mode, encoding=encoding) as f:
-                f.write(data)
-        return str(dest.relative_to(self.directory))
-
-
-def yaml_source_extract(node, ctx):
-    return ctx + Located(
-        location=Location(
-            source=getattr(ctx, "origin", None),
-            code=node.start_mark.buffer,
-            start=node.start_mark.index,
-            end=node.end_mark.index,
-            linecols=(
-                (node.start_mark.line, node.start_mark.column),
-                (node.end_mark.line, node.end_mark.column),
-            ),
-        )
-    )
-
-
-@dependent_check
-def ScalarNode(value: yaml.ScalarNode, tag_suffix):
-    return value.tag.endswith(tag_suffix)
 
 
 class FromFile(PartialBuilding):
@@ -81,48 +19,12 @@ class FromFile(PartialBuilding):
         if isinstance(ctx, WorkingDirectory):
             obj = ctx.directory / obj.expanduser()
         try:
-            data = formats.load(obj)
+            fmt = formats.find(obj)
+            data = fmt.load(obj)
         except Exception as exc:
             raise ValidationError(f"Could not read data from file '{obj}'", exc=exc, ctx=ctx)
-        ctx = ctx + WorkingDirectory(origin=obj, directory=obj.parent)
+        ctx = ctx + Sourced(origin=obj, directory=obj.parent, format=fmt)
         return recurse(t, data, ctx)
-
-    @ovld(priority=HI7)
-    def deserialize(self, t: Any, obj: yaml.MappingNode, ctx: Context):
-        return recurse(t, {k.value: v for k, v in obj.value}, yaml_source_extract(obj, ctx))
-
-    @ovld(priority=HI7)
-    def deserialize(self, t: Any, obj: yaml.SequenceNode, ctx: Context):
-        return recurse(t, obj.value, yaml_source_extract(obj, ctx))
-
-    @ovld(priority=HI7)
-    def deserialize(self, t: Any, obj: ScalarNode[":str"], ctx: Context):  # type: ignore
-        return recurse(t, obj.value, yaml_source_extract(obj, ctx))
-
-    @ovld(priority=HI7)
-    def deserialize(self, t: Any, obj: ScalarNode[":int"], ctx: Context):  # type: ignore
-        return recurse(t, int(obj.value), yaml_source_extract(obj, ctx))
-
-    @ovld(priority=HI7)
-    def deserialize(self, t: Any, obj: ScalarNode[":float"], ctx: Context):  # type: ignore
-        return recurse(t, float(obj.value), yaml_source_extract(obj, ctx))
-
-    @ovld(priority=HI7)
-    def deserialize(self, t: Any, obj: ScalarNode[":bool"], ctx: Context):  # type: ignore
-        value = obj.value.lower() in ("yes", "on", "true")
-        return recurse(t, value, yaml_source_extract(obj, ctx))
-
-    @ovld(priority=HI7)
-    def deserialize(self, t: Any, obj: ScalarNode[":null"], ctx: Context):  # type: ignore
-        return recurse(t, None, yaml_source_extract(obj, ctx))
-
-    @ovld(priority=HI7)
-    def deserialize(self, t: Any, obj: ScalarNode[":timestamp"], ctx: Context):  # type: ignore
-        return recurse(t, obj.value, yaml_source_extract(obj, ctx))
-
-    @ovld(priority=HI7)
-    def deserialize(self, t: Any, obj: yaml.ScalarNode, ctx: Context):  # pragma: no cover
-        raise ValidationError(f"Cannot deserialize YAML node of type `{obj.tag}`")
 
 
 class IncludeFile(FromFile):

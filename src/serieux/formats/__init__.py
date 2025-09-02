@@ -20,9 +20,6 @@ def register_entry_points():
             register(ep.name, Unavailable(ep.name, exc.name))
 
 
-register_entry_points()
-
-
 def find(p: Path, suffix: str | None = None):
     if suffix is None:
         suffix = p.suffix

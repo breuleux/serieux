@@ -8,10 +8,10 @@ import pytest
 
 from serieux import Serieux
 from serieux.auto import Auto, Call
-from serieux.ctx import Context
+from serieux.ctx import Context, WorkingDirectory
 from serieux.exc import ValidationError
 from serieux.features.clargs import CommandLineArguments, parse_cli
-from serieux.features.fromfile import IncludeFile, WorkingDirectory
+from serieux.features.fromfile import IncludeFile
 from serieux.features.interpol import Environment
 from serieux.features.tagset import TagDict, Tagged, TaggedUnion
 

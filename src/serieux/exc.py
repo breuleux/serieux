@@ -1,6 +1,6 @@
 import sys
 
-from .ctx import Context
+from .ctx import Context, locate
 
 
 def _color(code, text):
@@ -23,7 +23,7 @@ def context_string(
     n = 3 + indent
     acc_string = access_string(ctx)
     return_lines = [f"{_color(33, acc_string)}: {message}"]
-    if show_source and (location := getattr(ctx, "location", None)):
+    if show_source and (location := locate(ctx)):
         (l1, c1), (l2, c2) = location.linecols
         if c2 == 0:
             l2 -= 1
@@ -112,8 +112,7 @@ class IndividualSerieuxError(SerieuxError):
         )
 
     def __str__(self):
-        location = getattr(self.ctx, "location", None)
-        if location:
+        if location := locate(self.ctx):
             (l1, c1), (l2, c2) = location.linecols
             lc = f"{l1}:{c1}-{l2}:{c2}" if l1 != l2 else f"{l1}:{c1}-{c2}"
             return f"{location.source}:{lc} -- {self.message}"
