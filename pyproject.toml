@@ -87,3 +87,10 @@ usermeth = "serieux.features.usermeth:UserMethods"
 autotag = "serieux.features.autotag:AutoTagAny"
 dotted = "serieux.features.dotted:DottedNotation"
 include_file = "serieux.features.fromfile:IncludeFile"
+
+[project.entry-points."serieux.formats"]
+json = "serieux.formats.json:JSON"
+toml = "serieux.formats.toml:TOML"
+txt = "serieux.formats.txt:Text"
+yaml = "serieux.formats.yaml:YAML"
+yml = "serieux.formats.yaml:YAML"

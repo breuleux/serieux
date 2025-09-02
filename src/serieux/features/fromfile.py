@@ -1,6 +1,4 @@
 import hashlib
-import json
-import tomllib
 import uuid
 from pathlib import Path
 from typing import Any
@@ -9,6 +7,7 @@ import yaml
 from ovld import call_next, dependent_check, ovld, recurse
 from ovld.dependent import HasKey
 
+from .. import formats
 from ..ctx import Context, Located, Location
 from ..exc import ValidationError
 from ..priority import HI7, MIN
@@ -16,36 +15,6 @@ from ..utils import clsstring
 from .partial import PartialBuilding, Sources
 
 include_field = "$include"
-
-
-@dependent_check
-def FileSuffix(value: Path, *suffixes):
-    return value.exists() and value.suffix in suffixes
-
-
-@ovld
-def parse(path: FileSuffix[".toml"]):  # type: ignore
-    return tomllib.loads(path.read_text())
-
-
-@ovld
-def parse(path: FileSuffix[".json"]):  # type: ignore
-    return json.loads(path.read_text())
-
-
-@ovld
-def parse(path: FileSuffix[".yaml", ".yml"]):  # type: ignore
-    return yaml.compose(path.read_text()) or {}
-
-
-@ovld
-def parse(path: FileSuffix[".txt", ".md", ".html"]):  # type: ignore
-    return path.read_text()
-
-
-@ovld
-def parse(path: Path):
-    raise ValidationError(f"Could not read data from file '{path}'")
 
 
 class WorkingDirectory(Context):
@@ -111,7 +80,10 @@ class FromFile(PartialBuilding):
     def deserialize(self, t: Any, obj: Path, ctx: Context):
         if isinstance(ctx, WorkingDirectory):
             obj = ctx.directory / obj.expanduser()
-        data = parse(obj)
+        try:
+            data = formats.load(obj)
+        except Exception as exc:
+            raise ValidationError(f"Could not read data from file '{obj}'", exc=exc, ctx=ctx)
         ctx = ctx + WorkingDirectory(origin=obj, directory=obj.parent)
         return recurse(t, data, ctx)
 

@@ -7,7 +7,6 @@ from pathlib import Path
 from types import NoneType, UnionType
 from typing import Annotated, Any, get_args, get_origin
 
-import yaml
 from ovld import (
     Code,
     CodegenInProgress,
@@ -26,6 +25,7 @@ from ovld.medley import KeepLast, use_combiner
 from ovld.types import All, Exactly
 from ovld.utils import ResolutionError, subtler_type
 
+from . import formats
 from .auto import Auto
 from .ctx import AccessPath, Context
 from .exc import SchemaError, SerieuxError, ValidationError, ValidationExceptionGroup
@@ -85,16 +85,14 @@ class BaseImplementation(Medley):
         return self.deserialize(t, obj, ctx)
 
     @use_combiner(KeepLast)
-    def dump(self, t, obj, ctx=None, *, dest=None):
+    def dump(self, t, obj, ctx=None, *, dest=None, format=None):
         ctx = ctx or self.default_context
         if dest:
             dest = Path(dest)
             ctx = ctx + WorkingDirectory(origin=dest)
         serialized = self.serialize(t, obj, ctx)
         if dest:
-            assert dest.suffix == ".yaml"  # TODO: support other formats
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(yaml.safe_dump(serialized, sort_keys=False))
+            formats.dump(p=dest, data=serialized, suffix=format)
         else:
             return serialized
 
