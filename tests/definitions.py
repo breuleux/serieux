@@ -126,3 +126,11 @@ class LTHolder:
 class DotDict(dict):
     def __getattr__(self, attr):
         return self[attr]
+
+
+@dataclass
+class Character:
+    name: str
+    age: int
+    occupation: str
+    backstory: str

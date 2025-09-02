@@ -14,7 +14,7 @@ from serieux.exc import ValidationError
 from serieux.features.fromfile import IncludeFile, WorkingDirectory
 from serieux.features.partial import Sources
 
-from ..definitions import Citizen, Country, Player, Team, World
+from ..definitions import Character, Citizen, Country, Player, Team, World
 
 deserialize = (Serieux + IncludeFile)().deserialize
 
@@ -201,4 +201,14 @@ def test_deserialize_types():
     data = deserialize(Datatypes, datapath / "all.yaml")
     assert data == Datatypes(
         strong="hello", integger=5, flowhat=4.4, boule=True, nuttin=None, date=date(2025, 1, 3)
+    )
+
+
+def test_include_txt():
+    data = deserialize(Character, datapath / "character.yaml")
+    assert data == Character(
+        name="Jimbo Mayo",
+        age=32,
+        occupation="Journalist",
+        backstory=(datapath / "jimbo.txt").read_text(),
     )

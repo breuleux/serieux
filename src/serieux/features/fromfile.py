@@ -39,6 +39,11 @@ def parse(path: FileSuffix[".yaml", ".yml"]):  # type: ignore
 
 
 @ovld
+def parse(path: FileSuffix[".txt", ".md", ".html"]):  # type: ignore
+    return path.read_text()
+
+
+@ovld
 def parse(path: Path):
     raise ValidationError(f"Could not read data from file '{path}'")
 
@@ -153,7 +158,10 @@ class IncludeFile(FromFile):
     def deserialize(self, t: type[object], obj: HasKey[include_field], ctx: Context):
         obj = dict(obj)
         incl = recurse(str, obj.pop(include_field), ctx)
-        return recurse(t, Sources(Path(incl), obj), ctx)
+        if obj:
+            return recurse(t, Sources(Path(incl), obj), ctx)
+        else:
+            return recurse(t, Path(incl), ctx)
 
     @ovld(priority=MIN)
     def deserialize(self, t: type[object], obj: str, ctx: WorkingDirectory):

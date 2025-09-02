@@ -1,0 +1,5 @@
+name: Jimbo Mayo
+age: 32
+occupation: Journalist
+backstory:
+  $include: jimbo.txt
