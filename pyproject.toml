@@ -92,6 +92,7 @@ include_file = "serieux.features.fromfile:IncludeFile"
 
 [project.entry-points."serieux.formats"]
 json = "serieux.formats.json:JSON"
+pkl = "serieux.formats.pkl:PKL"
 toml = "serieux.formats.toml:TOML"
 txt = "serieux.formats.txt:Text"
 text = "serieux.formats.txt:Text"

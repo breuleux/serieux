@@ -10,6 +10,7 @@ data = {
 
 cases = [
     ("json", data),
+    ("pkl", data),
     ("yaml", data),
     ("toml", data),
     ("txt", "hello!"),
