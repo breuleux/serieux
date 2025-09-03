@@ -185,6 +185,11 @@ def add_argument_from_field(parser, fdest, overrides, field: Field):
             **meta,
             **overrides,
         }
+    if "nargs" in args:
+        try:
+            args["nargs"] = int(args["nargs"])
+        except (ValueError, TypeError):
+            pass
     args = make_argument(field.type, args, field)
     if args == "subparser":
         add_arguments(field.type, parser, fdest, overrides.get("required", None) is False)

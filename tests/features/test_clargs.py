@@ -275,6 +275,20 @@ def test_positional_multiple():
 
 
 @dataclass
+class Twordz:
+    # [positional: 2]
+    wordz: list[str]
+
+
+def test_positional_num():
+    result = deserialize(Twordz, CommandLineArguments(["hello", "everyone"]), Context())
+    assert result == Twordz(wordz=["hello", "everyone"])
+
+    with pytest.raises(SystemExit):
+        deserialize(Twordz, CommandLineArguments(["hello"]), Context())
+
+
+@dataclass
 class Sentence:
     # [nargs: *]
     sentence: str
