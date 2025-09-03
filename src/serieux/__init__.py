@@ -20,7 +20,7 @@ from .features.registered import Registered, StringMapped, singleton
 from .features.tagset import Tagged, TaggedSubclass, TaggedUnion
 from .impl import BaseImplementation
 from .instructions import Instruction
-from .model import Extensible, FieldModelizable, Model, Modelizable, StringModelizable
+from .model import Extensible, Field, FieldModelizable, Model, Modelizable, StringModelizable
 from .schema import RefPolicy, Schema
 from .utils import JSON, check_signature
 from .version import version as __version__
@@ -136,6 +136,7 @@ __all__ = [
     "dump",
     "Environment",
     "Extensible",
+    "Field",
     "IncludeFile",
     "JSON",
     "Lazy",
