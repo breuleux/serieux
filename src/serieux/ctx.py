@@ -91,7 +91,7 @@ class Sourced(WorkingDirectory):
     def compute_location(self):
         if isinstance(self, AccessPath):
             return self.format.locate(self.origin, self.access_path)
-        return None
+        return None  # pragma: no cover
 
 
 def locate(ctx):

@@ -1,10 +1,20 @@
 from pathlib import Path
 
-import yaml
-from ovld import dependent_check, ovld, recurse
+from ovld import ovld, recurse
 
 from ..ctx import Location
+from ..utils import import_any
 from .abc import FileFormat
+
+yaml = import_any(
+    feature="YAML loading and dumping",
+    candidates={
+        "pyyaml:yaml": lambda m: m,
+    },
+)
+
+Loader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+Dumper = getattr(yaml, "CSafeDumper", yaml.SafeDumper)
 
 
 def yaml_source_extract(node, origin):
@@ -18,11 +28,6 @@ def yaml_source_extract(node, origin):
             (node.end_mark.line, node.end_mark.column),
         ),
     )
-
-
-@dependent_check
-def ScalarNode(value: yaml.ScalarNode, tag_suffix):
-    return value.tag.endswith(tag_suffix)
 
 
 @ovld
@@ -42,7 +47,7 @@ def locate(obj: yaml.SequenceNode, origin: Path, access_path: tuple | list):
         for i, v in enumerate(obj.value):
             if i == nxt:
                 return recurse(v, origin, rest)
-    return yaml_source_extract(obj, origin)
+    return yaml_source_extract(obj, origin)  # pragma: no cover
 
 
 @ovld
@@ -55,9 +60,9 @@ class YAML(FileFormat):
         return locate(yaml.compose(f.read_text()), f, access_path)
 
     def load(self, f: Path):
-        with open(f, "r", encoding="utf-8") as file:
-            return yaml.safe_load(file)
+        with open(f, "r") as of:
+            return yaml.load(of, Loader)
 
     def dump(self, f: Path, data):
-        with open(f, "w", encoding="utf-8") as file:
-            yaml.safe_dump(data, file, allow_unicode=True, sort_keys=False)
+        with open(f, "w") as of:
+            yaml.dump(data, of, Dumper=Dumper, allow_unicode=True, sort_keys=False)

@@ -181,3 +181,34 @@ def check_signature(fn, flavor, expected):
         raise TypeError(
             f"{flavor} '{fn}' must define {nexpected} arguments: ({expected}). The first argument *must* be named 'self'."
         )
+
+
+class MissingModule:  # pragma: no cover
+    def __init__(self, feature, candidates):
+        self.feature = feature
+        self.candidates = candidates
+
+    def __call__(self, *args, **kwargs):
+        raise ImportError(
+            f"{self.feature} requires ONE of the following packages to be installed:{self.candidates}"
+        )
+
+
+def import_any(feature, candidates):  # pragma: no cover
+    proper_candidates = "".join(
+        f"\n  - pip install {k.split(':')[0]}" for k, v in candidates.items() if v
+    )
+    candidates = {k.split(":")[-1]: v for k, v in candidates.items()}
+    for modname, mapper in candidates.items():
+        try:
+            mod = importlib.import_module(modname)
+            if mapper is None:
+                result = MissingModule(feature, proper_candidates)
+            else:
+                result = mapper(mod)
+            return result
+        except ImportError:
+            continue
+    raise ImportError(
+        f"{feature} requires ONE of the following packages to be installed:{proper_candidates}"
+    )
