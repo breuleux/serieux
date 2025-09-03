@@ -36,7 +36,12 @@ class FromFile(PartialBuilding):
             data = obj.format.load(pth)
         except Exception as exc:
             raise ValidationError(f"Could not read data from file '{pth}'", exc=exc, ctx=ctx)
-        ctx = ctx + Sourced(origin=pth, directory=pth.parent, format=obj.format)
+        ctx = ctx + Sourced(
+            origin=pth,
+            directory=pth.parent,
+            format=obj.format,
+            source_access_path=getattr(ctx, "access_path", ()),
+        )
         return recurse(t, data, ctx)
 
     def deserialize(self, t: Any, obj: Path, ctx: Context):

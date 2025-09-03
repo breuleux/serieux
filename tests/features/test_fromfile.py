@@ -141,6 +141,11 @@ def test_deserialize_invalid(check_error_display):
         deserialize(Country, datapath / "invalid.yaml", AccessPath())
 
 
+def test_deserialize_invalid_indirect(check_error_display):
+    with check_error_display("Some errors occurred"):
+        deserialize(World, datapath / "world-invalid.yaml", AccessPath())
+
+
 def test_deserialize_oops_world(check_error_display):
     with check_error_display("Cannot deserialize string"):
         deserialize(World, datapath / "oops-world.yaml", AccessPath())

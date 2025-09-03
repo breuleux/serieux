@@ -1,0 +1,7 @@
+
+================================================================================
+[#0] [1m[33m.countries.france.population[0m: Cannot deserialize string 'thirteen' into expected type 'int'.
+  @ REDACTED/data/invalid.yaml:2
+    1: languages: ["French"]
+    2: population: [1m[31m"thirteen"[0m
+    3: capital: "Paris"

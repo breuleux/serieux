@@ -86,6 +86,7 @@ class WorkingDirectory(Context):
 class Sourced(WorkingDirectory):
     origin: Path = None
     format: FileFormat = None
+    source_access_path: tuple = ()
 
     def __post_init__(self):
         if self.directory is None:
@@ -93,7 +94,12 @@ class Sourced(WorkingDirectory):
 
     def compute_location(self):
         if isinstance(self, AccessPath):
-            return self.format.locate(self.origin, self.access_path)
+            access_path = self.access_path
+            pfx = len(self.source_access_path)
+            if access_path[:pfx] != self.source_access_path:  # pragma: no cover
+                return None
+            access_path = access_path[pfx:]
+            return self.format.locate(self.origin, access_path)
         return None  # pragma: no cover
 
 
