@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -7,24 +8,39 @@ from ovld.dependent import HasKey
 from .. import formats
 from ..ctx import Context, Sourced, WorkingDirectory
 from ..exc import ValidationError
+from ..formats.abc import FileFormat
 from ..priority import MIN
 from ..utils import clsstring
 from .partial import PartialBuilding, Sources
 
 include_field = "$include"
+format_field = "$format"
+
+
+@dataclass
+class PathAndFormat:
+    path: Path
+    format: FileFormat = None
+
+    def __post_init__(self):
+        if not isinstance(self.format, FileFormat):
+            self.format = formats.find(self.path, suffix=self.format)
 
 
 class FromFile(PartialBuilding):
-    def deserialize(self, t: Any, obj: Path, ctx: Context):
+    def deserialize(self, t: Any, obj: PathAndFormat, ctx: Context):
+        pth = obj.path
         if isinstance(ctx, WorkingDirectory):
-            obj = ctx.directory / obj.expanduser()
+            pth = ctx.directory / pth.expanduser()
         try:
-            fmt = formats.find(obj)
-            data = fmt.load(obj)
+            data = obj.format.load(pth)
         except Exception as exc:
-            raise ValidationError(f"Could not read data from file '{obj}'", exc=exc, ctx=ctx)
-        ctx = ctx + Sourced(origin=obj, directory=obj.parent, format=fmt)
+            raise ValidationError(f"Could not read data from file '{pth}'", exc=exc, ctx=ctx)
+        ctx = ctx + Sourced(origin=pth, directory=pth.parent, format=obj.format)
         return recurse(t, data, ctx)
+
+    def deserialize(self, t: Any, obj: Path, ctx: Context):
+        return recurse(t, PathAndFormat(obj), ctx)
 
 
 class IncludeFile(FromFile):
@@ -32,10 +48,12 @@ class IncludeFile(FromFile):
     def deserialize(self, t: type[object], obj: HasKey[include_field], ctx: Context):
         obj = dict(obj)
         incl = recurse(str, obj.pop(include_field), ctx)
+        fmt = obj.pop(format_field, None)
+        pth = PathAndFormat(Path(incl), fmt)
         if obj:
-            return recurse(t, Sources(Path(incl), obj), ctx)
+            return recurse(t, Sources(pth, obj), ctx)
         else:
-            return recurse(t, Path(incl), ctx)
+            return recurse(t, pth, ctx)
 
     @ovld(priority=MIN)
     def deserialize(self, t: type[object], obj: str, ctx: WorkingDirectory):

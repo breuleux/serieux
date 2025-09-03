@@ -11,7 +11,7 @@ import pytest
 from serieux import Serieux
 from serieux.ctx import AccessPath, Sourced, WorkingDirectory
 from serieux.exc import ValidationError
-from serieux.features.fromfile import IncludeFile
+from serieux.features.fromfile import IncludeFile, format_field, include_field
 from serieux.features.partial import Sources
 
 from ..definitions import Character, Citizen, Country, Player, Team, World
@@ -212,3 +212,12 @@ def test_include_txt():
         occupation="Journalist",
         backstory=(datapath / "jimbo.txt").read_text(),
     )
+
+
+def test_include_format():
+    construct = {
+        include_field: str(datapath / "character.yaml"),
+        format_field: "txt",
+    }
+    data = deserialize(str, construct)
+    assert data == (datapath / "character.yaml").read_text()
