@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from ovld import ovld, recurse
@@ -20,7 +21,6 @@ Dumper = getattr(yaml, "CSafeDumper", yaml.SafeDumper)
 def yaml_source_extract(node, origin):
     return Location(
         source=origin,
-        code=node.start_mark.buffer,
         start=node.start_mark.index,
         end=node.end_mark.index,
         linecols=(
@@ -57,7 +57,12 @@ def locate(obj: yaml.ScalarNode, origin: Path, access_path: tuple | list):
 
 class YAML(FileFormat):
     def locate(self, f: Path, access_path: tuple[str]):
-        return locate(yaml.compose(f.read_text()), f, access_path)
+        return locate(yaml.compose(f.read_text(), Loader), f, access_path)
+
+    def patch(self, source, patches):
+        for start, end, content in sorted(patches, reverse=True):
+            source = source[:start] + json.dumps(content) + source[end:]
+        return source
 
     def load(self, f: Path):
         with open(f, "r") as of:

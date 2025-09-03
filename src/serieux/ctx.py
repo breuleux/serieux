@@ -1,9 +1,9 @@
 import hashlib
-import json
 import logging
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Callable
 
@@ -36,14 +36,17 @@ class AccessPath(Context):
 @dataclass
 class Location:
     source: Path
-    code: str
     start: int
     end: int
     linecols: tuple
 
+    @cached_property
+    def whole_text(self):
+        return self.source.read_text()
+
     @property
     def text(self):  # pragma: no cover
-        return self.code[self.start : self.end]
+        return self.whole_text[self.start : self.end]
 
 
 class WorkingDirectory(Context):
@@ -137,14 +140,12 @@ class Patcher(Context):
         patches = defaultdict(list)
         for patch in self.patches.values():
             if loc := locate(patch.ctx):
-                codes[loc.source] = loc.code
-                patches[loc.source].append((loc.start, loc.end, json.dumps(patch.compute())))
+                codes[loc.source] = loc.whole_text
+                patches[loc.source].append((loc.start, loc.end, patch.compute()))
             else:  # pragma: no cover
                 logger.warning(f"Cannot apply patch at a context without a location: `{patch}`")
         for file, blocks in patches.items():
-            code = codes[file].strip("\0")
-            for start, end, content in sorted(blocks, reverse=True):
-                code = code[:start] + content + code[end:]
+            code = patch.ctx.format.patch(codes[file], blocks)
             file.write_text(code)
 
 

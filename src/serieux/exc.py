@@ -28,7 +28,7 @@ def context_string(
         if c2 == 0:
             l2 -= 1
             c2 = 10_000_000_000_000
-        lines = location.code.split("\n")
+        lines = location.whole_text.split("\n")
         start = l1 - source_context
         while start < 0 or not lines[start].strip():
             start += 1
