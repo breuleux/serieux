@@ -6,7 +6,6 @@ from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeAlias
 
-from . import formats
 from .auto import Auto
 from .ctx import AccessPath, Context, Patch, Patcher, WorkingDirectory
 from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
@@ -119,9 +118,6 @@ def schema_definition(fn=None, priority=0):
     check_signature(fn, "schema definition", ("self", "t: type[T1]", "ctx: T2>Context"))
     Serieux.schema.register(fn, priority=priority)
     return fn
-
-
-formats.register_entry_points()
 
 
 __all__ = [

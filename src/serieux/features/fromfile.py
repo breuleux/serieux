@@ -49,7 +49,12 @@ class IncludeFile(FromFile):
         obj = dict(obj)
         incl = recurse(str, obj.pop(include_field), ctx)
         fmt = obj.pop(format_field, None)
-        pth = PathAndFormat(Path(incl), fmt)
+        try:
+            pth = PathAndFormat(Path(incl), fmt)
+        except Exception as exc:
+            raise ValidationError(
+                f"Could not load file `{incl}` with format `{fmt}`", exc=exc, ctx=ctx
+            )
         if obj:
             return recurse(t, Sources(pth, obj), ctx)
         else:

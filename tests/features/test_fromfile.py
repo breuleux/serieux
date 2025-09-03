@@ -221,3 +221,12 @@ def test_include_format():
     }
     data = deserialize(str, construct)
     assert data == (datapath / "character.yaml").read_text()
+
+
+def test_bad_format():
+    construct = {
+        include_field: str(datapath / "character.yaml"),
+        format_field: "unknown",
+    }
+    with pytest.raises(ValidationError, match=r"Could not load file.*with format `unknown`"):
+        deserialize(str, construct)

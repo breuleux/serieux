@@ -1,23 +1,20 @@
 import importlib.metadata
 from pathlib import Path
 
-from .abc import FileFormat
-from .unavailable import Unavailable
 
-registry = {}
+class FormatRegistry(dict):
+    def __missing__(self, item):
+        match importlib.metadata.entry_points(group="serieux.formats", name=item):
+            case [ep, *__]:
+                ff_cls = ep.load()
+                ff = ff_cls()
+                self[item] = ff
+                return ff
+            case _:
+                raise ImportError(f"Format `{item}` is not recognized.")
 
 
-def register(suffix: str, ff: type[FileFormat]):
-    registry[suffix] = ff()
-
-
-def register_entry_points():
-    for ep in importlib.metadata.entry_points(group="serieux.formats"):
-        try:
-            ff_cls = ep.load()
-            register(ep.name, ff_cls)
-        except ModuleNotFoundError as exc:  # pragma: no cover
-            register(ep.name, Unavailable(ep.name, exc.name))
+registry = FormatRegistry()
 
 
 def find(p: Path, suffix: str | None = None):
