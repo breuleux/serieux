@@ -78,7 +78,7 @@ def make_argument(t: type[bool], partial: dict, model_field: Field):
 
 
 @ovld
-def make_argument(t: type[list], partial: dict, model_field: Field):
+def make_argument(t: type[list] | type[set] | type[frozenset], partial: dict, model_field: Field):
     (lt,) = get_args(t) or (object,)
     if partial.get("action", None) == "append":
         return {"type": lt, **partial}
