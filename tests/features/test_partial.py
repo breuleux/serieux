@@ -8,7 +8,7 @@ from ovld.dependent import Regexp
 from serieux import Serieux
 from serieux.ctx import AccessPath, Context
 from serieux.exc import SerieuxError, ValidationError
-from serieux.features.partial import Partial, PartialBuilding, Sources
+from serieux.features.partial import NOT_GIVEN, Partial, PartialBuilding, Sources
 
 from ..common import validation_errors
 from ..definitions import Defaults, Player, Point
@@ -47,6 +47,12 @@ def test_complicated_partial():
         ),
     )
     assert d == {"a": Point(3, 2), "b": "wow"}
+
+
+def test_partial_on_partial_type():
+    ppt = load(Partial[Point], Sources({"x": 1}))
+    assert ppt.x == 1
+    assert ppt.y is NOT_GIVEN
 
 
 def test_merge_lists():

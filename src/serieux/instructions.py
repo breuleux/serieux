@@ -53,6 +53,12 @@ class Instruction(BaseInstruction):
     __repr__ = __str__
 
 
+def has_instruction(cls, instr):
+    return get_origin(cls) is Annotated and any(
+        (isinstance(instr, type) and isinstance(a, instr)) or a == instr for a in cls.__metadata__
+    )
+
+
 def annotate(cls, annotations):
     if get_origin(annotations) is Annotated:
         annotations = annotations.__metadata__

@@ -12,7 +12,7 @@ from ..exc import (
     ValidationExceptionGroup,
     merge_errors,
 )
-from ..instructions import Instruction, T, strip
+from ..instructions import Instruction, T, has_instruction, strip
 from ..model import FieldModelizable, model
 from ..priority import HI4
 from .proxy import LazyProxy
@@ -101,13 +101,17 @@ class PartialBuilding(Medley):
 
     @ovld(priority=HI4.next())
     def deserialize(self, t: Any, obj: Sources, ctx: Context, /):
+        is_partial = has_instruction(t, Partial)
         parts = []
         for src in obj.sources:
             try:
-                parts.append(recurse(Partial[t], src, ctx))
+                parts.append(recurse(t if is_partial else Partial[t], src, ctx))
             except SerieuxError as exc:  # pragma: no cover
                 parts.append(exc)
-        rval = instantiate(reduce(merge, parts))
+        merged = reduce(merge, parts)
+        if is_partial:
+            return merged
+        rval = instantiate(merged)
         if isinstance(rval, SerieuxError):
             raise rval
         return rval
