@@ -13,3 +13,9 @@ class FileFormat:  # pragma: no cover
 
     def dump(self, f: Path, data):
         raise NotImplementedError(f"{type(self).__name__} does not implement `dump`")
+
+    @classmethod
+    def serieux_from_string(cls, suffix):
+        from . import registry
+
+        return registry[suffix.lstrip(".")]

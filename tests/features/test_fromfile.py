@@ -11,7 +11,7 @@ import pytest
 from serieux import Serieux
 from serieux.ctx import AccessPath, Sourced, WorkingDirectory
 from serieux.exc import ValidationError
-from serieux.features.fromfile import IncludeFile, format_field, include_field
+from serieux.features.fromfile import IncludeFile, include_field
 from serieux.features.partial import Sources
 
 from ..definitions import Character, Citizen, Country, Player, Team, World
@@ -221,8 +221,7 @@ def test_include_txt():
 
 def test_include_format():
     construct = {
-        include_field: str(datapath / "character.yaml"),
-        format_field: "txt",
+        include_field: {"path": str(datapath / "character.yaml"), "format": "txt"},
     }
     data = deserialize(str, construct)
     assert data == (datapath / "character.yaml").read_text()
@@ -230,8 +229,25 @@ def test_include_format():
 
 def test_bad_format():
     construct = {
-        include_field: str(datapath / "character.yaml"),
-        format_field: "unknown",
+        include_field: {"path": str(datapath / "character.yaml"), "format": "unknown"},
     }
-    with pytest.raises(ValidationError, match=r"Could not load file.*with format `unknown`"):
+    with pytest.raises(ValidationError, match=r"Format `unknown` is not recognized"):
         deserialize(str, construct)
+
+
+def test_include_list():
+    construct = {
+        include_field: [
+            {"path": str(datapath / "france.yaml")},
+            {"path": str(datapath / "france-capital.yaml")},
+        ]
+    }
+    data = deserialize(Country, construct)
+    assert data == Country(
+        languages=["French"],
+        population=13,
+        citizens=[
+            Citizen(name="Jeannot", birthyear=1893, hometown="Lyon"),
+        ],
+        capital="Paris",
+    )

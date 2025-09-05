@@ -14,7 +14,6 @@ from ..utils import clsstring
 from .partial import PartialBuilding, Sources
 
 include_field = "$include"
-format_field = "$format"
 
 
 @dataclass
@@ -25,6 +24,10 @@ class PathAndFormat:
     def __post_init__(self):
         if not isinstance(self.format, FileFormat):
             self.format = formats.find(self.path, suffix=self.format)
+
+    @classmethod
+    def serieux_from_string(cls, incl):
+        return cls(Path(incl))
 
 
 class FromFile(PartialBuilding):
@@ -52,18 +55,15 @@ class IncludeFile(FromFile):
     @ovld(priority=1)
     def deserialize(self, t: type[object], obj: HasKey[include_field], ctx: Context):
         obj = dict(obj)
-        incl = recurse(str, obj.pop(include_field), ctx)
-        fmt = obj.pop(format_field, None)
-        try:
-            pth = PathAndFormat(Path(incl), fmt)
-        except Exception as exc:
-            raise ValidationError(
-                f"Could not load file `{incl}` with format `{fmt}`", exc=exc, ctx=ctx
-            )
-        if obj:
-            return recurse(t, Sources(pth, obj), ctx)
-        else:
-            return recurse(t, pth, ctx)
+        paths = recurse(PathAndFormat | list[PathAndFormat], obj.pop(include_field), ctx)
+        match paths:
+            case [pth] | (PathAndFormat() as pth):
+                if obj:
+                    return recurse(t, Sources(pth, obj), ctx)
+                else:
+                    return recurse(t, pth, ctx)
+            case _:
+                return recurse(t, Sources(*paths, obj), ctx)
 
     @ovld(priority=MIN)
     def deserialize(self, t: type[object], obj: str, ctx: WorkingDirectory):

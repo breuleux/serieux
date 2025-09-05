@@ -78,7 +78,7 @@ def tells(typ: type[FieldModelizable]):
     return {TypeTell(dict)} | {KeyTell(f.serialized_name) for f in m.fields}
 
 
-@ovld
+@ovld(priority=1)
 def tells(typ: type[StringModelizable]):
     return {TypeTell(str)}
 
