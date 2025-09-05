@@ -53,6 +53,14 @@ def test_schema_list():
     assert schema(list[int]) == {"type": "array", "items": {"type": "integer"}}
 
 
+def test_schema_set():
+    assert schema(set[int]) == {"type": "array", "items": {"type": "integer"}}
+
+
+def test_schema_frozenset():
+    assert schema(frozenset[str]) == {"type": "array", "items": {"type": "string"}}
+
+
 def test_schema_dict():
     assert schema(dict[str, float]) == {
         "type": "object",

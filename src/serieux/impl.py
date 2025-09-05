@@ -355,6 +355,7 @@ class BaseImplementation(Medley):
     def deserialize(cls, t: type[list], obj: list, ctx: Context, /):
         return cls.__generic_codegen_list("deserialize", t, obj, ctx)
 
+    @ovld(priority=STD)
     def schema(self, t: type[list], ctx: Context, /):
         (lt,) = get_args(t)
         follow = hasattr(ctx, "follow")
@@ -373,6 +374,10 @@ class BaseImplementation(Medley):
     def deserialize(cls, t: type[set], obj: list, ctx: Context, /):
         return cls.__generic_codegen_list("deserialize", t, obj, ctx)
 
+    @ovld(priority=STD)
+    def schema(self, t: type[set], ctx: Context, /):
+        return recurse(list[*get_args(t)], ctx)
+
     ###############################
     # Implementations: frozensets #
     ###############################
@@ -384,6 +389,10 @@ class BaseImplementation(Medley):
     @code_generator(priority=STD)
     def deserialize(cls, t: type[frozenset], obj: list, ctx: Context, /):
         return cls.__generic_codegen_list("deserialize", t, obj, ctx)
+
+    @ovld(priority=STD)
+    def schema(self, t: type[frozenset], ctx: Context, /):
+        return recurse(list[*get_args(t)], ctx)
 
     ##########################
     # Implementations: dicts #
