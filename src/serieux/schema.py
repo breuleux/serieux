@@ -90,7 +90,7 @@ class SchemaCompiler(Medley):
         if x.redirect:
             return recurse(x.redirect, pth)
         is_always = self.ref_policy == RefPolicy.ALWAYS
-        if x.get("type", "object") != "object" or "oneOf" in x:
+        if x.get("type", "object") not in ("object", "array") or "oneOf" in x:
             return call_next(x.data, pth)
         elif x in self.refs:
             if x not in self.done and self.ref_policy == RefPolicy.NEVER:

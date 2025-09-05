@@ -11,7 +11,7 @@ from ovld import Medley, ovld, recurse
 
 from ..ctx import Context
 from ..instructions import pushdown, strip
-from ..model import Field, FieldModelizable, StringModelizable, field_at, model
+from ..model import Field, FieldModelizable, ListModelizable, StringModelizable, field_at, model
 from ..utils import IsLiteral, UnionAlias, clsstring
 from .dotted import unflatten
 from .partial import Sources
@@ -78,8 +78,8 @@ def make_argument(t: type[bool], partial: dict, model_field: Field):
 
 
 @ovld
-def make_argument(t: type[list] | type[set] | type[frozenset], partial: dict, model_field: Field):
-    (lt,) = get_args(t) or (object,)
+def make_argument(t: type[ListModelizable], partial: dict, model_field: Field):
+    lt = model(t).element_field.type
     if partial.get("action", None) == "append":
         return {"type": lt, **partial}
     else:

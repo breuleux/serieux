@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Annotated, Any, TypeAlias
 from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
-from ..instructions import Instruction, T
+from ..instructions import Instruction, T, pushdown
 from ..priority import HI5
 from .proxy import LazyProxy
 
@@ -36,7 +36,7 @@ class LazyDeserialization(Medley):
     @ovld(priority=HI5)
     def deserialize(self, t: type[Any @ DeepLazy], value: object, ctx: Context):
         def evaluate():
-            return call_next(t, value, ctx)
+            return call_next(pushdown(t), value, ctx)
 
         return LazyProxy(evaluate, type=t)
 

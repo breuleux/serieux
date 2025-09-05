@@ -338,7 +338,6 @@ def test_schema_descriptions():
     }
 
 
-@pytest.mark.xfail
 def test_schema_recursive_ltholder():
     assert schema(LTHolder) == {
         "type": "object",

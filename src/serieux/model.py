@@ -45,6 +45,11 @@ def FieldModelizable(t):
     return isinstance(m := model(t), Model) and m.fields is not None
 
 
+@class_check
+def ListModelizable(t):
+    return isinstance(m := model(t), Model) and m.element_field is not None
+
+
 @dataclass(kw_only=True)
 class Field:
     name: str
@@ -85,7 +90,9 @@ class Field:
 class Model:
     original_type: type
     fields: list[Field] = None
+    element_field: Field = None
     constructor: Callable = None
+    list_constructor: Callable = None
     from_string: Callable = None
     to_string: Callable = None
     regexp: re.Pattern = None
@@ -95,6 +102,8 @@ class Model:
     def __post_init__(self):
         if isinstance(self.regexp, str):
             self.regexp = re.compile(self.regexp)
+        if self.element_field is not None and self.list_constructor is None:
+            self.list_constructor = self.constructor
 
     def accepts(self, other):
         ot = self.original_type
@@ -208,6 +217,16 @@ def model(dc: type[Dataclass]):
     rval.fields = [make_field(i, field) for i, field in enumerate(fields(constructor))]
     rval.constructor = constructor
     return rval
+
+
+@ovld
+def model(sq: type[list] | type[set] | type[frozenset]):
+    (et,) = get_args(sq) or [object]
+    return Model(
+        original_type=sq,
+        element_field=Field(name="*", type=et),
+        list_constructor=get_origin(sq) or sq,
+    )
 
 
 @ovld

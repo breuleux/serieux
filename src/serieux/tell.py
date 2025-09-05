@@ -6,7 +6,7 @@ from typing import Annotated
 from ovld import Code, ovld, recurse
 
 from .instructions import pushdown
-from .model import FieldModelizable, StringModelizable, model
+from .model import FieldModelizable, ListModelizable, StringModelizable, model
 from .utils import TypeAliasType, basic_type
 
 
@@ -56,13 +56,7 @@ class KeyValueTell(Tell):
 
 @ovld
 def tells(
-    typ: type[int]
-    | type[str]
-    | type[bool]
-    | type[float]
-    | type[NoneType]
-    | type[list]
-    | type[dict],
+    typ: type[int] | type[str] | type[bool] | type[float] | type[NoneType] | type[dict],
 ):
     return {TypeTell(basic_type(typ))}
 
@@ -79,6 +73,11 @@ def tells(typ: type[FieldModelizable]):
 
 
 @ovld(priority=1)
+def tells(typ: type[ListModelizable]):
+    return {TypeTell(list)}
+
+
+@ovld(priority=2)
 def tells(typ: type[StringModelizable]):
     return {TypeTell(str)}
 

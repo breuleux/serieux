@@ -1,6 +1,6 @@
 from dataclasses import field, fields, make_dataclass
 from functools import reduce
-from typing import TYPE_CHECKING, Annotated, Any, TypeAlias
+from typing import TYPE_CHECKING, Annotated, Any, TypeAlias, get_origin
 
 from ovld import Medley, call_next, ovld, recurse
 
@@ -13,7 +13,7 @@ from ..exc import (
     merge_errors,
 )
 from ..instructions import Instruction, T, has_instruction, strip
-from ..model import FieldModelizable, model
+from ..model import FieldModelizable, ListModelizable, model
 from ..priority import HI4
 from .proxy import LazyProxy
 
@@ -74,6 +74,13 @@ def partialize(t: type[FieldModelizable]):
         namespace={"_constructor": staticmethod(m.constructor), "_model": m},
     )
     return dc
+
+
+@ovld
+def partialize(t: type[ListModelizable]):
+    # TODO: handle more complex types
+    m = model(t)
+    return get_origin(t)[recurse(m.element_field.type)]
 
 
 @ovld

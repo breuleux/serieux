@@ -30,7 +30,7 @@ from .auto import Auto
 from .ctx import AccessPath, Context, Sourced, WorkingDirectory
 from .exc import SchemaError, SerieuxError, ValidationError, ValidationExceptionGroup
 from .instructions import pushdown
-from .model import FieldModelizable, Modelizable, StringModelizable, model
+from .model import FieldModelizable, ListModelizable, Modelizable, StringModelizable, model
 from .priority import LO4, LOW, MAX, MIN, STD, STD2, STD3
 from .schema import AnnotatedSchema, Schema
 from .tell import tells as get_tells
@@ -322,79 +322,6 @@ class BaseImplementation(Medley):
         return {"type": "null"}
 
     ##########################
-    # Implementations: lists #
-    ##########################
-
-    @classmethod
-    def __generic_codegen_list(cls, method, t, obj, ctx):
-        (t,) = get_args(t)
-        builder = list if method == "serialize" else get_origin(t) or t
-        (lt,) = get_args(t) or (object,)
-        comp = "$lbody for IDX, X in enumerate($obj)"
-        if builder is list:
-            code = f"[{comp}]"
-        elif builder is set:
-            code = f"{{{comp}}}"
-        else:
-            code = f"$builder({comp})"
-        if hasattr(ctx, "follow"):
-            ctx_expr = Code("$ctx.follow($objt, $obj, IDX)", objt=t)
-            return Lambda(
-                code,
-                lbody=cls.subcode(method, lt, "X", ctx, ctx_expr=ctx_expr),
-                builder=builder,
-            )
-        else:
-            return Lambda("[$lbody for X in $obj]", lbody=cls.subcode(method, lt, "X", ctx))
-
-    @code_generator(priority=STD)
-    def serialize(cls, t: type[list], obj: list, ctx: Context, /):
-        return cls.__generic_codegen_list("serialize", t, obj, ctx)
-
-    @code_generator(priority=STD)
-    def deserialize(cls, t: type[list], obj: list, ctx: Context, /):
-        return cls.__generic_codegen_list("deserialize", t, obj, ctx)
-
-    @ovld(priority=STD)
-    def schema(self, t: type[list], ctx: Context, /):
-        (lt,) = get_args(t)
-        follow = hasattr(ctx, "follow")
-        fctx = ctx.follow(t, None, "*") if follow else ctx
-        return {"type": "array", "items": recurse(lt, fctx)}
-
-    #########################
-    # Implementations: sets #
-    #########################
-
-    @code_generator(priority=STD)
-    def serialize(cls, t: type[set], obj: set, ctx: Context, /):
-        return cls.__generic_codegen_list("serialize", t, obj, ctx)
-
-    @code_generator(priority=STD)
-    def deserialize(cls, t: type[set], obj: list, ctx: Context, /):
-        return cls.__generic_codegen_list("deserialize", t, obj, ctx)
-
-    @ovld(priority=STD)
-    def schema(self, t: type[set], ctx: Context, /):
-        return recurse(list[*get_args(t)], ctx)
-
-    ###############################
-    # Implementations: frozensets #
-    ###############################
-
-    @code_generator(priority=STD)
-    def serialize(cls, t: type[frozenset], obj: frozenset, ctx: Context, /):
-        return cls.__generic_codegen_list("serialize", t, obj, ctx)
-
-    @code_generator(priority=STD)
-    def deserialize(cls, t: type[frozenset], obj: list, ctx: Context, /):
-        return cls.__generic_codegen_list("deserialize", t, obj, ctx)
-
-    @ovld(priority=STD)
-    def schema(self, t: type[frozenset], ctx: Context, /):
-        return recurse(list[*get_args(t)], ctx)
-
-    ##########################
     # Implementations: dicts #
     ##########################
 
@@ -593,6 +520,43 @@ class BaseImplementation(Medley):
         else:
             return Lambda("$from_string($obj)", from_string=m.from_string)
 
+    ####################################
+    # Implementations: ListModelizable #
+    ####################################
+
+    @classmethod
+    def __generic_codegen_list(cls, method, m, obj, ctx):
+        builder = list if method == "serialize" else m.list_constructor
+        lt = m.element_field.type
+        comp = "$lbody for IDX, X in enumerate($obj)"
+        if builder is list:
+            code = f"[{comp}]"
+        elif builder is set:
+            code = f"{{{comp}}}"
+        else:
+            code = f"$builder({comp})"
+        if hasattr(ctx, "follow"):
+            ctx_expr = Code("$ctx.follow($objt, $obj, IDX)", objt=m.original_type)
+            return Lambda(
+                code,
+                lbody=cls.subcode(method, lt, "X", ctx, ctx_expr=ctx_expr),
+                builder=builder,
+            )
+        else:
+            return Lambda("[$lbody for X in $obj]", lbody=cls.subcode(method, lt, "X", ctx))
+
+    @code_generator(priority=STD)
+    def serialize(cls, t: type[ListModelizable], obj: Any, ctx: Context, /):
+        (t,) = get_args(t)
+        m = model(t)
+        return cls.__generic_codegen_list("serialize", m, obj, ctx)
+
+    @code_generator(priority=STD)
+    def deserialize(cls, t: type[ListModelizable], obj: list, ctx: Context, /):
+        (t,) = get_args(t)
+        m = model(t)
+        return cls.__generic_codegen_list("deserialize", m, obj, ctx)
+
     ################################
     # Implementations: Modelizable #
     ################################
@@ -601,7 +565,7 @@ class BaseImplementation(Medley):
     def schema(self, t: type[Modelizable], ctx: Context, /):
         m = model(t)
 
-        f_schema, s_schema = None, None
+        f_schema = s_schema = l_schema = None
         follow = hasattr(ctx, "follow")
 
         if m.fields is not None:
@@ -633,14 +597,20 @@ class BaseImplementation(Medley):
             if m.regexp:
                 s_schema["pattern"] = m.regexp.pattern
 
-        assert f_schema or s_schema
+        if m.element_field is not None:
+            fctx = ctx.follow(t, None, "*") if follow else ctx
+            l_schema = {
+                "type": "array",
+                "items": recurse(m.element_field.type, fctx),
+            }
 
-        if f_schema is not None and s_schema is not None:
-            return {"oneOf": [f_schema, s_schema]}
-        elif f_schema is not None:
-            return f_schema
-        else:
-            return s_schema
+        assert f_schema or s_schema or l_schema
+        possibilities = [x for x in [f_schema, s_schema, l_schema] if x]
+        match possibilities:
+            case [sch]:
+                return sch
+            case _:
+                return {"oneOf": possibilities}
 
     ###########################
     # Implementations: Unions #
