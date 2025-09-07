@@ -227,10 +227,10 @@ class BaseImplementation(Medley):
         return self._schema_cache[t]
 
     @ovld(priority=MIN)
-    def schema(self, t: Indirect | TypeAliasType, ctx: Context, /):
+    def schema(self, t: Indirect | TypeAliasType, ctx: Context, /):  # pragma: no cover
         return recurse(t.__value__, ctx)
 
-    @ovld(priority=LOW)
+    @ovld(priority=LOW)  # pragma: no cover
     def schema(self, t: type[Annotated], ctx: Context, /):
         return recurse(pushdown(t), ctx)
 

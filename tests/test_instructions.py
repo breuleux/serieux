@@ -2,9 +2,9 @@ from typing import Annotated, Literal
 
 from serieux import deserialize, schema, serialize
 from serieux.instructions import Instruction, inherit, pushdown, strip
-from tests.common import one_test_per_assert
 
-from .definitions import Point
+from .common import one_test_per_assert
+from .features.test_usermeth import RGB
 
 Apple = Instruction("Apple", annotation_priority=1)
 Banana = Instruction("Banana", annotation_priority=2)
@@ -43,10 +43,10 @@ def test_pushdown_no_inherit():
 
 
 def test_ser_deser_ignores_them():
-    assert serialize(Useless[list[Point]], [Point(1, 2)]) == [{"x": 1, "y": 2}]
-    assert deserialize(Useless[list[Point]], [{"x": 1, "y": 2}]) == [Point(1, 2)]
-    s1 = schema(Useless[list[Point]]).json()
-    s2 = schema(list[Point]).json()
+    assert serialize(Useless[RGB], RGB(1, 2, 3)) == "#010203"
+    assert deserialize(Useless[RGB], "#010203") == RGB(1, 2, 3)
+    s1 = schema(Useless[RGB]).json()
+    s2 = schema(RGB).json()
     assert s1 == s2
 
 

@@ -102,7 +102,7 @@ class Model:
     def __post_init__(self):
         if isinstance(self.regexp, str):
             self.regexp = re.compile(self.regexp)
-        if self.element_field is not None and self.list_constructor is None:
+        if self.element_field is not None and self.list_constructor is None:  # pragma: no cover
             self.list_constructor = self.constructor
 
     def accepts(self, other):
@@ -237,7 +237,10 @@ def model(t: type[Any @ Extensible]):
 
 @ovld(priority=-1)
 def model(t: type[Annotated]):
-    m = call_next(strip(t))
+    if t is Annotated:  # pragma: no cover
+        # This is hit in Python <= 3.12
+        return None
+    m = recurse(strip(t))
     if m and m.fields is not None:
         return Model(
             original_type=m.original_type,

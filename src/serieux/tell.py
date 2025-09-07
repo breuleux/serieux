@@ -83,7 +83,7 @@ def tells(typ: type[StringModelizable]):
 
 
 @ovld
-def tells(typ: TypeAliasType):
+def tells(typ: TypeAliasType):  # pragma: no cover
     return recurse(typ.__value__)
 
 
