@@ -161,6 +161,28 @@ def test_serialize_literal_enum():
         serialize(Literal["red", "green", "blue"], "yellow")
 
 
+def test_serialize_literal_int_enum():
+    assert serialize(Literal[1, 2, 7], 2) == 2
+    with pytest.raises(
+        ValidationError,
+        match=r"'3' is not a valid option for typing.Literal\[1, 2, 7\]",
+    ):
+        serialize(Literal[1, 2, 7], 3)
+
+
+def test_serialize_literal_mixed_enum():
+    lit = Literal[1, True, "quack"]
+    assert serialize(lit, 1) == 1
+    assert serialize(lit, True) is True
+    assert serialize(lit, "quack") == "quack"
+    with pytest.raises(ValidationError):
+        serialize(lit, 3)
+    with pytest.raises(ValidationError):
+        serialize(lit, "boop")
+    with pytest.raises(ValidationError):
+        serialize(lit, False)
+
+
 ###############
 # Error tests #
 ###############

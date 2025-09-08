@@ -190,6 +190,28 @@ def test_deserialize_literal_enum():
         deserialize(Literal["red", "green", "blue"], "yellow")
 
 
+def test_deserialize_literal_int_enum():
+    assert deserialize(Literal[1, 2, 7], 2) == 2
+    with pytest.raises(
+        ValidationError,
+        match=r"'3' is not a valid option for typing.Literal\[1, 2, 7\]",
+    ):
+        deserialize(Literal[1, 2, 7], 3)
+
+
+def test_deserialize_literal_mixed_enum():
+    lit = Literal[1, True, "quack"]
+    assert deserialize(lit, 1) == 1
+    assert deserialize(lit, True) is True
+    assert deserialize(lit, "quack") == "quack"
+    with pytest.raises(ValidationError):
+        deserialize(lit, 3)
+    with pytest.raises(ValidationError):
+        deserialize(lit, "boop")
+    with pytest.raises(ValidationError):
+        deserialize(lit, False)
+
+
 ###############
 # Error tests #
 ###############

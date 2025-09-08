@@ -49,6 +49,10 @@ def test_schema_literal():
     assert schema(Literal["red", "green", "blue"]) == {"enum": ["red", "green", "blue"]}
 
 
+def test_schema_literal_mixed():
+    assert schema(Literal[1, True, "wow"]) == {"enum": [1, True, "wow"]}
+
+
 def test_schema_list():
     assert schema(list[int]) == {"type": "array", "items": {"type": "integer"}}
 
