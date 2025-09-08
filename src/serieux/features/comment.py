@@ -6,7 +6,7 @@ from ovld import Medley, call_next, ovld, recurse
 from ..ctx import Context
 from ..exc import ValidationError
 from ..instructions import BaseInstruction
-from ..priority import HI6, STD
+from ..priority import HI6
 from ..schema import AnnotatedSchema
 from .proxy import CommentProxy
 from .tagset import value_field
@@ -58,7 +58,7 @@ class CommentedObjects(Medley):
             raise ValidationError("Comment is required but object is not a CommentProxy", ctx=ctx)
         return call_next(t, obj, ctx)
 
-    @ovld(priority=STD)
+    @ovld(priority=HI6)
     def serialize(self, t: Any, obj: CommentProxy, ctx: Context):
         return recurse(t, obj._obj, ctx)
 
