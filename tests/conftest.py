@@ -9,7 +9,10 @@ import pytest
 from serieux import Serieux
 from serieux.exc import SerieuxError
 
-datapath = Path(__file__).parent / "data"
+
+@pytest.fixture
+def datapath():
+    return Path(__file__).parent / "data"
 
 
 @pytest.hookimpl()
@@ -26,7 +29,7 @@ def pytest_exception_interact(node, call, report):
 
 
 @pytest.fixture
-def check_error_display(capsys, file_regression):
+def check_error_display(capsys, file_regression, datapath):
     @contextmanager
     def check(message=None, exc_type=SerieuxError):
         with pytest.raises(exc_type, match=message) as exc:

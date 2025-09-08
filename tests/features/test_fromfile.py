@@ -19,10 +19,9 @@ from ..definitions import Character, Citizen, Country, Player, Team, World
 deserialize = (Serieux + IncludeFile)().deserialize
 
 here = Path(__file__).parent
-datapath = Path(__file__).parent.parent / "data"
 
 
-def test_deserialize_from_file():
+def test_deserialize_from_file(datapath):
     assert deserialize(Country, datapath / "canada.yaml") == Country(
         languages=["English", "French"],
         capital="Ottawa",
@@ -42,7 +41,7 @@ def test_deserialize_from_file():
     )
 
 
-def test_deserialize_override():
+def test_deserialize_override(datapath):
     srcs = Sources(
         datapath / "canada.yaml",
         {"capital": "Montreal"},
@@ -66,7 +65,7 @@ def test_deserialize_override():
     )
 
 
-def test_deserialize_world():
+def test_deserialize_world(datapath):
     world = deserialize(World, datapath / "world.yaml")
     assert world == World(
         countries={
@@ -103,7 +102,7 @@ def test_deserialize_world():
     )
 
 
-def test_deserialize_json():
+def test_deserialize_json(datapath):
     file = datapath / "world.json"
     # Sanity check that this is a valid JSON file
     json.loads(file.read_text())
@@ -112,7 +111,7 @@ def test_deserialize_json():
     assert world == world_baseline
 
 
-def test_deserialize_toml():
+def test_deserialize_toml(datapath):
     file = datapath / "world.toml"
     # Sanity check that this is a valid TOML file
     tomllib.loads(file.read_text())
@@ -121,32 +120,34 @@ def test_deserialize_toml():
     assert world == world_baseline
 
 
-def test_deserialize_missing_file():
+def test_deserialize_missing_file(datapath):
     with pytest.raises(ValidationError, match="Could not read data"):
         deserialize(World, datapath / "missing.yaml")
 
 
-def test_deserialize_read_direct():
+def test_deserialize_read_direct(
+    datapath,
+):
     team = deserialize(Team, datapath / "team.yaml")
     assert team.players[0] == Player(first="Olivier", last="Breuleux", batting=0.9)
 
 
-def test_deserialize_incomplete(check_error_display):
+def test_deserialize_incomplete(datapath, check_error_display):
     with check_error_display("KeyError: 'capital'"):
         deserialize(Country, datapath / "france.yaml", AccessPath())
 
 
-def test_deserialize_invalid(check_error_display):
+def test_deserialize_invalid(datapath, check_error_display):
     with check_error_display("Cannot deserialize string"):
         deserialize(Country, datapath / "invalid.yaml", AccessPath())
 
 
-def test_deserialize_invalid_indirect(check_error_display):
+def test_deserialize_invalid_indirect(datapath, check_error_display):
     with check_error_display("Some errors occurred"):
         deserialize(World, datapath / "world-invalid.yaml", AccessPath())
 
 
-def test_deserialize_oops_world(check_error_display):
+def test_deserialize_oops_world(datapath, check_error_display):
     with check_error_display("Cannot deserialize string"):
         deserialize(World, datapath / "oops-world.yaml", AccessPath())
 
@@ -202,14 +203,14 @@ class Datatypes:
     date: date | None
 
 
-def test_deserialize_types():
+def test_deserialize_types(datapath):
     data = deserialize(Datatypes, datapath / "all.yaml")
     assert data == Datatypes(
         strong="hello", integger=5, flowhat=4.4, boule=True, nuttin=None, date=date(2025, 1, 3)
     )
 
 
-def test_include_txt():
+def test_include_txt(datapath):
     data = deserialize(Character, datapath / "character.yaml")
     assert data == Character(
         name="Jimbo Mayo",
@@ -219,7 +220,7 @@ def test_include_txt():
     )
 
 
-def test_include_format():
+def test_include_format(datapath):
     construct = {
         include_field: {"path": str(datapath / "character.yaml"), "format": "txt"},
     }
@@ -227,7 +228,7 @@ def test_include_format():
     assert data == (datapath / "character.yaml").read_text()
 
 
-def test_bad_format():
+def test_bad_format(datapath):
     construct = {
         include_field: {"path": str(datapath / "character.yaml"), "format": "unknown"},
     }
@@ -235,7 +236,7 @@ def test_bad_format():
         deserialize(str, construct)
 
 
-def test_include_list():
+def test_include_list(datapath):
     construct = {
         include_field: [
             {"path": str(datapath / "france.yaml")},
