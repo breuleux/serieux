@@ -10,7 +10,7 @@ from serieux.features.dotted import DottedNotation
 from serieux.features.partial import Sources
 from serieux.features.tagset import (
     FromEntryPoint,
-    Referenced,
+    ReferencedClass,
     TagDict,
     TaggedSubclass,
     TagSetFeature,
@@ -338,12 +338,12 @@ def test_tagged_subclass_schema(file_regression):
 
 
 def test_tagged_subclass_schema_fully_qualified(file_regression):
-    sch = schema(Annotated[Animal, Referenced])
+    sch = schema(Annotated[Animal, ReferencedClass])
     file_regression.check(json.dumps(sch.compile(), indent=4))
 
 
 def test_open_schema():
-    sch = schema(Annotated[Any, Referenced])
+    sch = schema(Annotated[Any, ReferencedClass])
     assert sch.compile(root=False) == {"type": "object", "additionalProperties": True}
 
 

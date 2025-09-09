@@ -147,7 +147,7 @@ class FromEntryPoint(TagSet):
 
 
 @dataclass(frozen=True)
-class ReferencedClass(TagSet):
+class _ReferencedClass(TagSet):
     default: type = None
     default_module: str = None
 
@@ -207,7 +207,7 @@ class ReferencedClass(TagSet):
         return type(self)(*args, **kwargs)
 
 
-Referenced = ReferencedClass()
+ReferencedClass = _ReferencedClass()
 
 
 class MultiTagSet(TagSet):
@@ -325,7 +325,7 @@ else:
 
     class TaggedSubclass:
         def __class_getitem__(cls, item):
-            return Annotated[item, Referenced(default=item, default_module=item.__module__)]
+            return Annotated[item, ReferencedClass(default=item, default_module=item.__module__)]
 
     class Tagged(type):
         def __class_getitem__(cls, arg):
