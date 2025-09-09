@@ -77,6 +77,7 @@ exclude_lines = [
 [project.entry-points."serieux.default_features"]
 clargs = "serieux.features.clargs:FromArguments"
 comment = "serieux.features.comment:CommentedObjects"
+encrypt = "serieux.features.encrypt:Encrypt"
 fromfile = "serieux.features.fromfile:FromFile"
 interpol = "serieux.features.interpol:Interpolation"
 lazy = "serieux.features.lazy:LazyDeserialization"
