@@ -16,8 +16,8 @@ from .features.fromfile import IncludeFile
 from .features.interpol import Environment
 from .features.lazy import DeepLazy, Lazy, LazyProxy
 from .features.partial import Partial, Sources
-from .features.registered import Registered, StringMapped, singleton
-from .features.tagset import Tagged, TaggedSubclass, TaggedUnion
+from .features.registered import AutoRegistered, Referenced, auto_singleton
+from .features.tagset import ReferencedClass, Tagged, TaggedSubclass, TaggedUnion
 from .impl import BaseImplementation
 from .instructions import Instruction
 from .model import Extensible, Field, FieldModelizable, Model, Modelizable, StringModelizable
@@ -124,6 +124,8 @@ __all__ = [
     "__version__",
     "AccessPath",
     "Auto",
+    "AutoRegistered",
+    "auto_singleton",
     "BaseImplementation",
     "CLIDefinition",
     "CommandLineArguments",
@@ -151,6 +153,8 @@ __all__ = [
     "Patch",
     "Patcher",
     "RefPolicy",
+    "Referenced",
+    "ReferencedClass",
     "Registered",
     "schema",
     "Schema",
@@ -158,9 +162,7 @@ __all__ = [
     "serieux",
     "Serieux",
     "SerieuxError",
-    "singleton",
     "Sources",
-    "StringMapped",
     "StringModelizable",
     "Tagged",
     "TaggedUnion",

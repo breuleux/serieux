@@ -93,7 +93,7 @@ class Team:
     players: list[Player]
 
 
-@dataclass
+@dataclass(frozen=True)
 class Job:
     # Name of the job
     title: str

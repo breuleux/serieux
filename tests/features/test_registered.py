@@ -1,20 +1,47 @@
+from typing import Any
+
 import pytest
 
 from serieux import deserialize, schema, serialize
 from serieux.exc import ValidationError
-from serieux.features.registered import Registered, StringMapped, singleton
+from serieux.features.registered import AutoRegistered, Referenced, Registry, auto_singleton
+from tests.definitions import Job
+
+teacher = Job(title="Teacher", yearly_pay=50000)
+engineer = Job(title="Engineer", yearly_pay=90000)
+artist = Job(title="Artist", yearly_pay=40000)
 
 
-class Numero(StringMapped):
-    one = 1
-    two = 2
-    three = 3
+def test_registry():
+    reg = Registry(
+        {
+            "teacher": teacher,
+            "artist": artist,
+        }
+    )
+    assert deserialize(Job @ reg, "teacher") is teacher
+    assert serialize(Job @ reg, artist) == "artist"
+
+    with pytest.raises(ValidationError):
+        deserialize(Job @ reg, "engineer")
+
+    with pytest.raises(ValidationError):
+        serialize(Job @ reg, engineer)
 
 
-NumeroDeux = StringMapped.create("NumeroDeux", {"one": 1, "two": 2, "three": 3})
+def test_referenced():
+    assert deserialize(Referenced[Job], "tests.features.test_registered:teacher") is teacher
+    with pytest.raises(ValidationError):
+        assert serialize(Referenced[Job], teacher)
 
 
-class Person(Registered):
+def test_referenced_function():
+    sym = "tests.features.test_registered:test_referenced_function"
+    assert deserialize(Referenced[Any], sym) is test_referenced_function
+    assert serialize(Referenced[Any], test_referenced_function) == sym
+
+
+class Person(AutoRegistered):
     def __init__(self, name, age):
         super().__init__(name)
         self.name = name
@@ -30,34 +57,6 @@ class SuperPerson(Person):
 anita = Person("anita", 76)
 bernard = Person("bernard", 73)
 charlotte = SuperPerson("charlotte", 33, "spits fire")
-
-
-def test_string_mapped_deserialize():
-    assert deserialize(Numero, "one") == 1
-
-
-def test_string_mapped_deserialize2():
-    assert deserialize(NumeroDeux, "one") == 1
-
-
-def test_string_mapped_deserialize_unknown():
-    with pytest.raises(ValidationError, match="'bone' is not a registered option"):
-        deserialize(Numero, "bone")
-
-
-def test_string_mapped_serialize():
-    assert serialize(Numero, 1) == "one"
-
-
-def test_string_mapped_serialize_unknown():
-    with pytest.raises(ValidationError, match="The value '33' is not registered"):
-        serialize(Numero, 33)
-
-
-def test_string_mapped_schema():
-    sch = schema(Numero).compile(root=False)
-
-    assert sch == {"type": "string", "enum": ["one", "two", "three"]}
 
 
 def test_registered_serialize():
@@ -78,25 +77,34 @@ def test_registered_schema():
     assert sch == {"type": "string", "enum": ["anita", "bernard", "charlotte"]}
 
 
-class Tool(Registered):
+class Tool(AutoRegistered):
     pass
 
 
-@singleton("hammer")
+@auto_singleton("HAMMER")
 class Hammer(Tool):
     def use(self):
         return "bang!"
 
 
-@singleton
+@auto_singleton
 class Saw(Tool):
     def use(self):
         return "zing!"
 
 
-def test_singleton():
-    assert deserialize(Tool, "hammer") is Hammer
+def test_singleton_deserialize():
+    assert deserialize(Tool, "HAMMER") is Hammer
     assert deserialize(Tool, "saw") is Saw
+    with pytest.raises(ValidationError):
+        deserialize(Tool, "nail")
+
+
+def test_singleton_serialize():
+    assert serialize(Tool, Hammer) == "HAMMER"
+    assert serialize(Tool, Saw) == "saw"
+    with pytest.raises(ValidationError):
+        serialize(Tool, object())
 
 
 def test_illegal_singleton():
@@ -104,6 +112,6 @@ def test_illegal_singleton():
         TypeError, match="must be a subclass of Registered, but not a direct subclass"
     ):
 
-        @singleton
-        class Bloop(Registered):
+        @auto_singleton
+        class Bloop(AutoRegistered):
             pass

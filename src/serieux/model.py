@@ -14,7 +14,7 @@ from typing import (
 )
 from zoneinfo import ZoneInfo
 
-from ovld import Dataclass, Lambda, call_next, class_check, ovld, recurse
+from ovld import Dataclass, Lambda, call_next, class_check, ovld, recurse, subclasscheck
 
 from .docstrings import VariableDoc, get_attribute_docstrings
 from .exc import ValidationError
@@ -37,7 +37,7 @@ def Modelizable(t):
 
 @class_check
 def StringModelizable(t):
-    return strip(t) is t and isinstance(m := model(t), Model) and m.from_string is not None
+    return isinstance(m := model(t), Model) and m.from_string is not None
 
 
 @class_check
@@ -106,12 +106,12 @@ class Model:
             self.list_constructor = self.constructor
 
     def accepts(self, other):
-        ot = self.original_type
-        return issubclass(other, get_origin(ot) or ot)
+        ot = strip(self.original_type)
+        return subclasscheck(other, get_origin(ot) or ot)
 
     def is_submodel_of(self, other):
         # TODO: check that the fields are also the same
-        return issubclass(self.original_type, other.original_type)
+        return subclasscheck(self.original_type, other.original_type)
 
     def __str__(self):
         return f"Model({clsstring(self.original_type)})"
