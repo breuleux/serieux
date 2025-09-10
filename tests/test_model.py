@@ -94,3 +94,9 @@ def test_field_at():
 
     fld4 = field_at(object, ["Jonathan", "job", "gluglu"])
     assert fld4 is None
+
+    fld5 = field_at(list[str], [0])
+    assert fld5.type is str
+
+    fld6 = field_at(list[str], ["what"])
+    assert fld6 is None

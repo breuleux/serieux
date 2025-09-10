@@ -373,6 +373,17 @@ def field_at(t: type[FieldModelizable], path: list, f: Field):
     return None
 
 
+@ovld(priority=1)
+def field_at(t: type[ListModelizable], path: list, f: Field):
+    m = model(t)
+    curr, *rest = path
+    try:
+        int(curr)
+    except ValueError:
+        return None
+    return recurse(m.element_field.type, rest, m.element_field)
+
+
 @ovld
 def field_at(t: type[UnionAlias], path: list, f: Field):
     for opt in get_args(t):
