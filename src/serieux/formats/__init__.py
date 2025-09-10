@@ -30,3 +30,11 @@ def load(p: Path, suffix: str | None = None):
 
 def dump(p: Path, data: object, suffix: str | None = None):
     return find(p, suffix).dump(p, data)
+
+
+def loads(s: str, suffix: str | None = None):
+    return find(None, suffix).loads(s)
+
+
+def dumps(data: object, suffix: str | None = None):
+    return find(None, suffix).dumps(data)

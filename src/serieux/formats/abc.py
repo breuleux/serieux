@@ -8,11 +8,17 @@ class FileFormat:  # pragma: no cover
     def patch(self, source, patches):
         raise NotImplementedError(f"{type(self).__name__} does not implement `patch`")
 
+    def loads(self, s: str):
+        raise NotImplementedError(f"{type(self).__name__} does not implement `loads`")
+
+    def dumps(self, data):
+        raise NotImplementedError(f"{type(self).__name__} does not implement `dumps`")
+
     def load(self, f: Path):
-        raise NotImplementedError(f"{type(self).__name__} does not implement `load`")
+        return self.loads(f.read_text())
 
     def dump(self, f: Path, data):
-        raise NotImplementedError(f"{type(self).__name__} does not implement `dump`")
+        f.write_text(self.dumps(data))
 
     @classmethod
     def serieux_from_string(cls, suffix):

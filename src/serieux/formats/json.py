@@ -1,5 +1,4 @@
 from functools import partial
-from pathlib import Path
 
 from ..utils import import_any
 from .abc import FileFormat
@@ -16,12 +15,11 @@ loads, dumps = import_any(
 
 
 class JSON(FileFormat):
-    def load(self, f: Path):
-        return loads(f.read_bytes())
+    def loads(self, s: str):
+        return loads(s)
 
-    def dump(self, f: Path, data):
+    def dumps(self, data):
         result = dumps(data)
         if isinstance(result, bytes):
-            f.write_bytes(result)
-        else:  # pragma: no cover
-            f.write_text(result, encoding="utf-8")
+            result = result.decode("utf-8")
+        return result

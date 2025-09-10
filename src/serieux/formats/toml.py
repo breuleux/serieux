@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from ..utils import import_any
 from .abc import FileFormat
 
@@ -25,9 +23,8 @@ dumps = import_any(
 
 
 class TOML(FileFormat):
-    def load(self, f: Path):
-        return loads(f.read_text())
+    def loads(self, s: str):
+        return loads(s)
 
-    def dump(self, f: Path, data):
-        result = dumps(data)
-        f.write_text(result, encoding="utf-8")
+    def dumps(self, data):
+        return dumps(data)

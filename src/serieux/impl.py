@@ -92,6 +92,8 @@ class BaseImplementation(Medley):
         serialized = self.serialize(t, obj, ctx)
         if dest:
             formats.dump(p=dest, data=serialized, suffix=format)
+        elif format:
+            return formats.dumps(data=serialized, suffix=format)
         else:
             return serialized
 

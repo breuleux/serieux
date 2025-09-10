@@ -238,6 +238,12 @@ def test_dump(tmp_path):
     assert load(Point, dest) == pt
 
 
+def test_dump_str_with_format():
+    pt = Point(1, 2)
+    s = dump(Point, pt, format="yaml")
+    assert s == "x: 1\ny: 2\n"
+
+
 def test_serialize_recursive_type():
     data = DIDHolder(
         did={

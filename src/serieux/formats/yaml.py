@@ -64,10 +64,8 @@ class YAML(FileFormat):
             source = source[:start] + json.dumps(content) + source[end:]
         return source
 
-    def load(self, f: Path):
-        with open(f, "r") as of:
-            return yaml.load(of, Loader)
+    def loads(self, s: str):
+        return yaml.load(s, Loader)
 
-    def dump(self, f: Path, data):
-        with open(f, "w") as of:
-            yaml.dump(data, of, Dumper=Dumper, allow_unicode=True, sort_keys=False)
+    def dumps(self, data):
+        return yaml.dump(data, Dumper=Dumper, allow_unicode=True, sort_keys=False)
