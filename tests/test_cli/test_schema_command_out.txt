@@ -1,0 +1,60 @@
+{
+    "type": "object",
+    "properties": {
+        "countries": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "object",
+                "properties": {
+                    "languages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "capital": {
+                        "type": "string"
+                    },
+                    "population": {
+                        "type": "integer"
+                    },
+                    "citizens": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                },
+                                "birthyear": {
+                                    "type": "integer"
+                                },
+                                "hometown": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "name",
+                                "birthyear",
+                                "hometown"
+                            ],
+                            "additionalProperties": false
+                        }
+                    }
+                },
+                "required": [
+                    "languages",
+                    "capital",
+                    "population",
+                    "citizens"
+                ],
+                "additionalProperties": false
+            }
+        }
+    },
+    "required": [
+        "countries"
+    ],
+    "additionalProperties": false,
+    "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

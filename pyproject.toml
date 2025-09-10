@@ -74,6 +74,9 @@ exclude_lines = [
     "if TYPE_CHECKING:",
 ]
 
+[project.scripts]
+serieux = "serieux.__main__:main"
+
 [project.entry-points."serieux.default_features"]
 clargs = "serieux.features.clargs:FromArguments"
 comment = "serieux.features.comment:CommentedObjects"

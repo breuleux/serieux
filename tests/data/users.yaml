@@ -1,0 +1,6 @@
+- name: "alice"
+  password: "super_secret"
+- name: "bob"
+  password: "abc123"
+- name: "carol"
+  password: "letmein"

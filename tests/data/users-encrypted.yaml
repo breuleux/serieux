@@ -1,0 +1,6 @@
+- name: "alice"
+  password: "~CRYPT~gAAAAABowdFMXH-fRQozPosNKJgvfo4Wt6IDDxigFbbllLqWI5hheextHGx9JXtT16o2c_2i0so_h-eypmyJGNgkajWFu0JTCw=="
+- name: "bob"
+  password: "~CRYPT~gAAAAABowdFMGLENmvPr2AFcxemvZn9q7U-w36TLO0zPUwdA0cxUbyOh-4_jnn2OZZ0Sbpwbyj796DBVzfgznYgZArsBTNHAwQ=="
+- name: "carol"
+  password: "~CRYPT~gAAAAABowdFMMpv1vAShWNwiIefYOWyvr4z-c71DP5rNNXTiPrwoAtKCYfl7qR7nNN8ZvAfGRRDnibu8V94R5p6dmHwSjXDCBQ=="

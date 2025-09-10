@@ -130,7 +130,7 @@ class Patch:
         return f"Patch({self.description!r})"
 
 
-class Patcher(Context):
+class Patcher(AccessPath):
     patches: dict[int, tuple[Context, Any]] = field(default_factory=dict)
 
     def declare_patch(self, patch):
@@ -138,10 +138,10 @@ class Patcher(Context):
             patch = Patch(patch, ctx=self)
         elif not patch.ctx:  # pragma: no cover
             patch = replace(patch, ctx=self)
-        start = (loc := locate(patch.ctx)) and loc.start
-        self.patches[start] = patch
+        if start := (loc := locate(patch.ctx)) and loc.start:
+            self.patches[start] = patch
 
-    def apply_patches(self):
+    def apply_patches(self, file_remap=None):
         codes = {}
         patches = defaultdict(list)
         for patch in self.patches.values():
@@ -152,6 +152,8 @@ class Patcher(Context):
                 logger.warning(f"Cannot apply patch at a context without a location: `{patch}`")
         for file, blocks in patches.items():
             code = patch.ctx.format.patch(codes[file], blocks)
+            if file_remap:
+                file = file_remap[file]
             file.write_text(code)
 
 
