@@ -65,7 +65,7 @@ class YAML(FileFormat):
         return source
 
     def loads(self, s: str):
-        return yaml.load(s, Loader)
+        return yaml.load(s or "{}", Loader)
 
     def dumps(self, data):
         return yaml.dump(data, Dumper=Dumper, allow_unicode=True, sort_keys=False)
