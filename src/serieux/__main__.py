@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from . import CommandLineArguments, TaggedUnion, deserialize, schema, serieux
+from .auto import Auto
 from .ctx import Patcher, empty
 from .features.encrypt import EncryptionKey
 from .features.fromfile import IncludeFile
@@ -142,7 +143,7 @@ class Check(SelectableFileOperation):
 class Patch(FileOperation):
     """Patch a configuration file for prompts and secrets."""
 
-    # Output file
+    # Output file (will modify inplace if omitted)
     # [alias: -o]
     out: Path = None
 
@@ -162,12 +163,32 @@ class Patch(FileOperation):
             print("\033[1;36mNo patches were applied.\033[0m")
 
 
+@dataclass(kw_only=True)
+class Run:
+    """Run a function or class."""
+
+    # Reference to the function or class to run
+    # [positional]
+    func: Referenced[Any]
+
+    # Function arguments
+    # [positional: ...]
+    args: list[str]
+
+    def __call__(self):
+        result = deserialize(Auto[self.func], CommandLineArguments(self.args))
+        if callable(result):
+            result = result()
+        if result is not None:
+            print(result)
+
+
 @dataclass
 class SerieuxCommand:
     """Do things with serieux configurations."""
 
     # The command to run
-    command: TaggedUnion[Schema, Dump, Check, Patch]
+    command: TaggedUnion[Schema, Dump, Check, Patch, Run]
 
     def __call__(self):  # pragma: no cover
         self.command()

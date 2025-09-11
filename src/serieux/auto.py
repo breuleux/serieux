@@ -85,7 +85,14 @@ def model_from_callable(t, call=False, embed_self=True):
     sig = inspect.signature(t)
     fields = []
     docs = get_variable_data(t)
+    positionals = []
     for param in sig.parameters.values():
+        meta = {}
+        if param.kind == inspect.Parameter.POSITIONAL_ONLY:
+            meta["positional"] = True
+            positionals.append(param.name)
+        if param.name in docs:
+            meta.update(docs[param.name].metadata)
         if param.name == "self" and param.annotation in (inspect._empty, typing.Self):
             parent_class = getattr(
                 importlib.import_module(t.__module__), t.__qualname__.split(".")[0]
@@ -101,7 +108,7 @@ def model_from_callable(t, call=False, embed_self=True):
         field = Field(
             name=param.name,
             description=(docs[param.name].doc or None) if param.name in docs else None,
-            metadata=(docs[param.name].metadata or {}) if param.name in docs else {},
+            metadata=meta,
             type=inherit(orig_t, evaluate_hint(param.annotation, None, None, None)),
             default=MISSING if param.default is inspect._empty else param.default,
             argument_name=param.name,
@@ -117,10 +124,18 @@ def model_from_callable(t, call=False, embed_self=True):
     else:
         build = t
 
+    if positionals:
+
+        def constructor(**kwargs):
+            args = [kwargs.pop(k) for k in positionals]
+            return build(*args, **kwargs)
+    else:
+        constructor = build
+
     return Model(
         original_type=t,
         fields=fields,
-        constructor=build,
+        constructor=constructor,
     )
 
 

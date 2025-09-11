@@ -1,9 +1,12 @@
+from dataclasses import dataclass
+
 import pytest
 
 from serieux.__main__ import (
     Check,
     Dump,
     Patch,
+    Run,
     Schema,
     model_at,
     value_at,
@@ -178,3 +181,36 @@ def test_patch_command_inplace(tmp_path, datapath):
     assert "abc123" not in content
     assert "letmein" not in content
     assert crypt_prefix in content
+
+
+def addnums(x: int, y: int, /):
+    return x + y
+
+
+def test_run_command(capsys):
+    runner = Run(
+        func=addnums,
+        args=["6", "7"],
+    )
+    runner()
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "13"
+
+
+@dataclass
+class Multiplier:
+    left: int
+    right: int
+
+    def __call__(self):
+        return self.left * self.right
+
+
+def test_run_command_dataclass(capsys):
+    runner = Run(
+        func=Multiplier,
+        args=["--left", "6", "--right", "7"],
+    )
+    runner()
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "42"

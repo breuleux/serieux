@@ -460,6 +460,10 @@ def mul_them(x: int, y: int) -> int:
     return x * y
 
 
+def sub_them(x: int, y: int, /) -> int:
+    return x - y
+
+
 def test_clargs_call():
     def do(*args):
         return deserialize(Call[add_them], CommandLineArguments(args))
@@ -472,6 +476,13 @@ def test_clargs_auto():
         return deserialize(Auto[add_them], CommandLineArguments(args))
 
     assert do("-x", "3", "-y", "4")() == 7
+
+
+def test_clargs_auto_pos_only():
+    def do(*args):
+        return deserialize(Auto[sub_them], CommandLineArguments(args))
+
+    assert do("30", "4")() == 26
 
 
 def test_clargs_auto_union():
