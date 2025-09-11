@@ -41,7 +41,7 @@ class FromFile(PartialBuilding):
             raise ValidationError(f"Could not read data from file '{pth}'", exc=exc, ctx=ctx)
         ctx = ctx + Sourced(
             origin=pth,
-            directory=pth.parent,
+            directory=pth.parent.absolute(),
             format=obj.format,
             source_access_path=getattr(ctx, "access_path", ()),
         )
