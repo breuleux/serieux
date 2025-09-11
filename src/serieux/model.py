@@ -348,7 +348,7 @@ def field_at(t: Any, path: str, f: Field):
     return recurse(t, path.lstrip(".").split("."), f)
 
 
-@ovld(priority=1)
+@ovld(priority=10)
 def field_at(t: Any, path: list, f: Field):
     if not path:
         return f
