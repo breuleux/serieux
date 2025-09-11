@@ -9,7 +9,9 @@ from serieux.features.partial import Sources
 
 from .definitions import Point
 
-deserialize = (Serieux + LazyDeserialization)().deserialize
+srx = (Serieux + LazyDeserialization)()
+deserialize = srx.deserialize
+serialize = srx.serialize
 
 
 @dataclass(frozen=True)
@@ -103,3 +105,9 @@ def test_lazy_callable():
 
     lazy_adder = LazyProxy(lambda: Adder(10))
     assert lazy_adder(5) == 15
+
+
+def test_lazyproxy_serialize():
+    lazy_point = LazyProxy(lambda: Point(1, 2))
+    serialized = serialize(Point, lazy_point)
+    assert serialized == {"x": 1, "y": 2}

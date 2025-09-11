@@ -27,6 +27,10 @@ else:
 
 class LazyDeserialization(Medley):
     @ovld(priority=HI5)
+    def serialize(self, t: Any, value: LazyProxy, ctx: Context):
+        return recurse(t, value._obj, ctx)
+
+    @ovld(priority=HI5)
     def deserialize(self, t: type[Any @ Lazy], value: object, ctx: Context):
         def evaluate():
             return recurse(Lazy.strip(t), value, ctx)
