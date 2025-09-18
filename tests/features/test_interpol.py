@@ -11,6 +11,7 @@ from serieux import Serieux
 from serieux.exc import NotGivenError, ValidationError
 from serieux.features.interpol import Environment, Interpolation
 from serieux.features.partial import Sources
+from serieux.instructions import Instruction
 from tests.definitions import Country
 
 deserialize = (Serieux + Interpolation)().deserialize
@@ -179,6 +180,11 @@ def test_unsupported_resolver():
 def test_not_given():
     with pytest.raises(NotGivenError, match="Environment variable 'MISSING' is not defined"):
         deserialize(str, "${env:MISSING}", Environment())
+
+
+def test_annotated():
+    X = Instruction("X")
+    assert deserialize(X[str], "${env:XX}", Environment(environ={"XX": "nice"})) == "nice"
 
 
 @dataclass

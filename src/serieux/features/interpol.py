@@ -4,7 +4,7 @@ import re
 from dataclasses import field
 from pathlib import Path
 from types import NoneType
-from typing import Any, Literal, get_args
+from typing import Annotated, Any, Literal, get_args
 
 from ovld import Medley, call_next, ovld, recurse
 
@@ -65,6 +65,11 @@ def decode_string(t: type[UnionAlias], value: str):
 def decode_string(t: type[list], value: str):
     (element_type,) = get_args(t) or (object,)
     return [recurse(element_type, item.strip()) for item in str(value).split(",")]
+
+
+@ovld
+def decode_string(t: type[Annotated], value: str):
+    return recurse(strip(t), value)
 
 
 class Environment(AccessPath):
@@ -142,7 +147,7 @@ class Interpolation(Medley):
             case [s]:
                 return call_next(t, s, ctx)
             case ["", expr, ""]:
-                obj = ctx.resolve_variable(strip(t), expr)
+                obj = ctx.resolve_variable(t, expr)
                 if isinstance(obj, LazyProxy):
 
                     def interpolate():
