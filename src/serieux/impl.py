@@ -539,13 +539,13 @@ class BaseImplementation(Medley):
             code = f"$builder({comp})"
         if hasattr(ctx, "follow"):
             ctx_expr = Code("$ctx.follow($objt, $obj, IDX)", objt=m.original_type)
-            return Lambda(
-                code,
-                lbody=cls.subcode(method, lt, "X", ctx, ctx_expr=ctx_expr),
-                builder=builder,
-            )
         else:
-            return Lambda("[$lbody for X in $obj]", lbody=cls.subcode(method, lt, "X", ctx))
+            ctx_expr = Code("$ctx")
+        return Lambda(
+            code,
+            lbody=cls.subcode(method, lt, "X", ctx, ctx_expr=ctx_expr),
+            builder=builder,
+        )
 
     @code_generator(priority=STD)
     def serialize(cls, t: type[ListModelizable], obj: Any, ctx: Context, /):
