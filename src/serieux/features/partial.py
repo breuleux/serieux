@@ -1,6 +1,6 @@
-from dataclasses import field, fields, make_dataclass
+from dataclasses import dataclass, field, fields, make_dataclass, replace
 from functools import reduce
-from typing import TYPE_CHECKING, Annotated, Any, TypeAlias, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, TypeAlias
 
 from ovld import Medley, call_next, ovld, recurse
 
@@ -13,7 +13,7 @@ from ..exc import (
     merge_errors,
 )
 from ..instructions import Instruction, T, has_instruction, strip
-from ..model import FieldModelizable, ListModelizable, model
+from ..model import FieldModelizable, ListModelizable, Model, model
 from ..priority import HI4
 from .proxy import LazyProxy
 
@@ -76,11 +76,28 @@ def partialize(t: type[FieldModelizable]):
     return dc
 
 
-@ovld
+@dataclass
+class PartialListModelizable:
+    elements: list
+
+
+@ovld(priority=1)
 def partialize(t: type[ListModelizable]):
-    # TODO: handle more complex types
     m = model(t)
-    return get_origin(t)[recurse(m.element_field.type)]
+    ef = m.element_field
+
+    class PLM(PartialListModelizable):
+        _model = m
+
+        @classmethod
+        def serieux_model(cls, call_next):
+            return Model(
+                original_type=cls,
+                element_field=replace(ef, type=Partial[ef.type]),
+                list_constructor=lambda xs: PLM(list(xs)),
+            )
+
+    return PLM
 
 
 @ovld
@@ -124,7 +141,7 @@ class PartialBuilding(Medley):
         return rval
 
 
-@model.register
+@model.register(priority=2)
 def _(p: type[Any @ Partial]):
     return call_next(partialize(strip(p, Partial)))
 
@@ -225,6 +242,12 @@ def merge(x: dict, y: dict):
 
 
 @ovld
+def merge(x: PartialListModelizable, y: PartialListModelizable):
+    assert x._model is y._model
+    return type(x)(x.elements + y.elements)
+
+
+@ovld
 def merge(x: list, y: list):
     return x + y
 
@@ -282,6 +305,14 @@ def instantiate(p: PartialBase):
         return dc(**args)
     except Exception as exc:
         return ValidationError(exc=exc, ctx=p._serieux_ctx)
+
+
+@ovld
+def instantiate(p: PartialListModelizable):
+    elems = recurse(p.elements)
+    if isinstance(elems, SerieuxError):
+        return elems
+    return p._model.list_constructor(elems)
 
 
 @ovld

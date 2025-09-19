@@ -63,7 +63,10 @@ class IncludeFile(FromFile):
                 else:
                     return recurse(t, pth, ctx)
             case _:
-                return recurse(t, Sources(*paths, obj), ctx)
+                if obj:  # pragma: no cover
+                    return recurse(t, Sources(*paths, obj), ctx)
+                else:
+                    return recurse(t, Sources(*paths), ctx)
 
     @ovld(priority=MIN)
     def deserialize(self, t: type[object], obj: str, ctx: WorkingDirectory):

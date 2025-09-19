@@ -13,6 +13,7 @@ from serieux.ctx import AccessPath, Sourced, WorkingDirectory
 from serieux.exc import ValidationError
 from serieux.features.fromfile import IncludeFile, include_field
 from serieux.features.partial import Sources
+from serieux.model import Field, Model
 
 from ..definitions import Character, Citizen, Country, Player, Team, World
 
@@ -252,3 +253,49 @@ def test_include_list(datapath):
         ],
         capital="Paris",
     )
+
+
+def test_include_list_for_list_type(datapath):
+    construct = {
+        include_field: [
+            {"path": str(datapath / "things.yaml")},
+            {"path": str(datapath / "thangs.yaml")},
+        ]
+    }
+    data = deserialize(set[str], construct)
+    assert data == {
+        "Pants",
+        "Jackets",
+        "Yo-yos",
+        "Pajamas",
+        "Maggots",
+        "French kisses",
+    }
+
+
+@dataclass
+class Loves:
+    loves: list[str]
+
+    def say(self):
+        return f"I love {', '.join(self.loves)}"
+        # INSERT_YOUR_CODE
+
+    @classmethod
+    def serieux_model(cls, call_next):
+        return Model(
+            original_type=cls,
+            element_field=Field(name="*", type=str),
+            list_constructor=lambda xs: Loves(list(xs)),
+        )
+
+
+def test_include_loves(datapath):
+    construct = {
+        include_field: [
+            {"path": str(datapath / "things.yaml")},
+            {"path": str(datapath / "thangs.yaml")},
+        ]
+    }
+    lv = deserialize(Loves, construct)
+    assert lv.say() == "I love Pants, Jackets, Yo-yos, Pajamas, Maggots, French kisses"
