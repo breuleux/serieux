@@ -218,7 +218,7 @@ def merge(x: object, y: PartialBase):
 
 @ovld
 def merge(x: dict, y: dict):
-    result = dict(x)
+    result = type(x)(x)
     for k, v in y.items():
         result[k] = recurse(result.get(k, NOT_GIVEN), v)
     return result
@@ -259,7 +259,7 @@ def instantiate(xs: list):
 
 @ovld
 def instantiate(xs: dict):
-    rval = {}
+    rval = type(xs)()
     err = None
     for k, v in xs.items():
         if v is NOT_GIVEN:
