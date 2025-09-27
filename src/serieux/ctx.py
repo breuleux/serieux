@@ -19,7 +19,11 @@ class Context(Medley, default_combiner=KeepLast):
 
 
 class EmptyContext(Context):
-    pass
+    def __add__(self, other):
+        return other
+
+    def __radd__(self, other):
+        return other
 
 
 class AccessPath(Context):

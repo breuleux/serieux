@@ -1,4 +1,4 @@
-from dataclasses import MISSING, field, is_dataclass
+from dataclasses import MISSING, is_dataclass
 from datetime import date, datetime
 from enum import Enum
 from functools import wraps
@@ -27,7 +27,7 @@ from ovld.utils import ResolutionError, subtler_type
 
 from . import formats
 from .auto import Auto
-from .ctx import AccessPath, Context, Sourced, WorkingDirectory
+from .ctx import Context, Sourced, WorkingDirectory, empty
 from .exc import SchemaError, SerieuxError, ValidationError, ValidationExceptionGroup
 from .instructions import pushdown
 from .model import FieldModelizable, ListModelizable, Modelizable, StringModelizable, model
@@ -67,7 +67,6 @@ def code_generator_wrap_error(fn, priority=0):
 
 
 class BaseImplementation(Medley):
-    default_context: Context = field(default_factory=AccessPath)
     validate_serialize: CodegenParameter[bool] = True
     validate_deserialize: CodegenParameter[bool] = True
 
@@ -79,13 +78,11 @@ class BaseImplementation(Medley):
     #######################
 
     @use_combiner(KeepLast)
-    def load(self, t, obj, ctx=None):
-        ctx = ctx or self.default_context
+    def load(self, t, obj, ctx=empty):
         return self.deserialize(t, obj, ctx)
 
     @use_combiner(KeepLast)
-    def dump(self, t, obj, ctx=None, *, dest=None, format=None):
-        ctx = ctx or self.default_context
+    def dump(self, t, obj, ctx=empty, *, dest=None, format=None):
         if dest:
             dest = Path(dest)
             ctx = ctx + Sourced(origin=dest)
@@ -170,10 +167,10 @@ class BaseImplementation(Medley):
         return recurse(pushdown(t), obj, ctx)
 
     def serialize(self, obj: Any, /):
-        return recurse(type(obj), obj, self.default_context)
+        return recurse(type(obj), obj, empty)
 
     def serialize(self, t: Any, obj: Any, /):
-        return recurse(t, obj, self.default_context)
+        return recurse(t, obj, empty)
 
     #########################################
     # deserialize: helpers and entry points #
@@ -210,7 +207,7 @@ class BaseImplementation(Medley):
         return recurse(pushdown(t), obj, ctx)
 
     def deserialize(self, t: Any, obj: Any, /):
-        return recurse(t, obj, self.default_context)
+        return recurse(t, obj, empty)
 
     ####################################
     # schema: helpers and entry points #
@@ -237,7 +234,7 @@ class BaseImplementation(Medley):
         return recurse(pushdown(t), ctx)
 
     def schema(self, t: Any, /):
-        return recurse(t, self.default_context)
+        return recurse(t, empty)
 
     ################################
     # Implementations: basic types #
