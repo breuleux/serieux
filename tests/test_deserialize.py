@@ -241,8 +241,8 @@ def test_error_display(capsys, file_regression):
         {"x": 1, "y": 2},
         {"x": 3},
     ]
-    with pytest.raises(ValidationError, match=r"At path .1: KeyError: 'y'") as exc:
-        deserialize(list[Point], pts, AccessPath())
+    with pytest.raises(ValidationError, match=r"At path .1: Missing required field 'y'") as exc:
+        deserialize(list[Point], pts)
 
     exc.value.display(file=sys.stderr)
     cap = capsys.readouterr()

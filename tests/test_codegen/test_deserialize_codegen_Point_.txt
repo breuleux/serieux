@@ -1,9 +1,18 @@
 def __GENERATED__(self, t, obj, ctx, /):
+    used = 2
     try:
-        v_0 = obj['x'] if type(__checked := obj['x']) is int else deserialize(self, int, __checked, ctx)
-        v_1 = obj['y'] if type(__checked := obj['y']) is int else deserialize(self, int, __checked, ctx)
-        return Point(v_0,v_1)
-    except SerieuxError:
-        raise
-    except Exception as exc:
-        raise ValidationError(exc=exc, ctx=ctx)
+        x_x = obj['x']
+    except KeyError:
+        raise ValidationError("Missing required field 'x' for type `Point`")
+    else:
+        v_x = x_x if type(x_x) is int else deserialize(self, int, x_x, ctx)
+    try:
+        x_y = obj['y']
+    except KeyError:
+        raise ValidationError("Missing required field 'y' for type `Point`")
+    else:
+        v_y = x_y if type(x_y) is int else deserialize(self, int, x_y, ctx)
+    if used != len(obj):
+        extra = set(obj.keys()) - expected
+        raise ValidationError(f'Extra unrecognized fields were found for type `Point`: {extra}', ctx=ctx)
+    return Point(v_x, v_y)

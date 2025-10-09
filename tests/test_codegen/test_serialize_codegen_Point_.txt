@@ -1,9 +1,4 @@
 def __GENERATED__(self, t, obj, ctx, /):
-    try:
-        v_0 = obj.x if type(__checked := obj.x) is int else serialize(self, int, __checked, ctx)
-        v_1 = obj.y if type(__checked := obj.y) is int else serialize(self, int, __checked, ctx)
-        return {'x': v_0,'y': v_1}
-    except SerieuxError:
-        raise
-    except Exception as exc:
-        raise ValidationError(exc=exc, ctx=ctx)
+    v_x = obj.x if type(__TMP := obj.x) is int else serialize(self, int, __TMP, ctx)
+    v_y = obj.y if type(__TMP := obj.y) is int else serialize(self, int, __TMP, ctx)
+    return {'x': v_x, 'y': v_y}

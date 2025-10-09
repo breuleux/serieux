@@ -21,7 +21,7 @@ class Person:
 
     def __post_init__(self):
         if self.age < 0:
-            raise ValueError("Age cannot be negative!")
+            raise ValidationError("Age cannot be negative!")
 
 
 def test_lazy_object():

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+import cryptography
 import pytest
 
 from serieux.__main__ import (
@@ -11,7 +12,6 @@ from serieux.__main__ import (
     model_at,
     value_at,
 )
-from serieux.exc import ValidationError
 from serieux.features.encrypt import crypt_prefix
 from tests.definitions import Pig, Point, World
 from tests.features.test_encrypt import User
@@ -105,7 +105,7 @@ def test_dump_command_wrong_password(datapath):
         format="yaml",
         password="WRONG",
     )
-    with pytest.raises(ValidationError):
+    with pytest.raises(cryptography.fernet.InvalidToken):
         dumper()
 
 

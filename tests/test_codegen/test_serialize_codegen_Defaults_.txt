@@ -1,10 +1,5 @@
 def __GENERATED__(self, t, obj, ctx, /):
-    try:
-        v_0 = obj.name if type(__checked := obj.name) is str else serialize(self, str, __checked, ctx)
-        v_1 = method_map[t_list, type(OBJ := obj.aliases), Context](self, list1, OBJ, ctx)
-        v_2 = obj.cool if type(__checked := obj.cool) is bool else serialize(self, bool, __checked, ctx)
-        return {'name': v_0,'aliases': v_1,'cool': v_2}
-    except SerieuxError:
-        raise
-    except Exception as exc:
-        raise ValidationError(exc=exc, ctx=ctx)
+    v_name = obj.name if type(__TMP := obj.name) is str else serialize(self, str, __TMP, ctx)
+    v_aliases = method_map[t_list, type(__TMP := obj.aliases), Context](self, list1, __TMP, ctx)
+    v_cool = obj.cool if type(__TMP := obj.cool) is bool else serialize(self, bool, __TMP, ctx)
+    return {'name': v_name, 'aliases': v_aliases, 'cool': v_cool}

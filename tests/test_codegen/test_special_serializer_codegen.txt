@@ -1,9 +1,4 @@
 def __GENERATED__(self, t, obj, ctx, /):
-    try:
-        v_0 = method_map[t_int, type(OBJ := obj.x), Context](self, int, OBJ, ctx)
-        v_1 = method_map[t_int1, type(OBJ := obj.y), Context](self, int, OBJ, ctx)
-        return {'x': v_0,'y': v_1}
-    except SerieuxError:
-        raise
-    except Exception as exc:
-        raise ValidationError(exc=exc, ctx=ctx)
+    v_x = method_map[t_int, type(__TMP := obj.x), Context](self, int, __TMP, ctx)
+    v_y = method_map[t_int1, type(__TMP := obj.y), Context](self, int, __TMP, ctx)
+    return {'x': v_x, 'y': v_y}

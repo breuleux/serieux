@@ -1,7 +1,6 @@
 from dataclasses import MISSING, is_dataclass
 from datetime import date, datetime
 from enum import Enum
-from functools import wraps
 from itertools import pairwise
 from pathlib import Path
 from types import NoneType, UnionType
@@ -16,7 +15,6 @@ from ovld import (
     Medley,
     call_next,
     code_generator,
-    keyword_decorator,
     ovld,
     recurse,
 )
@@ -28,7 +26,7 @@ from ovld.utils import ResolutionError, subtler_type
 from . import formats
 from .auto import Auto
 from .ctx import Context, Sourced, WorkingDirectory, empty
-from .exc import SchemaError, SerieuxError, ValidationError, ValidationExceptionGroup
+from .exc import SchemaError, ValidationError, ValidationExceptionGroup
 from .instructions import pushdown
 from .model import FieldModelizable, ListModelizable, Modelizable, StringModelizable, model
 from .priority import LO4, LOW, MAX, MIN, STD, STD2, STD3
@@ -43,27 +41,6 @@ from .utils import (
     basic_type,
     clsstring,
 )
-
-
-@keyword_decorator
-def code_generator_wrap_error(fn, priority=0):
-    @wraps(fn)
-    def f(cls, *args, **kwargs):
-        result = fn(cls, *args, **kwargs)
-        if not result:
-            return None
-        body = result.create_body(("t", "obj", "ctx"))
-        stmts = [
-            "try:",
-            [body],
-            "except $SXE:",
-            ["raise"],
-            "except Exception as exc:",
-            ["raise $VE(exc=exc, ctx=$ctx)"],
-        ]
-        return Def(stmts, SXE=SerieuxError, VE=ValidationError)
-
-    return code_generator(f, priority=priority)
 
 
 class BaseImplementation(Medley):
@@ -102,7 +79,12 @@ class BaseImplementation(Medley):
     def subcode(
         cls, method_name, t, accessor, ctx_t, ctx_expr=Code("$ctx"), after=None, validate=None
     ):
-        accessor = accessor if isinstance(accessor, Code) else Code(accessor)
+        if isinstance(accessor, str):
+            acc1 = acc2 = Code(accessor)
+        else:
+            acc1 = Code("__TMP := $accessor", accessor=accessor)
+            acc2 = Code("__TMP")
+
         if validate is None:
             validate = getattr(cls, f"validate_{method_name}")
         method = getattr(cls, method_name)
@@ -119,9 +101,10 @@ class BaseImplementation(Medley):
                         return Code(body)
                     else:
                         return Code(
-                            "$body if type(__checked := $accessor) is $t else $recurse($self, $t, __checked, $ctx_expr)",
+                            "$body if type($acc1) is $t else $recurse($self, $t, $acc2, $ctx_expr)",
                             body=Code(body),
-                            accessor=accessor,
+                            acc1=acc1,
+                            acc2=acc2,
                             t=ot,
                             recurse=method,
                             ctx_expr=ctx_expr,
@@ -132,11 +115,12 @@ class BaseImplementation(Medley):
                 # We currently never do that.
                 pass
         return Code(
-            "$method_map[$tt, type(OBJ := $accessor), $ctxt]($self, $t, OBJ, $ctx_expr)",
+            "$method_map[$tt, type($acc1), $ctxt]($self, $t, $acc2, $ctx_expr)",
             tt=subtler_type(t),
             ctxt=ctx_t,
             t=t,
-            accessor=accessor,
+            acc1=acc1,
+            acc2=acc2,
             method_map=method.map,
             ctx_expr=ctx_expr,
         )
@@ -364,7 +348,7 @@ class BaseImplementation(Medley):
     # Implementations: FieldModelizable #
     #####################################
 
-    @code_generator_wrap_error(priority=STD)
+    @code_generator(priority=STD)
     def serialize(cls, t: type[FieldModelizable], obj: Any, ctx: Context, /):
         (orig_t,) = get_args(t)
         t = model(orig_t)
@@ -372,7 +356,7 @@ class BaseImplementation(Medley):
             return None
         stmts = []
         follow = hasattr(ctx, "follow")
-        for i, f in enumerate(t.fields):
+        for f in t.fields:
             if f.property_name is None:
                 raise SchemaError(
                     f"Cannot serialize '{clsstring(t)}' because its model does not specify how to serialize property '{f.name}'"
@@ -383,86 +367,101 @@ class BaseImplementation(Medley):
                 else Code("$ctx")
             )
             stmt = Code(
-                f"v_{i} = $setter",
+                f"v_{f.name} = $setter",
                 setter=cls.subcode(
-                    "serialize", f.type, f"$obj.{f.property_name}", ctx, ctx_expr=ctx_expr
+                    "serialize", f.type, Code(f"$obj.{f.property_name}"), ctx, ctx_expr=ctx_expr
                 ),
             )
             stmts.append(stmt)
         final = Code(
-            "return {$[,]parts}",
+            "return {$[, ]parts}",
             parts=[
                 Code(
-                    f"$fname: v_{i}",
+                    f"$fname: v_{f.name}",
                     fname=f.serialized_name,
                 )
-                for i, f in enumerate(t.fields)
+                for f in t.fields
             ],
         )
         stmts.append(final)
         return Def(stmts, VE=ValidationError, VEG=ValidationExceptionGroup)
 
-    @code_generator_wrap_error(priority=STD)
+    @code_generator(priority=STD)
     def deserialize(cls, t: type[FieldModelizable], obj: dict, ctx: Context, /):
         (orig_t,) = get_args(t)
         t = model(orig_t)
         follow = hasattr(ctx, "follow")
-        stmts = []
+        stmts = [f"used = {sum(1 for f in t.fields if f.required)}"]
         args = []
-        for i, f in enumerate(t.fields):
+
+        def _extract(f):
+            n = f.name
+            if f.metavar:
+                return [Code(f"v_{n} = $meta", meta=Code(f.metavar))]
+
             ctx_expr = (
                 Code("$ctx.follow($objt, $obj, $fld)", objt=orig_t, fld=f.name)
                 if follow
                 else Code("$ctx")
             )
-            if f.metavar:
-                expr = Code(f.metavar)
-            else:
-                expr = cls.subcode(
-                    "deserialize",
-                    f.type,
-                    Code("$obj[$pname]", pname=f.serialized_name),
-                    ctx,
-                    ctx_expr=ctx_expr,
-                )
 
-            stmt = Code([f"v_{i} = $expr"], expr=expr)
-
-            if f.required or f.metavar:
-                pass
-            elif f.default is not MISSING:
-                stmt = Code(
-                    [
-                        "if $pname in $obj:",
-                        ["$stmt"],
-                        "else:",
-                        [f"v_{i} = $dflt"],
-                    ],
-                    dflt=f.default,
-                    pname=f.serialized_name,
-                    stmt=stmt,
+            try_stmts = [Code(f"x_{n} = $obj[$pname]", pname=f.serialized_name)]
+            msg = f"Missing required field '{f.serialized_name}' for type `{clsstring(t)}`"
+            exc_stmts = [Code("raise $VE($msg)", msg=msg, ve=ValidationError)]
+            else_stmts = [
+                Code(
+                    f"v_{n} = $expr",
+                    expr=cls.subcode(
+                        "deserialize",
+                        f.type,
+                        f"x_{n}",
+                        ctx,
+                        ctx_expr=ctx_expr,
+                    ),
                 )
+            ]
+
+            if f.default is not MISSING:
+                try_stmts.append("used += 1")
+                exc_stmts = [Code(f"v_{n} = $dflt", dflt=f.default)]
+
             elif f.default_factory is not MISSING:
-                stmt = Code(
-                    [
-                        "if $pname in $obj:",
-                        ["$stmt"],
-                        "else:",
-                        [f"v_{i} = $dflt()"],
-                    ],
-                    dflt=f.default_factory,
-                    pname=f.serialized_name,
-                    stmt=stmt,
-                )
-            stmts.append(stmt)
+                try_stmts.append("used += 1")
+                exc_stmts = [Code(f"v_{n} = $dflt()", dflt=f.default_factory)]
+
+            return [
+                "try:",
+                try_stmts,
+                "except KeyError:",
+                exc_stmts,
+                "else:",
+                else_stmts,
+            ]
+
+        for f in t.fields:
+            stmts.extend(_extract(f))
             if isinstance(f.argument_name, str):
-                arg = f"{f.argument_name}=v_{i}"
+                arg = f"{f.argument_name}=v_{f.name}"
             else:
-                arg = f"v_{i}"
+                arg = f"v_{f.name}"
             args.append(arg)
 
+        stmts.append(
+            Code(
+                [
+                    "if used != len($obj):",
+                    [
+                        "extra = set($obj.keys()) - $expected",
+                        f"raise $VE(f'Extra unrecognized fields were found for type `{clsstring(t)}`: {{extra}}', ctx=$ctx)",
+                    ],
+                ],
+                VE=ValidationError,
+                expected={f.serialized_name for f in t.fields},
+            )
+        )
+
         final = Code(
-            "return $constructor($[,]parts)",
+            "return $constructor($[, ]parts)",
             constructor=t.constructor,
             parts=[Code(a) for a in args],
         )
@@ -473,7 +472,7 @@ class BaseImplementation(Medley):
     # Implementations: StringModelizable #
     ######################################
 
-    @code_generator_wrap_error(priority=STD2)
+    @code_generator(priority=STD2)
     def serialize(self, t: type[StringModelizable], obj: Any, ctx: Context, /):
         (t,) = get_args(t)
         m = model(t)
@@ -484,7 +483,7 @@ class BaseImplementation(Medley):
         else:
             return Lambda("$to_string($obj)", to_string=m.to_string)
 
-    @code_generator_wrap_error(priority=STD2)
+    @code_generator(priority=STD2)
     def deserialize(self, t: type[StringModelizable], obj: str, ctx: Context, /):
         (t,) = get_args(t)
         m = model(t)
@@ -498,7 +497,6 @@ class BaseImplementation(Medley):
             descr = m.string_description or f"pattern {m.regexp.pattern!r}"
             pattern = f"String {{$obj!r}} is not a valid {clsstring(t)}. It should match: {descr}"
             return Def(
-                ["t", "obj", "ctx"],
                 Code(
                     [
                         ["if $regexp.match($obj):", ["return $expr"]],
@@ -702,11 +700,11 @@ class BaseImplementation(Medley):
     # Implementations: Enums #
     ##########################
 
-    @code_generator_wrap_error(priority=STD3)
+    @code_generator(priority=STD3)
     def serialize(cls, t: type[Enum], obj: Enum, ctx: Context, /):
         return Lambda(Code("$obj.value"))
 
-    @code_generator_wrap_error(priority=STD3)
+    @code_generator(priority=STD3)
     def deserialize(cls, t: type[Enum], obj: Any, ctx: Context, /):
         (t,) = get_args(t)
         return Lambda(Code("$t($obj)", t=t))
@@ -741,7 +739,7 @@ class BaseImplementation(Medley):
     # Implementations: Dates #
     ##########################
 
-    @code_generator_wrap_error(priority=STD)
+    @code_generator(priority=STD)
     def deserialize(cls, t: type[datetime], obj: int | float, ctx: Context, /):
         return Lambda(Code("$fromtimestamp($obj)", fromtimestamp=datetime.fromtimestamp))
 

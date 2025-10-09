@@ -134,7 +134,7 @@ def test_deserialize_read_direct(
 
 
 def test_deserialize_incomplete(datapath, check_error_display):
-    with check_error_display("KeyError: 'capital'"):
+    with check_error_display("Missing required field 'capital'"):
         deserialize(Country, datapath / "france.yaml", AccessPath())
 
 
@@ -233,7 +233,7 @@ def test_bad_format(datapath):
     construct = {
         include_field: {"path": str(datapath / "character.yaml"), "format": "unknown"},
     }
-    with pytest.raises(ValidationError, match=r"Format `unknown` is not recognized"):
+    with pytest.raises(ImportError, match=r"Format `unknown` is not recognized"):
         deserialize(str, construct)
 
 

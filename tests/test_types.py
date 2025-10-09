@@ -1,7 +1,7 @@
 import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pytest
 
@@ -173,7 +173,7 @@ def test_serialize_zoneinfo():
 def test_deserialize_zoneinfo():
     assert deserialize(ZoneInfo, "America/New_York") == ZoneInfo("America/New_York")
     assert deserialize(ZoneInfo, "UTC") == ZoneInfo("UTC")
-    with pytest.raises(ValidationError, match="No time zone found"):
+    with pytest.raises(ZoneInfoNotFoundError, match="No time zone found"):
         deserialize(ZoneInfo, "Invalid/Timezone")
 
 
@@ -214,7 +214,7 @@ def test_deserialize_complex_pattern():
 
 
 def test_deserialize_pattern_invalid():
-    with pytest.raises(ValidationError, match="bad character range"):
+    with pytest.raises(re.PatternError, match="bad character range"):
         deserialize(re.Pattern, r"[z-a]")  # Invalid character range
 
 
