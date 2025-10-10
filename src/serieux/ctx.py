@@ -96,7 +96,7 @@ class Sourced(WorkingDirectory):
         if self.directory is None:
             self.directory = self.origin.parent
 
-    def compute_location(self):
+    def compute_location(self, access_path=None):
         if isinstance(self, AccessPath):
             access_path = self.access_path
             pfx = len(self.source_access_path)

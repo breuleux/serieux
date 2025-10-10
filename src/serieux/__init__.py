@@ -1,6 +1,8 @@
 import importlib
 import importlib.metadata
 import logging
+import os
+import sys
 import traceback
 from functools import partial
 from pathlib import Path
@@ -118,6 +120,25 @@ def schema_definition(fn=None, priority=0):
     check_signature(fn, "schema definition", ("self", "t: type[T1]", "ctx: T2>Context"))
     Serieux.schema.register(fn, priority=priority)
     return fn
+
+
+if sys.excepthook is sys.__excepthook__ and not os.getenv("SERIEUX_DISABLE_EXCEPTHOOK", None):
+
+    def custom_excepthook(exc_type, exc_value, exc_traceback):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+        from .exc import display_context_information
+
+        tb = exc_value.__traceback__
+        frame = None
+        while tb:
+            frame = tb.tb_frame
+            tb = tb.tb_next
+        display_context_information(
+            "The error happened in serieux.{func} at location {access_path}", ctx=None, frame=frame
+        )
+
+    sys.excepthook = custom_excepthook
 
 
 __all__ = [

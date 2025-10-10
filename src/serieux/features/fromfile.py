@@ -35,10 +35,9 @@ class FromFile(PartialBuilding):
         pth = obj.path
         if isinstance(ctx, WorkingDirectory):
             pth = ctx.directory / pth.expanduser()
-        try:
-            data = obj.format.load(pth)
-        except Exception as exc:
-            raise ValidationError(f"Could not read data from file '{pth}'", exc=exc, ctx=ctx)
+        if not pth.exists():
+            raise ValidationError(f"File '{pth.absolute()}' does not exist", ctx=ctx)
+        data = obj.format.load(pth)
         ctx = ctx + Sourced(
             origin=pth,
             directory=pth.parent.absolute(),

@@ -6,7 +6,7 @@ from typing import Any, Literal
 import pytest
 
 from serieux import deserialize
-from serieux.ctx import AccessPath
+from serieux.ctx import AccessPath, empty
 from serieux.exc import SchemaError, ValidationError
 from serieux.model import AllowExtras
 

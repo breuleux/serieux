@@ -122,7 +122,7 @@ def test_deserialize_toml(datapath):
 
 
 def test_deserialize_missing_file(datapath):
-    with pytest.raises(ValidationError, match="Could not read data"):
+    with pytest.raises(ValidationError, match="does not exist"):
         deserialize(World, datapath / "missing.yaml")
 
 
