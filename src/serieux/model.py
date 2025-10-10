@@ -25,9 +25,9 @@ UNDEFINED = object()
 
 
 if TYPE_CHECKING:
-    Extensible: TypeAlias = Annotated[T, None]
+    AllowExtras: TypeAlias = Annotated[T, None]
 else:
-    Extensible = Instruction("Extensible", annotation_priority=1, inherit=True)
+    AllowExtras = Instruction("AllowExtras", annotation_priority=1, inherit=True)
 
 
 @class_check
@@ -97,7 +97,7 @@ class Model:
     to_string: Callable = None
     regexp: re.Pattern = None
     string_description: str = None
-    extensible: bool = False
+    allow_extras: bool = False
 
     def __post_init__(self):
         if isinstance(self.regexp, str):
@@ -230,9 +230,9 @@ def model(sq: type[list] | type[set] | type[frozenset]):
 
 
 @ovld
-def model(t: type[Any @ Extensible]):
-    m = call_next(strip(t, Extensible))
-    return m and replace(m, extensible=True)
+def model(t: type[Any @ AllowExtras]):
+    m = call_next(strip(t, AllowExtras))
+    return m and replace(m, allow_extras=True)
 
 
 @ovld(priority=-1)

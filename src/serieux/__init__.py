@@ -20,7 +20,7 @@ from .features.registered import AutoRegistered, Referenced, auto_singleton
 from .features.tagset import ReferencedClass, Tagged, TaggedSubclass, TaggedUnion
 from .impl import BaseImplementation
 from .instructions import Instruction
-from .model import Extensible, Field, FieldModelizable, Model, Modelizable, StringModelizable
+from .model import AllowExtras, Field, FieldModelizable, Model, Modelizable, StringModelizable
 from .schema import RefPolicy, Schema
 from .utils import JSON, check_signature
 from .version import version as __version__
@@ -123,6 +123,7 @@ def schema_definition(fn=None, priority=0):
 __all__ = [
     "__version__",
     "AccessPath",
+    "AllowExtras",
     "Auto",
     "AutoRegistered",
     "auto_singleton",
@@ -137,7 +138,6 @@ __all__ = [
     "DottedNotation",
     "dump",
     "Environment",
-    "Extensible",
     "Field",
     "IncludeFile",
     "JSON",

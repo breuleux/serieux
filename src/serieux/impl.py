@@ -1,3 +1,4 @@
+import math
 from dataclasses import MISSING, is_dataclass
 from datetime import date, datetime
 from enum import Enum
@@ -390,8 +391,11 @@ class BaseImplementation(Medley):
     def deserialize(cls, t: type[FieldModelizable], obj: dict, ctx: Context, /):
         (orig_t,) = get_args(t)
         t = model(orig_t)
+        forbid_extras = not t.allow_extras
         follow = hasattr(ctx, "follow")
-        stmts = [f"used = {sum(1 for f in t.fields if f.required)}"]
+        stmts = []
+        if forbid_extras:
+            stmts.append(f"used = {sum(1 for f in t.fields if f.required)}")
         args = []
 
         def _extract(f):
@@ -422,11 +426,13 @@ class BaseImplementation(Medley):
             ]
 
             if f.default is not MISSING:
-                try_stmts.append("used += 1")
+                if forbid_extras:
+                    try_stmts.append("used += 1")
                 exc_stmts = [Code(f"v_{n} = $dflt", dflt=f.default)]
 
             elif f.default_factory is not MISSING:
-                try_stmts.append("used += 1")
+                if forbid_extras:
+                    try_stmts.append("used += 1")
                 exc_stmts = [Code(f"v_{n} = $dflt()", dflt=f.default_factory)]
 
             return [
@@ -438,7 +444,10 @@ class BaseImplementation(Medley):
                 else_stmts,
             ]
 
-        for f in t.fields:
+        def _sortkey(f):
+            return an if isinstance(an := f.argument_name, int) else math.inf
+
+        for f in sorted(t.fields, key=_sortkey):
             stmts.extend(_extract(f))
             if isinstance(f.argument_name, str):
                 arg = f"{f.argument_name}=v_{f.name}"
@@ -446,19 +455,20 @@ class BaseImplementation(Medley):
                 arg = f"v_{f.name}"
             args.append(arg)
 
-        stmts.append(
-            Code(
-                [
-                    "if used != len($obj):",
+        if forbid_extras:
+            stmts.append(
+                Code(
                     [
-                        "extra = set($obj.keys()) - $expected",
-                        f"raise $VE(f'Extra unrecognized fields were found for type `{clsstring(t)}`: {{extra}}', ctx=$ctx)",
+                        "if used != len($obj):",
+                        [
+                            "extra = set($obj.keys()) - $expected",
+                            f"raise $VE(f'Extra unrecognized fields were found for type `{clsstring(t)}`: {{extra}}', ctx=$ctx)",
+                        ],
                     ],
-                ],
-                VE=ValidationError,
-                expected={f.serialized_name for f in t.fields},
+                    VE=ValidationError,
+                    expected={f.serialized_name for f in t.fields},
+                )
             )
-        )
 
         final = Code(
             "return $constructor($[, ]parts)",
@@ -586,7 +596,7 @@ class BaseImplementation(Medley):
                 "type": "object",
                 "properties": properties,
                 "required": required,
-                "additionalProperties": m.extensible,
+                "additionalProperties": m.allow_extras,
             }
 
         if m.from_string is not None:

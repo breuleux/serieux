@@ -134,3 +134,13 @@ class Character:
     age: int
     occupation: str
     backstory: str
+
+
+@dataclass(kw_only=True)
+class Car:
+    horsepower: int
+
+
+@dataclass
+class IdentifiedCar(Car):
+    id: int

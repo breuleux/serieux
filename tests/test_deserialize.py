@@ -8,6 +8,7 @@ import pytest
 from serieux import deserialize
 from serieux.ctx import AccessPath
 from serieux.exc import SchemaError, ValidationError
+from serieux.model import AllowExtras
 
 from .common import has_312_features, one_test_per_assert
 from .definitions import (
@@ -15,6 +16,7 @@ from .definitions import (
     Defaults,
     DIDHolder,
     DotDict,
+    IdentifiedCar,
     Level,
     LTHolder,
     Point,
@@ -227,13 +229,25 @@ def test_deserialize_scalar_error_2():
         deserialize(str, 13)
 
 
-def test_deserialize_missing_field():
+@pytest.mark.parametrize("ctx", (AccessPath(), empty))
+def test_deserialize_missing_field(ctx):
     pts = [
         {"x": 1, "y": 2},
         {"x": 3},
     ]
-    with pytest.raises(ValidationError, match=r"At path .1: KeyError: 'y'"):
-        deserialize(list[Point], pts, AccessPath())
+    with pytest.raises(ValidationError, match=r"At path .1: Missing required field 'y'"):
+        deserialize(list[Point], pts, ctx)
+
+
+def test_deserialize_extra_fields_not_allowed():
+    data = {"x": 1, "y": 2, "poop": 123}
+    with pytest.raises(ValidationError, match=r"Extra unrecognized fields.*Point.*poop"):
+        deserialize(Point, data)
+
+
+def test_deserialize_extra_fields_allowed():
+    data = {"x": 1, "y": 2, "poop": 123}
+    assert deserialize(AllowExtras[Point], data) == Point(1, 2)
 
 
 def test_error_display(capsys, file_regression):
@@ -299,3 +313,9 @@ def test_deserialize_from_init():
 def test_deserialize_pointato():
     with pytest.raises(ValidationError, match="Did you mean for it to be a dataclass"):
         deserialize(Pointato, {"x": 1, "y": 2})
+
+
+def test_deserialize_kwonly_fields():
+    data = {"id": 42, "horsepower": 300}
+    car = deserialize(IdentifiedCar, data)
+    assert car == IdentifiedCar(42, horsepower=300)

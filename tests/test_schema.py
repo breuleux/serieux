@@ -6,7 +6,7 @@ import pytest
 
 from serieux import schema as _schema
 from serieux.exc import ValidationError
-from serieux.model import Extensible
+from serieux.model import AllowExtras
 from serieux.schema import AnnotatedSchema, Schema
 
 from .common import has_312_features
@@ -93,8 +93,8 @@ def test_schema_dataclass():
     }
 
 
-def test_schema_extensible_dataclass():
-    assert schema(Extensible[Point]) == {
+def test_schema_allow_extras_dataclass():
+    assert schema(AllowExtras[Point]) == {
         "type": "object",
         "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
         "required": ["x", "y"],
