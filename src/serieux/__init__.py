@@ -10,7 +10,12 @@ from typing import TYPE_CHECKING, TypeAlias
 
 from .auto import Auto
 from .ctx import AccessPath, Context, Patch, Patcher, WorkingDirectory
-from .exc import SerieuxError, ValidationError, ValidationExceptionGroup
+from .exc import (
+    SerieuxError,
+    ValidationError,
+    ValidationExceptionGroup,
+    display_context_information,
+)
 from .features.clargs import CLIDefinition, CommandLineArguments, parse_cli
 from .features.comment import Comment, CommentRec
 from .features.dotted import DottedNotation
@@ -124,19 +129,9 @@ def schema_definition(fn=None, priority=0):
 
 if sys.excepthook is sys.__excepthook__ and not os.getenv("SERIEUX_DISABLE_EXCEPTHOOK", None):
 
-    def custom_excepthook(exc_type, exc_value, exc_traceback):
+    def custom_excepthook(exc_type, exc_value, exc_traceback):  # pragma: no cover
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
-
-        from .exc import display_context_information
-
-        tb = exc_value.__traceback__
-        frame = None
-        while tb:
-            frame = tb.tb_frame
-            tb = tb.tb_next
-        display_context_information(
-            "The error happened in serieux.{func} at location {access_path}", ctx=None, frame=frame
-        )
+        display_context_information(exc=exc_value)
 
     sys.excepthook = custom_excepthook
 
@@ -156,6 +151,7 @@ __all__ = [
     "Context",
     "DeepLazy",
     "deserialize",
+    "display_context_information",
     "DottedNotation",
     "dump",
     "Environment",

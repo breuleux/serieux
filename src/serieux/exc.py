@@ -100,22 +100,31 @@ def extract_information(ctx=None, frame=None):
 
 
 def display_context_information(
-    message,
+    message="An error happened in serieux.{func} at location {access_path}",
     *,
     ctx=None,
+    exc=None,
     frame=None,
     show_source=True,
     file=sys.stderr,
     **kwargs,
 ):
+    if exc is not None:
+        if isinstance(exc, IndividualSerieuxError) and exc.ctx:  # pragma: no cover
+            ctx = exc.ctx
+        else:
+            tb = exc.__traceback__
+            while tb:
+                frame = tb.tb_frame
+                tb = tb.tb_next
     func, acc, locs = extract_information(ctx, frame)
-    if func is None:
+    if func is None:  # pragma: no cover
         return
     access_string = "".join([f".{field}" for field in acc]) if acc else "(at root)"
     print(message.format(access_path=_color(33, access_string), func=func), file=file)
     if show_source and locs:
         for location in locs:
-            display_location(location, **kwargs)
+            display_location(location, file=file, **kwargs)
 
 
 def display_location(location, source_context=1, indent=0, ellipsis_cutoff=3, file=sys.stderr):
@@ -207,7 +216,7 @@ def context_string(
     return "\n".join(return_lines)
 
 
-def display_context(*args, file=sys.stdout, **kwargs):
+def display_context(*args, file=sys.stderr, **kwargs):
     cs = context_string(*args, **kwargs)
     print(cs, file=file)
 
@@ -237,17 +246,6 @@ class IndividualSerieuxError(SerieuxError):
     def message(self):
         return self.args[0]
 
-    def display(self, file=sys.stderr, prefix=""):
-        print(prefix, end="", file=file)
-        display_context(
-            self.ctx,
-            access_string=self.access_string,
-            show_source=True,
-            message=self.message,
-            file=file,
-            indent=2,
-        )
-
     def __str__(self):
         if location := locate(self.ctx):
             (l1, c1), (l2, c2) = location.linecols
@@ -265,10 +263,6 @@ class ValidationExceptionGroup(SerieuxError, ExceptionGroup):
     def derive(self, excs):  # pragma: no cover
         return ValidationExceptionGroup(self.message, excs)
 
-    def display(self, file=sys.stderr):
-        for i, exc in enumerate(self.exceptions):
-            exc.display(file=file, prefix=f"[#{i}] ")
-
 
 class ValidationError(IndividualSerieuxError):
     def __init__(self, message=None, *, exc=None, ctx=None):
@@ -284,3 +278,29 @@ class SchemaError(IndividualSerieuxError):
             message = f"{type(exc).__name__}: {exc}"
         super().__init__(message=message, ctx=ctx)
         self.exc = exc
+
+
+@ovld
+def display(exc: IndividualSerieuxError, file=sys.stderr):
+    display_context(
+        exc.ctx,
+        access_string=exc.access_string,
+        show_source=True,
+        message=exc.message,
+        file=file,
+        indent=2,
+    )
+
+
+@ovld
+def display(exc: ValidationExceptionGroup, file=sys.stderr):
+    for i, subexc in enumerate(exc.exceptions):
+        print(f"[#{i}] ", end="", file=file)
+        display(subexc, file)
+
+
+@ovld
+def display(exc: Exception, file=sys.stderr):
+    display_context_information(
+        f"At path {{access_path}}: {type(exc).__name__}: {exc}", exc=exc, file=file
+    )

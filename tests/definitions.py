@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from enum import Enum
 from numbers import Number
 
@@ -9,6 +10,13 @@ from numbers import Number
 class Tree:
     left: Tree | Number
     right: Tree | Number
+
+
+@dataclass
+class Elf:
+    name: str
+    birthdate: date
+    favorite_color: str
 
 
 @dataclass

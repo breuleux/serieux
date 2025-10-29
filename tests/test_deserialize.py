@@ -7,7 +7,7 @@ import pytest
 
 from serieux import deserialize
 from serieux.ctx import AccessPath, empty
-from serieux.exc import SchemaError, ValidationError
+from serieux.exc import SchemaError, ValidationError, display
 from serieux.model import AllowExtras
 
 from .common import has_312_features, one_test_per_assert
@@ -258,7 +258,7 @@ def test_error_display(capsys, file_regression):
     with pytest.raises(ValidationError, match=r"At path .1: Missing required field 'y'") as exc:
         deserialize(list[Point], pts)
 
-    exc.value.display(file=sys.stderr)
+    display(exc.value, sys.stderr)
     cap = capsys.readouterr()
     file_regression.check("\n".join([cap.out, "=" * 80, cap.err]))
 

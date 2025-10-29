@@ -15,7 +15,7 @@ from serieux.features.fromfile import IncludeFile, include_field
 from serieux.features.partial import Sources
 from serieux.model import Field, Model
 
-from ..definitions import Character, Citizen, Country, Player, Team, World
+from ..definitions import Character, Citizen, Country, Elf, Player, Team, World
 
 deserialize = (Serieux + IncludeFile)().deserialize
 
@@ -171,6 +171,16 @@ def test_deserialize_invalid_indirect(datapath, check_error_display):
 def test_deserialize_oops_world(datapath, check_error_display):
     with check_error_display("Cannot deserialize string"):
         deserialize(World, datapath / "oops-world.yaml", AccessPath())
+
+
+def test_deserialize_oops_elves(datapath, check_error_display):
+    with check_error_display("Invalid isoformat string", exc_type=ValueError):
+        deserialize(dict[str, Elf], datapath / "elves.yaml")
+
+
+def test_deserialize_oops_elves_ap(datapath, check_error_display):
+    with check_error_display("Invalid isoformat string", exc_type=ValueError):
+        deserialize(dict[str, Elf], datapath / "elves.yaml", AccessPath())
 
 
 def test_make_path_for(tmp_path):

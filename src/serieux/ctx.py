@@ -22,7 +22,7 @@ class EmptyContext(Context):
     def __add__(self, other):
         return other
 
-    def __radd__(self, other):
+    def __radd__(self, other):  # pragma: no cover
         return other
 
 

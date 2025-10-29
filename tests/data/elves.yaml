@@ -1,0 +1,15 @@
+twinkletoes:
+  name: Twinkletoes McJingles
+  birthdate: 2010-12-25
+  favorite_color: chartreuse
+
+glitterpants:
+  name: Glitterpants Bumbersnoot
+  birthdate: invalid-date
+  favorite_color: teal
+
+sprinklesocks:
+  name: Sprinklesocks Wobblewand
+  birthdate: 1997-08-09
+  favorite_color: mauve
+

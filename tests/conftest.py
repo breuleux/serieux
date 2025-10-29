@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from serieux import Serieux
-from serieux.exc import SerieuxError
+from serieux.exc import SerieuxError, display
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ def check_error_display(capsys, file_regression, datapath):
         with pytest.raises(exc_type, match=message) as exc:
             yield
 
-        exc.value.display(file=sys.stderr)
+        display(exc.value, sys.stderr)
         cap = capsys.readouterr()
         out = cap.out.replace(str(datapath.parent), "REDACTED")
         err = cap.err.replace(str(datapath.parent), "REDACTED")

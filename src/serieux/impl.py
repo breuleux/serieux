@@ -27,7 +27,7 @@ from ovld.utils import ResolutionError, subtler_type
 from . import formats
 from .auto import Auto
 from .ctx import Context, Sourced, WorkingDirectory, empty
-from .exc import SchemaError, ValidationError, ValidationExceptionGroup
+from .exc import SchemaError, ValidationError
 from .instructions import pushdown
 from .model import FieldModelizable, ListModelizable, Modelizable, StringModelizable, model
 from .priority import LO4, LOW, MAX, MIN, STD, STD2, STD3
@@ -385,7 +385,7 @@ class BaseImplementation(Medley):
             ],
         )
         stmts.append(final)
-        return Def(stmts, VE=ValidationError, VEG=ValidationExceptionGroup)
+        return Def(stmts, VE=ValidationError)
 
     @code_generator(priority=STD)
     def deserialize(cls, t: type[FieldModelizable], obj: dict, ctx: Context, /):
@@ -476,7 +476,7 @@ class BaseImplementation(Medley):
             parts=[Code(a) for a in args],
         )
         stmts.append(final)
-        return Def(stmts, VE=ValidationError, VEG=ValidationExceptionGroup)
+        return Def(stmts, VE=ValidationError)
 
     ######################################
     # Implementations: StringModelizable #
