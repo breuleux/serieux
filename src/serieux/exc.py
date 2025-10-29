@@ -7,6 +7,7 @@ from ovld import ovld
 from ovld.medley import ABSENT
 
 from .ctx import AccessPath, Context, locate
+from .formats import FileSource
 
 
 def _color(code, text):
@@ -67,8 +68,6 @@ def find_access_path(ctx):
 
 
 def extract_information(ctx=None, frame=None):
-    from .features.fromfile import PathAndFormat
-
     frame = frame or sys._getframe(1)
     locs = []
     ap = []
@@ -79,11 +78,14 @@ def extract_information(ctx=None, frame=None):
         ctx = lcls.get("ctx", ctx)
         if isinstance(ctx, AccessPath):
             ap = [*ctx.access_path, *reversed(ap)]
-            return (ap, locate(ctx))
+            locs = [locate(ctx), *reversed(locs)]
+            return (func or "<serieux>", ap, locs)
         elif ctx and (m := re.match(r"^((?:de)?serialize|schema)\[", frame.f_code.co_name)):
             func = m.groups()[0]
             t1, obj1 = lcls.get("t", ABSENT), lcls.get("obj", ABSENT)
-            if isinstance(obj1, PathAndFormat):
+            if isinstance(obj1, FileSource):
+                if obj1.field:  # pragma: no cover
+                    ap.extend(reversed(obj1.field.split(".")))
                 loc = obj1.format.locate(obj1.path, list(reversed(ap)))
                 locs.append(loc)
             if above is not None:

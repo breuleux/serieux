@@ -1,5 +1,24 @@
 import importlib.metadata
+from dataclasses import dataclass
 from pathlib import Path
+
+from .abc import FileFormat
+
+
+@dataclass
+class FileSource:
+    path: Path
+    format: FileFormat = None
+    field: str = None
+
+    def __post_init__(self):
+        if not isinstance(self.format, FileFormat):
+            self.format = find(self.path, suffix=self.format)
+
+    @classmethod
+    def serieux_from_string(cls, incl):
+        pth, at, fld = incl.partition("@")
+        return cls(Path(pth.strip()), field=fld if at else None)
 
 
 class FormatRegistry(dict):

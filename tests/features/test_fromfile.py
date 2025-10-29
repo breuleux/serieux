@@ -103,6 +103,26 @@ def test_deserialize_world(datapath):
     )
 
 
+def test_deserialize_world_clone(datapath):
+    world = deserialize(World, datapath / "clone.yaml")
+    assert world == World(
+        countries={
+            "france": Country(
+                languages=["French"],
+                capital="Paris",
+                population=68_000_000,
+                citizens=[
+                    Citizen(
+                        name="Jeannot",
+                        birthyear=1893,
+                        hometown="Lyon",
+                    ),
+                ],
+            ),
+        }
+    )
+
+
 def test_deserialize_json(datapath):
     file = datapath / "world.json"
     # Sanity check that this is a valid JSON file
