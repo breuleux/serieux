@@ -4,7 +4,7 @@ from datetime import date, datetime
 from enum import Enum
 from itertools import pairwise
 from pathlib import Path
-from types import NoneType, UnionType
+from types import NoneType, UnionType, WrapperDescriptorType
 from typing import Annotated, Any, get_args, get_origin
 
 from ovld import (
@@ -791,7 +791,8 @@ class BaseImplementation(Medley):
 
     @ovld(priority=LO4)
     def deserialize(self, t: type[object], obj: dict, ctx: Context):
-        if t.__init__ is object.__init__:
+        ot = get_origin(t) or t
+        if isinstance(ot.__init__, WrapperDescriptorType):
             msg = f"Cannot deserialize `{obj}` to type `{clsstring(t)}.`"
             if getattr(t, "__annotations__", None) and not is_dataclass(t):
                 msg += f" `{clsstring(t)}` appears to have type annotations on some fields, but it is not a dataclass. Did you mean for it to be a dataclass?"

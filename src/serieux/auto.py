@@ -104,7 +104,7 @@ def model_from_callable(t, call=False, embed_self=True):
             else:
                 param = param.replace(annotation=parent_class)
         if param.annotation is inspect._empty:
-            raise TypeError(f"Cannot model {t}: '{param.name}' lacks a type annotation.")
+            raise TypeError(f"Cannot model {t}: parameter '{param.name}' lacks a type annotation.")
         field = Field(
             name=param.name,
             description=(docs[param.name].doc or None) if param.name in docs else None,
