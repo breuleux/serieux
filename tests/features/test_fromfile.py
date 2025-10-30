@@ -15,7 +15,7 @@ from serieux.features.fromfile import IncludeFile, include_field
 from serieux.features.partial import Sources
 from serieux.model import Field, Model
 
-from ..definitions import Character, Citizen, Country, Elf, Player, Team, World
+from ..definitions import Character, Citizen, Country, Elf, Job, Player, Team, Worker, World
 
 deserialize = (Serieux + IncludeFile)().deserialize
 
@@ -239,6 +239,11 @@ def test_deserialize_types(datapath):
     assert data == Datatypes(
         strong="hello", integger=5, flowhat=4.4, boule=True, nuttin=None, date=date(2025, 1, 3)
     )
+
+
+def test_deserialize_default_from_file(datapath):
+    data = deserialize(Worker, datapath / "worker-include.yaml")
+    assert data == Worker(name="Humbert", job=Job(title="Lawyer", yearly_pay=1000000.0))
 
 
 def test_include_txt(datapath):

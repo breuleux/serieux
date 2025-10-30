@@ -1,7 +1,7 @@
 
 ================================================================================
-At path [1m[33m.glitterpants.birthdate[0m: ValueError: Invalid isoformat string: 'invalid-date'
-@ REDACTED/data/elves.yaml:8
-  7:   name: Glitterpants Bumbersnoot
-  8:   birthdate: [1m[31minvalid-date[0m
-  9:   favorite_color: teal
+[1m[33m.glitterpants.birthdate[0m: ValueError: Invalid isoformat string: 'invalid-date'
+  @ REDACTED/data/elves.yaml:8
+    7:   name: Glitterpants Bumbersnoot
+    8:   birthdate: [1m[31minvalid-date[0m
+    9:   favorite_color: teal
