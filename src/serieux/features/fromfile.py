@@ -8,7 +8,7 @@ from ovld.dependent import HasKey
 from ..ctx import Context, Sourced, WorkingDirectory
 from ..exc import ValidationError
 from ..formats import FileSource
-from ..priority import MIN
+from ..priority import HI1, MIN
 from ..utils import clsstring
 from .partial import PartialBuilding, Sources
 
@@ -39,7 +39,7 @@ class FromFile(PartialBuilding):
 
 
 class IncludeFile(FromFile):
-    @ovld(priority=1)
+    @ovld(priority=HI1)
     def deserialize(self, t: type[object], obj: HasKey[include_field], ctx: Context):
         obj = dict(obj)
         paths = recurse(FileSource | list[FileSource], obj.pop(include_field), ctx)

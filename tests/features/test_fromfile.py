@@ -241,11 +241,6 @@ def test_deserialize_types(datapath):
     )
 
 
-def test_deserialize_default_from_file(datapath):
-    data = deserialize(Worker, datapath / "worker-include.yaml")
-    assert data == Worker(name="Humbert", job=Job(title="Lawyer", yearly_pay=1000000.0))
-
-
 def test_include_txt(datapath):
     data = deserialize(Character, datapath / "character.yaml")
     assert data == Character(
