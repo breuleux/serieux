@@ -192,16 +192,19 @@ def model(dc: type[Dataclass]):
             typ = Optional[typ]
 
         vardoc = attributes.get(field.name, None) or VariableDoc("", {})
+        meta = {**field.metadata, **vardoc.metadata}
+        if meta.get("ignore", False):
+            return None
 
         return Field(
             name=field.name,
-            description=((meta := field.metadata).get("description", None) or vardoc.doc),
+            description=meta.get("description", None) or vardoc.doc,
             type=typ,
             default=field.default,
             default_factory=field.default_factory,
             flatten=meta.get("flatten", False),
             metavar=meta.get("serieux_metavar", None),
-            metadata={**meta, **vardoc.metadata},
+            metadata=meta,
             argument_name=field.name if field.kw_only else i,
         )
 
@@ -214,7 +217,8 @@ def model(dc: type[Dataclass]):
 
     attributes = get_attribute_docstrings(dc)
 
-    rval.fields = [make_field(i, field) for i, field in enumerate(fields(constructor))]
+    _fields = [make_field(i, field) for i, field in enumerate(fields(constructor))]
+    rval.fields = [f for f in _fields if f]
     rval.constructor = constructor
     return rval
 

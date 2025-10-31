@@ -8,7 +8,7 @@ from serieux.ctx import AccessPath, Context
 from serieux.exc import ValidationError
 
 from .common import has_312_features, one_test_per_assert
-from .definitions import Color, DIDHolder, DotDict, Level, LTHolder, Point
+from .definitions import Color, DIDHolder, DotDict, File, Level, LTHolder, Point
 
 
 @one_test_per_assert
@@ -181,6 +181,12 @@ def test_serialize_literal_mixed_enum():
         serialize(lit, "boop")
     with pytest.raises(ValidationError):
         serialize(lit, False)
+
+
+def test_serialize_ignore(datapath):
+    pth = datapath / "job.yaml"
+    f = File(pth)
+    assert serialize(File, f) == {"path": str(pth)}
 
 
 ###############

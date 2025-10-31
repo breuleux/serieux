@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
 from numbers import Number
+from pathlib import Path
 
 
 @dataclass
@@ -152,3 +153,14 @@ class Car:
 @dataclass
 class IdentifiedCar(Car):
     id: int
+
+
+@dataclass
+class File:
+    path: Path
+
+    # [ignore]
+    fd: object = None
+
+    def __post_init__(self):
+        self.fd = open(self.path, "r")
