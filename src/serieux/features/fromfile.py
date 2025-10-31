@@ -40,7 +40,7 @@ class FromFile(PartialBuilding):
 
 class IncludeFile(FromFile):
     @ovld(priority=HI1)
-    def deserialize(self, t: type[object], obj: HasKey[include_field], ctx: Context):
+    def deserialize(self, t: Any, obj: HasKey[include_field], ctx: Context):
         obj = dict(obj)
         paths = recurse(FileSource | list[FileSource], obj.pop(include_field), ctx)
         match paths:
@@ -56,7 +56,7 @@ class IncludeFile(FromFile):
                     return recurse(t, Sources(*paths), ctx)
 
     @ovld(priority=MIN)
-    def deserialize(self, t: type[object], obj: str, ctx: WorkingDirectory):
+    def deserialize(self, t: Any, obj: str, ctx: WorkingDirectory):
         if "." not in obj or obj.rsplit(".", 1)[1].isnumeric():
             return call_next(t, obj, ctx)
 
