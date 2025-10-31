@@ -22,7 +22,7 @@ from ovld import (
 from ovld.codegen import Function
 from ovld.medley import KeepLast, use_combiner
 from ovld.types import All, Exactly
-from ovld.utils import ResolutionError, subtler_type
+from ovld.utils import subtler_type
 
 from . import formats
 from .auto import Auto
@@ -642,29 +642,33 @@ class BaseImplementation(Medley):
         (t,) = get_args(t)
         options = get_args(t)
 
-        try:
-            tells = [get_tells(opt := o) for o in options]
-        except ResolutionError as exc:
-            raise SchemaError(
-                f"Cannot deserialize union type `{t}`, because no rule is defined to discriminate `{opt}` from other types.",
-                exc=exc,
-            )
+        tells = [(o, tls) for o in options if (tls := get_tells(opt := o, obj)) is not None]
+        if not tells:
+            return None
+
         elim = set()
-        for tl1, tl2 in pairwise(tells):
+        for (_, tl1), (_, tl2) in pairwise(tells):
             elim |= tl1 & tl2
-        for tls in tells:
+        for _, tls in tells:
             tls -= elim
 
-        if sum(not tl for tl in tells) > 1:
+        if len(tells) == 1:
+            [[opt, tls]] = tells
+            fn = cls.deserialize.resolve(type[opt], All[obj], ctx)
+            if getattr(fn, "__codegen__", None):
+                # TODO: I'm not sure this is correct, because the first argument
+                # that will actually be given is t, not opt
+                return fn
+
+        if sum(not tl for _, tl in tells) > 1:
             raise SchemaError(f"Cannot differentiate the possible union members in type '{t}'")
 
-        options = list(zip(tells, options))
-        options.sort(key=lambda x: len(x[0]))
+        tells.sort(key=lambda x: len(x[1]))
 
-        (_, o1), *rest = options
+        (o1, _), *rest = tells
 
         code = cls.subcode("deserialize", o1, "$obj", ctx)
-        for tls, opt in rest:
+        for opt, tls in rest:
             code = Code(
                 "($ocode if $cond else $code)",
                 cond=min(tls).gen(Code("$obj")),

@@ -7,7 +7,7 @@ import pytest
 
 from serieux import deserialize
 from serieux.ctx import AccessPath, empty
-from serieux.exc import SchemaError, ValidationError, display
+from serieux.exc import ValidationError, display
 from serieux.model import AllowExtras
 
 from .common import has_312_features, one_test_per_assert
@@ -98,14 +98,6 @@ def test_deserialize_union():
     assert deserialize(str | int, 3) == 3
     assert deserialize(str | int, "wow") == "wow"
     assert deserialize(Point | int, 3) == 3
-
-
-def test_deserialize_union_untellable():
-    class Bob:
-        pass
-
-    with pytest.raises(SchemaError, match="Cannot deserialize union type"):
-        deserialize(int | Bob, 3)
 
 
 @dataclass

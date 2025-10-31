@@ -8,7 +8,7 @@ import pytest
 from serieux import JSON, deserialize, serialize
 from serieux.ctx import WorkingDirectory
 from serieux.exc import ValidationError
-from serieux.tell import TypeTell, tells
+from serieux.tell import tells
 
 from .test_schema import schema
 
@@ -48,7 +48,7 @@ def test_schema_date():
 
 
 def test_tells_date():
-    assert tells(date) == {TypeTell(str)}
+    assert tells(date, str) == set()
 
 
 #################
@@ -80,7 +80,7 @@ def test_schema_datetime():
 
 
 def test_tells_datetime():
-    assert tells(datetime) == {TypeTell(str)}
+    assert tells(datetime, str) == set()
 
 
 ##################
@@ -129,7 +129,7 @@ def test_schema_timedelta():
 
 
 def test_tells_timedelta():
-    assert tells(timedelta) == {TypeTell(str)}
+    assert tells(timedelta, str) == set()
 
 
 #############
@@ -157,7 +157,7 @@ def test_schema_path():
 
 
 def test_tells_path():
-    assert tells(Path) == {TypeTell(str)}
+    assert tells(Path, str) == set()
 
 
 #################
@@ -182,7 +182,7 @@ def test_schema_zoneinfo():
 
 
 def test_tells_zoneinfo():
-    assert tells(ZoneInfo) == {TypeTell(str)}
+    assert tells(ZoneInfo, str) == set()
 
 
 ###################
@@ -238,7 +238,7 @@ def test_schema_pattern():
 
 
 def test_tells_pattern():
-    assert tells(re.Pattern) == {TypeTell(str)}
+    assert tells(re.Pattern, str) == set()
 
 
 #############

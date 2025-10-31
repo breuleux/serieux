@@ -12,7 +12,7 @@ from ..exc import ValidationError
 from ..instructions import BaseInstruction, Instruction, T, annotate, pushdown, strip
 from ..model import constructed_type
 from ..schema import AnnotatedSchema
-from ..tell import KeyValueTell, TypeTell, tells
+from ..tell import KeyValueTell, tells
 
 tag_field = "$class"
 value_field = "$value"
@@ -310,10 +310,9 @@ class TagSetFeature(Medley):
 
 
 @tells.register(priority=1)
-def tells(typ: type[Any @ TagSet]):
-    base, ts = decompose(typ)
-    kvt = [KeyValueTell(tag_field, tag) for tag, _ in ts.iterate(base)]
-    return {TypeTell(dict), *kvt}
+def tells(expected: type[Any @ TagSet], given: type[dict]):
+    base, ts = decompose(expected)
+    return {KeyValueTell(tag_field, tag) for tag, _ in ts.iterate(base)}
 
 
 if TYPE_CHECKING:

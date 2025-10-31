@@ -1,29 +1,20 @@
 from dataclasses import dataclass
 from pathlib import Path
 from types import NoneType
-from typing import Annotated
+from typing import Annotated, Any
 
 from ovld import Code, ovld, recurse
 
 from .instructions import pushdown
 from .model import FieldModelizable, ListModelizable, StringModelizable, model
-from .utils import TypeAliasType, basic_type
 
 
 class Tell:
     def __lt__(self, other):
         return self.cost() < other.cost()
 
-    def cost(self):
+    def cost(self):  # pragma: no cover
         return 1
-
-
-@dataclass(frozen=True)
-class TypeTell(Tell):
-    t: type
-
-    def gen(self, arg):
-        return Code("isinstance($arg, $t)", arg=arg, t=self.t)
 
 
 @dataclass(frozen=True)
@@ -55,38 +46,51 @@ class KeyValueTell(Tell):
 
 
 @ovld
-def tells(
-    typ: type[int] | type[str] | type[bool] | type[float] | type[NoneType] | type[dict],
-):
-    return {TypeTell(basic_type(typ))}
+def tells(expected: type[int], given: type[int]):
+    return set()
 
 
 @ovld
-def tells(typ: type[Path]):
-    return {TypeTell(str)}
+def tells(expected: type[str] | type[Path] | type[StringModelizable], given: type[str]):
+    return set()
 
 
 @ovld
-def tells(typ: type[FieldModelizable]):
-    m = model(typ)
-    return {TypeTell(dict)} | {KeyTell(f.serialized_name) for f in m.fields}
-
-
-@ovld(priority=1)
-def tells(typ: type[ListModelizable]):
-    return {TypeTell(list)}
-
-
-@ovld(priority=2)
-def tells(typ: type[StringModelizable]):
-    return {TypeTell(str)}
+def tells(expected: type[bool], given: type[bool]):
+    return set()
 
 
 @ovld
-def tells(typ: TypeAliasType):  # pragma: no cover
-    return recurse(typ.__value__)
+def tells(expected: type[float], given: type[float]):
+    return set()
+
+
+@ovld
+def tells(expected: type[NoneType], given: type[NoneType]):
+    return set()
+
+
+@ovld
+def tells(expected: type[dict], given: type[dict]):
+    return set()
+
+
+@ovld
+def tells(expected: type[FieldModelizable], given: type[dict]):
+    m = model(expected)
+    return {KeyTell(f.serialized_name) for f in m.fields}
+
+
+@ovld
+def tells(expected: type[ListModelizable], given: type[list]):
+    return set()
+
+
+@ovld
+def tells(expected: type[Annotated], given: Any):
+    return recurse(pushdown(expected), given)
 
 
 @ovld(priority=-1)
-def tells(typ: type[Annotated]):
-    return recurse(pushdown(typ))
+def tells(expected: Any, given: Any):
+    return None
