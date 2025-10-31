@@ -122,6 +122,8 @@ class PartialBuilding(Medley):
             return call_next(t, obj, ctx)
         except SerieuxError as exc:
             return exc
+        except Exception as exc:
+            return ValidationError(exc=exc)
 
     @ovld(priority=HI4.next())
     def deserialize(self, t: Any, obj: Sources, ctx: Context, /):

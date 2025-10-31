@@ -11,7 +11,7 @@ from serieux.exc import SerieuxError, ValidationError
 from serieux.features.partial import NOT_GIVEN, Partial, PartialBuilding, Sources
 
 from ..common import validation_errors
-from ..definitions import Defaults, Player, Point
+from ..definitions import Defaults, Elf, Player, Point
 
 load = (Serieux + PartialBuilding)().load
 
@@ -148,6 +148,16 @@ def test_multiple_errors():
     msg = "Cannot deserialize string"
     with validation_errors({".0.y": msg, ".1.x": msg, ".1.y": msg}):
         load(list[Point], Sources([{"x": 23, "y": "crap"}, {"x": "oh", "y": "no"}]), AccessPath())
+
+
+def test_multiple_errors_2():
+    errs = {
+        ".name": "Cannot deserialize object `123`",
+        ".birthdate": "Invalid isoformat string",
+        ".favorite_color": "Cannot deserialize object `False`",
+    }
+    with validation_errors(errs):
+        load(Elf, Sources({"name": 123, "birthdate": "no", "favorite_color": False}))
 
 
 def test_multiple_errors_display(check_error_display):
