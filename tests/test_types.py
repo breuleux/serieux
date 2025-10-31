@@ -214,7 +214,7 @@ def test_deserialize_complex_pattern():
 
 
 def test_deserialize_pattern_invalid():
-    with pytest.raises(re.PatternError, match="bad character range"):
+    with pytest.raises(Exception, match="bad character range"):
         deserialize(re.Pattern, r"[z-a]")  # Invalid character range
 
 

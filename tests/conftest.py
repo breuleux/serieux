@@ -20,7 +20,7 @@ def pytest_exception_interact(node, call, report):
     if issubclass(call.excinfo.type, SerieuxError):
         exc = call.excinfo.value
         io = StringIO()
-        exc.display(file=io)
+        display(exc, file=io)
         entry = report.longrepr.reprtraceback.reprentries[-1]
         entry.style = "short"
         content = io.getvalue()
