@@ -8,6 +8,7 @@ import pytest
 from apischema import serialize
 
 from .interfaces import (
+    adaptix,
     apischema,
     marshmallow,
     mashumaro,
@@ -107,11 +108,12 @@ def bench(interfaces, data):
 @bench(
     interfaces=[
         apischema,
-        pydantic,
-        serde,
         marshmallow,
+        pydantic,
+        adaptix,
         mashumaro,
         serieux,
+        serde,
     ],
     data=[point, world, roboland, tree],
 )
@@ -124,11 +126,12 @@ def test_serialize(interface, data, benchmark):
 @bench(
     interfaces=[
         apischema,
-        pydantic,
-        serde,
         marshmallow,
+        pydantic,
+        adaptix,
         mashumaro,
         serieux,
+        serde,
     ],
     data=[roboland],
 )
@@ -140,12 +143,13 @@ def test_json(interface, data, benchmark):
 
 @bench(
     interfaces=[
-        marshmallow,
         apischema,
+        marshmallow,
         pydantic,
-        serde,
+        adaptix,
         mashumaro,
         serieux,
+        serde,
     ],
     data=[point, world, roboland, tree],
 )

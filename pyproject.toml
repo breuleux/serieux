@@ -36,13 +36,14 @@ dev = [
     "tomli-w>=1.2.0",
 ]
 benchmark = [
+    "adaptix>=3.0.0b11",
     "apischema>=0.19.0",
     "marshmallow-dataclass>=8.7.1",
     "marshmallow>=3.23.1",
+    "mashumaro[orjson]>=3.15",
     "orjson>=3.10.12",
     "pydantic>=2.10.2",
     "pyserde>=0.24.0",
-    "mashumaro[orjson]>=3.15",
 ]
 
 [tool.hatch.metadata]

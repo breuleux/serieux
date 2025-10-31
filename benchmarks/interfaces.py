@@ -1,5 +1,6 @@
 import marshmallow_dataclass
 import orjson as json
+from adaptix import Retort
 from apischema import deserialize as apischema_deserialize, serialize as apischema_serialize
 from mashumaro.codecs.basic import BasicDecoder, BasicEncoder
 from mashumaro.codecs.orjson import ORJSONEncoder
@@ -112,3 +113,22 @@ class SerdeInterface:
 
 
 serde = SerdeInterface()
+
+_retort = Retort()
+
+
+class AdaptixInterface:
+    __name__ = "adaptix"
+
+    def serializer_for_type(self, t):
+        return _retort.get_dumper(t)
+
+    def json_for_type(self, t):
+        dump = _retort.get_dumper(t)
+        return lambda x: json.dumps(dump(x))
+
+    def deserializer_for_type(self, t):
+        return _retort.get_loader(t)
+
+
+adaptix = AdaptixInterface()
