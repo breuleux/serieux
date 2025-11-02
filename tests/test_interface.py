@@ -1,9 +1,12 @@
+from datetime import date
+
 import pytest
 from ovld import Medley
 
-from serieux import deserializer, schema_definition, serializer
+from serieux import deserializer, get_deserializer, get_serializer, schema_definition, serializer
 from serieux.ctx import Context
 from serieux.exc import ValidationError
+from tests.definitions import Point
 
 
 class Beep:
@@ -74,3 +77,15 @@ def test_inherits(fresh_serieux):
 
     assert srx.deserialize(Beep, 7) == Beep(7)
     assert srx.deserialize(Beep, "9") == Beep(9)
+
+
+def test_serializer_for():
+    assert get_serializer(Point)(Point(1, 2)) == {"x": 1, "y": 2}
+    assert get_serializer(list[Point])([Point(1, 2)]) == [{"x": 1, "y": 2}]
+
+
+def test_deserializer_for():
+    assert get_deserializer(Point)({"x": 1, "y": 2}) == Point(1, 2)
+    assert get_deserializer(list[Point])([{"x": 1, "y": 2}]) == [Point(1, 2)]
+    assert get_deserializer(int)(42) == 42
+    assert get_deserializer(date)("2025-12-01") == date(2025, 12, 1)

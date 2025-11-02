@@ -98,6 +98,8 @@ deserialize = serieux.deserialize
 schema = serieux.schema
 load = serieux.load
 dump = serieux.dump
+get_serializer = serieux.get_serializer
+get_deserializer = serieux.get_deserializer
 
 
 def serializer(fn=None, priority=0):
@@ -156,6 +158,8 @@ __all__ = [
     "dump",
     "Environment",
     "Field",
+    "get_deserializer",
+    "get_serializer",
     "IncludeFile",
     "JSON",
     "Lazy",

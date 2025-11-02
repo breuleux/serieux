@@ -9,24 +9,21 @@ from serde.de import from_dict as serde_from_dict
 from serde.json import to_json as serde_to_json
 from serde.se import to_dict as serde_to_dict
 
-from serieux import deserialize as serieux_deserialize, serialize as serieux_serialize, serieux
-from serieux.ctx import EmptyContext, empty
+from serieux import get_deserializer, get_serializer
 
 
 class SerieuxInterface:
     __name__ = "serieux"
 
     def serializer_for_type(self, t):
-        func = serieux_serialize.resolve(type[t], t, EmptyContext)
-        return lambda x: func(serieux, t, x, empty)
+        return get_serializer(t)
 
     def json_for_type(self, t):
-        func = serieux_serialize.resolve(type[t], t, EmptyContext)
-        return lambda x: json.dumps(func(serieux, t, x, empty))
+        func = get_serializer(t)
+        return lambda x: json.dumps(func(x))
 
     def deserializer_for_type(self, t):
-        func = serieux_deserialize.resolve(type[t], dict, EmptyContext)
-        return lambda x: func(serieux, t, x, empty)
+        return get_deserializer(t)
 
 
 serieux = SerieuxInterface()

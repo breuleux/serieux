@@ -72,6 +72,21 @@ class BaseImplementation(Medley):
         else:
             return serialized
 
+    def get_serializer(self, t, ctx=empty):
+        func = self.serialize.resolve(type[t], get_origin(t) or t, type(ctx))
+        return lambda obj: func(self, t, obj, ctx)
+
+    def get_deserializer(self, t, ctx=empty):
+        if issubclass(t, FieldModelizable):
+            func = self.deserialize.resolve(type[t], dict, type(ctx))
+        elif issubclass(t, ListModelizable):
+            func = self.deserialize.resolve(type[t], list, type(ctx))
+        elif issubclass(t, StringModelizable):
+            func = self.deserialize.resolve(type[t], str, type(ctx))
+        else:
+            func = type(self).deserialize
+        return lambda obj: func(self, t, obj, ctx)
+
     ##################
     # Global helpers #
     ##################
