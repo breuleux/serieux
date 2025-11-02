@@ -26,15 +26,15 @@ class EmptyContext(Context):
         return other
 
 
-class AccessPath(Context):
-    full_path: tuple = ()
+class Trail(Context):
+    full_trail: tuple = ()
 
     @property
-    def access_path(self):
-        return tuple(k for _, _, k in self.full_path)
+    def trail(self):
+        return tuple(k for _, _, k in self.full_trail)
 
     def follow(self, objt, obj, field):
-        return replace(self, full_path=(*self.full_path, (objt, obj, field)))
+        return replace(self, full_trail=(*self.full_trail, (objt, obj, field)))
 
 
 @dataclass
@@ -90,20 +90,20 @@ class WorkingDirectory(Context):
 class Sourced(WorkingDirectory):
     origin: Path = None
     format: FileFormat = None
-    source_access_path: tuple = ()
+    source_trail: tuple = ()
 
     def __post_init__(self):
         if self.directory is None:
             self.directory = self.origin.parent
 
-    def compute_location(self, access_path=None):
-        if isinstance(self, AccessPath):
-            access_path = self.access_path
-            pfx = len(self.source_access_path)
-            if access_path[:pfx] != self.source_access_path:  # pragma: no cover
+    def compute_location(self, trail=None):
+        if isinstance(self, Trail):
+            trail = self.trail
+            pfx = len(self.source_trail)
+            if trail[:pfx] != self.source_trail:  # pragma: no cover
                 return None
-            access_path = access_path[pfx:]
-            return self.format.locate(self.origin, access_path)
+            trail = trail[pfx:]
+            return self.format.locate(self.origin, trail)
         return None  # pragma: no cover
 
 
@@ -134,7 +134,7 @@ class Patch:
         return f"Patch({self.description!r})"
 
 
-class Patcher(AccessPath):
+class Patcher(Trail):
     patches: dict[int, tuple[Context, Any]] = field(default_factory=dict)
 
     def declare_patch(self, patch):

@@ -157,7 +157,7 @@ class Patch(FileOperation):
             print("\033[1;36mThe following patches were applied:\033[0m")
             for p in patcher.patches.values():
                 print(
-                    f"\033[1;33m[{'.'.join(str(x) for x in p.ctx.access_path)}]\033[0m \033[1;32m{p.description}\033[0m"
+                    f"\033[1;33m[{'.'.join(str(x) for x in p.ctx.trail)}]\033[0m \033[1;32m{p.description}\033[0m"
                 )
         else:  # pragma: no cover
             print("\033[1;36mNo patches were applied.\033[0m")

@@ -31,9 +31,9 @@ def yaml_source_extract(node, origin):
 
 
 @ovld
-def locate(obj: yaml.MappingNode, origin: Path, access_path: tuple | list):
-    if access_path:
-        nxt, *rest = access_path
+def locate(obj: yaml.MappingNode, origin: Path, trail: tuple | list):
+    if trail:
+        nxt, *rest = trail
         for k, v in obj.value:
             if k.value == nxt:
                 return recurse(v, origin, rest)
@@ -41,9 +41,9 @@ def locate(obj: yaml.MappingNode, origin: Path, access_path: tuple | list):
 
 
 @ovld
-def locate(obj: yaml.SequenceNode, origin: Path, access_path: tuple | list):
-    if access_path:
-        nxt, *rest = access_path
+def locate(obj: yaml.SequenceNode, origin: Path, trail: tuple | list):
+    if trail:
+        nxt, *rest = trail
         for i, v in enumerate(obj.value):
             if i == nxt:
                 return recurse(v, origin, rest)
@@ -51,13 +51,13 @@ def locate(obj: yaml.SequenceNode, origin: Path, access_path: tuple | list):
 
 
 @ovld
-def locate(obj: yaml.ScalarNode, origin: Path, access_path: tuple | list):
+def locate(obj: yaml.ScalarNode, origin: Path, trail: tuple | list):
     return yaml_source_extract(obj, origin)
 
 
 class YAML(FileFormat):
-    def locate(self, f: Path, access_path: tuple[str]):
-        return locate(yaml.compose(f.read_text(), Loader), f, access_path)
+    def locate(self, f: Path, trail: tuple[str]):
+        return locate(yaml.compose(f.read_text(), Loader), f, trail)
 
     def patch(self, source, patches):
         for start, end, content in sorted(patches, reverse=True):

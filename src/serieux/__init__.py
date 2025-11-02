@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeAlias
 
 from .auto import Auto
-from .ctx import AccessPath, Context, Patch, Patcher, WorkingDirectory
+from .ctx import Context, Patch, Patcher, Trail, WorkingDirectory
 from .exc import (
     SerieuxError,
     ValidationError,
@@ -138,7 +138,7 @@ if sys.excepthook is sys.__excepthook__ and not os.getenv("SERIEUX_DISABLE_EXCEP
 
 __all__ = [
     "__version__",
-    "AccessPath",
+    "Trail",
     "AllowExtras",
     "Auto",
     "AutoRegistered",

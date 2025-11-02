@@ -15,7 +15,7 @@ from ovld.dependent import Regexp
 from rich.pretty import pprint
 
 from serieux import Serieux, deserialize
-from serieux.ctx import AccessPath, Context
+from serieux.ctx import Context, Trail
 
 ##################
 # Implementation #
@@ -32,11 +32,11 @@ class Tracker:
         return self.current == 0
 
 
-class Grid(AccessPath):
+class Grid(Trail):
     trackers: dict[str, Tracker] = field(default_factory=dict)
 
     def get_choice(self, choices):
-        if (acc := self.access_path) not in self.trackers:
+        if (acc := self.trail) not in self.trackers:
             self.trackers[acc] = Tracker(len(choices))
         tracker = self.trackers[acc]
         assert tracker.length == len(choices)

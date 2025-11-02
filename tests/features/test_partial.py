@@ -6,7 +6,7 @@ from ovld import Medley
 from ovld.dependent import Regexp
 
 from serieux import Serieux
-from serieux.ctx import AccessPath, Context
+from serieux.ctx import Context, Trail
 from serieux.exc import SerieuxError, ValidationError
 from serieux.features.partial import NOT_GIVEN, Partial, PartialBuilding, Sources
 
@@ -141,13 +141,13 @@ class Positive:
 
 def test_error_at_construction():
     with pytest.raises(ValidationError, match="At path .1"):
-        load(list[Positive], [{"m": 3, "n": 7}, Sources({"m": 1}, {"n": -3})], AccessPath())
+        load(list[Positive], [{"m": 3, "n": 7}, Sources({"m": 1}, {"n": -3})], Trail())
 
 
 def test_multiple_errors():
     msg = "Cannot deserialize string"
     with validation_errors({".0.y": msg, ".1.x": msg, ".1.y": msg}):
-        load(list[Point], Sources([{"x": 23, "y": "crap"}, {"x": "oh", "y": "no"}]), AccessPath())
+        load(list[Point], Sources([{"x": 23, "y": "crap"}, {"x": "oh", "y": "no"}]), Trail())
 
 
 def test_multiple_errors_2():
@@ -162,7 +162,7 @@ def test_multiple_errors_2():
 
 def test_multiple_errors_display(check_error_display):
     with check_error_display():
-        load(list[Point], Sources([{"x": 23, "y": "crap"}, {"x": "oh", "y": "no"}]), AccessPath())
+        load(list[Point], Sources([{"x": 23, "y": "crap"}, {"x": "oh", "y": "no"}]), Trail())
 
 
 def test_partial_defaults():

@@ -19,7 +19,7 @@ def validation_errors(msgs):
     except ValidationExceptionGroup as veg:
         for pth, msg in msgs.items():
             if not any(
-                (exc.info.access_string == pth and msg in str(exc)) for exc in veg.exceptions
+                (exc.info.trail_string == pth and msg in str(exc)) for exc in veg.exceptions
             ):
                 traceback.print_exception(veg)
                 raise Exception(f"No exception was raised at {pth} for '{msg}'")

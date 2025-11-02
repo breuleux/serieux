@@ -9,7 +9,7 @@ from types import NoneType
 import pytest
 
 from serieux import Serieux
-from serieux.ctx import AccessPath, Sourced, WorkingDirectory
+from serieux.ctx import Sourced, Trail, WorkingDirectory
 from serieux.exc import ValidationError
 from serieux.features.fromfile import IncludeFile, include_field
 from serieux.features.partial import Sources
@@ -155,22 +155,22 @@ def test_deserialize_read_direct(
 
 def test_deserialize_incomplete(datapath, check_error_display):
     with check_error_display("Missing required field 'capital'"):
-        deserialize(Country, datapath / "france.yaml", AccessPath())
+        deserialize(Country, datapath / "france.yaml", Trail())
 
 
 def test_deserialize_invalid(datapath, check_error_display):
     with check_error_display("Cannot deserialize string"):
-        deserialize(Country, datapath / "invalid.yaml", AccessPath())
+        deserialize(Country, datapath / "invalid.yaml", Trail())
 
 
 def test_deserialize_invalid_indirect(datapath, check_error_display):
     with check_error_display("Some errors occurred"):
-        deserialize(World, datapath / "world-invalid.yaml", AccessPath())
+        deserialize(World, datapath / "world-invalid.yaml", Trail())
 
 
 def test_deserialize_oops_world(datapath, check_error_display):
     with check_error_display("Cannot deserialize string"):
-        deserialize(World, datapath / "oops-world.yaml", AccessPath())
+        deserialize(World, datapath / "oops-world.yaml", Trail())
 
 
 def test_deserialize_oops_elves(datapath, check_error_display):
@@ -180,7 +180,7 @@ def test_deserialize_oops_elves(datapath, check_error_display):
 
 def test_deserialize_oops_elves_ap(datapath, check_error_display):
     with check_error_display("Invalid isoformat string", exc_type=ValueError):
-        deserialize(dict[str, Elf], datapath / "elves.yaml", AccessPath())
+        deserialize(dict[str, Elf], datapath / "elves.yaml", Trail())
 
 
 def test_make_path_for(tmp_path):

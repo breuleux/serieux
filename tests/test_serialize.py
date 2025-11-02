@@ -4,7 +4,7 @@ import pytest
 from ovld import Medley
 
 from serieux import Serieux, dump, load, serialize
-from serieux.ctx import AccessPath, Context
+from serieux.ctx import Context, Trail
 from serieux.exc import ValidationError
 
 from .common import has_312_features, one_test_per_assert
@@ -205,7 +205,7 @@ def test_error_dataclass():
     with pytest.raises(
         ValidationError, match=r"Cannot serialize object of type 'str' into expected type 'int'"
     ):
-        serialize(Point, Point(x=1, y="oops"), AccessPath())
+        serialize(Point, Point(x=1, y="oops"), Trail())
 
 
 @has_312_features
@@ -215,21 +215,21 @@ def test_error_serialize_tree():
     tree = Tree(Tree("a", 2), "b")
 
     with pytest.raises(ValidationError, match=r"At path \.left\.right"):
-        serialize(Tree[str], tree, AccessPath())
+        serialize(Tree[str], tree, Trail())
 
 
 def test_error_serialize_list():
     li = [0, 1, 2, 3, "oops", 5, 6]
 
     with pytest.raises(ValidationError, match=r"At path .4"):
-        serialize(list[int], li, AccessPath())
+        serialize(list[int], li, Trail())
 
 
 def test_error_serialize_list_of_lists():
     li = [[0, 1], [2, 3, "oops", 5, 6]]
 
     with pytest.raises(ValidationError, match=r"At path .1.2"):
-        serialize(list[list[int]], li, AccessPath())
+        serialize(list[list[int]], li, Trail())
 
 
 def test_dump_no_dest():

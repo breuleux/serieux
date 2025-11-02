@@ -6,7 +6,7 @@ from typing import Any, Literal
 import pytest
 
 from serieux import deserialize
-from serieux.ctx import AccessPath, empty
+from serieux.ctx import Trail, empty
 from serieux.exc import ValidationError, display
 from serieux.model import AllowExtras
 
@@ -221,7 +221,7 @@ def test_deserialize_scalar_error_2():
         deserialize(str, 13)
 
 
-@pytest.mark.parametrize("ctx", (AccessPath(), empty))
+@pytest.mark.parametrize("ctx", (Trail(), empty))
 def test_deserialize_missing_field(ctx):
     pts = [
         {"x": 1, "y": 2},

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from ovld import ovld
 from ovld.medley import ABSENT
 
-from .ctx import AccessPath, Context, Location, locate
+from .ctx import Context, Location, Trail, locate
 from .formats import FileSource
 
 
@@ -17,7 +17,7 @@ class ContextInformation:
     ctx: Context = None
 
     @property
-    def access_string(self):
+    def trail_string(self):
         return "".join([f".{field}" for field in self.path]) if self.path else "(at root)"
 
 
@@ -56,19 +56,19 @@ def extract_information(ctx=None, frame=None):
 
     def _fast_path():
         ci.func = ci.func or "<serieux>"
-        ci.path[:0] = ci.ctx.access_path
+        ci.path[:0] = ci.ctx.trail
         if loc := locate(ci.ctx):
             ci.locs.insert(0, loc)
         return ci
 
-    if isinstance(ci.ctx, AccessPath):
+    if isinstance(ci.ctx, Trail):
         return _fast_path()
 
     above = None
     while frame:
         lcls = frame.f_locals
         ci.ctx = lcls.get("ctx", ci.ctx)
-        if isinstance(ci.ctx, AccessPath):
+        if isinstance(ci.ctx, Trail):
             return _fast_path()
         elif ci.ctx and (m := re.match(r"^((?:de)?serialize|schema)\[", frame.f_code.co_name)):
             ci.func = m.groups()[0]
@@ -91,7 +91,7 @@ def extract_information(ctx=None, frame=None):
 
 
 def display_context_information(
-    template="An error happened in serieux.{func} at location {access_path}",
+    template="An error happened in serieux.{func} at location {trail}",
     *,
     ctx=None,
     exc=None,
@@ -115,7 +115,7 @@ def display_context_information(
     if ci.func is None:  # pragma: no cover
         return
     print(
-        template.format(access_path=_color(33, ci.access_string), func=ci.func, message=message),
+        template.format(trail=_color(33, ci.trail_string), func=ci.func, message=message),
         file=file,
     )
     if show_source and ci.locs:
@@ -192,7 +192,7 @@ class IndividualSerieuxError(SerieuxError):
             lc = f"{l1}:{c1}-{l2}:{c2}" if l1 != l2 else f"{l1}:{c1}-{c2}"
             return f"{location.source}:{lc} -- {self.message}"
         else:
-            return f"At path {self.info.access_string}: {self.message}"
+            return f"At path {self.info.trail_string}: {self.message}"
 
 
 class NotGivenError(IndividualSerieuxError):
@@ -231,7 +231,7 @@ def display(exc, file=sys.stderr):
         else:
             msg = f"{type(exc).__name__}: {exc}"
         display_context_information(
-            "{access_path}: {message}",
+            "{trail}: {message}",
             exc=exc,
             file=file,
             message=msg,

@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 class FileFormat:  # pragma: no cover
-    def locate(self, f: Path, access_path: tuple[str]):
+    def locate(self, f: Path, trail: tuple[str]):
         return None
 
     def patch(self, source, patches):

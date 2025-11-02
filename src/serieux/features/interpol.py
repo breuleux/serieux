@@ -8,7 +8,7 @@ from typing import Annotated, Any, Literal, get_args
 
 from ovld import Medley, call_next, ovld, recurse
 
-from ..ctx import AccessPath
+from ..ctx import Trail
 from ..exc import NotGivenError, ValidationError
 from ..instructions import strip
 from ..priority import HI1
@@ -72,7 +72,7 @@ def decode_string(t: type[Annotated], value: str):
     return recurse(strip(t), value)
 
 
-class Environment(AccessPath):
+class Environment(Trail):
     refs: dict[tuple[str, ...], object] = field(default_factory=dict, repr=False)
     environ: dict = field(default_factory=lambda: os.environ, repr=False)
     interpolation_pattern: re.Pattern = re.compile(r"\$\{([^}]+)\}")
@@ -90,7 +90,7 @@ class Environment(AccessPath):
 
         stripped = ref.lstrip(".")
         dots = len(ref) - len(stripped)
-        root = () if not dots else self.access_path[:-dots]
+        root = () if not dots else self.trail[:-dots]
         parts = [try_int(x) for x in stripped.split(".")]
         return self.refs[(*root, *parts)]
 
@@ -138,7 +138,7 @@ class Interpolation(Medley):
     @ovld(priority=HI1(3))
     def deserialize(self, t: Any, obj: object, ctx: Environment):
         rval = call_next(t, obj, ctx)
-        ctx.refs[ctx.access_path] = rval
+        ctx.refs[ctx.trail] = rval
         return rval
 
     @ovld(priority=HI1(2))

@@ -30,7 +30,7 @@ class FromFile(PartialBuilding):
             origin=pth,
             directory=pth.parent.absolute(),
             format=obj.format,
-            source_access_path=getattr(ctx, "access_path", ()),
+            source_trail=getattr(ctx, "trail", ()),
         )
         return recurse(t, data, ctx)
 

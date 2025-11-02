@@ -7,19 +7,19 @@ from ovld.dependent import Regexp
 from rich.pretty import pprint
 
 from serieux import LazyProxy, Serieux, deserialize
-from serieux.ctx import AccessPath
+from serieux.ctx import Trail
 
 ##################
 # Implementation #
 ##################
 
 
-class Variables(AccessPath):
+class Variables(Trail):
     refs: dict[tuple[str, ...], object] = field(default_factory=dict)
 
 
 def evaluate(expr, ctx):
-    current = ctx.access_path[:-1]
+    current = ctx.trail[:-1]
     while True:
         lcl = vars(ctx.refs[current])
         try:
@@ -36,7 +36,7 @@ class VarInterpolation(Medley):
     @ovld(priority=3)
     def deserialize(self, typ: type[object], value: object, ctx: Variables):
         rval = call_next(typ, value, ctx)
-        ctx.refs[ctx.access_path] = rval
+        ctx.refs[ctx.trail] = rval
         return rval
 
     @ovld(priority=2)
