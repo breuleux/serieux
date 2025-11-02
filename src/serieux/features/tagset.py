@@ -270,9 +270,9 @@ class TagSetFeature(Medley):
 
     def deserialize(self, t: type[Any @ TagSet], obj: dict, ctx: Context, /):
         base, ts = decompose(t)
-        obj = dict(obj)
-        tag = obj.pop(tag_field, None)
-        obj = obj.pop(value_field, obj)
+        data = dict(obj)
+        tag = data.pop(tag_field, None)
+        data = data.pop(value_field, data)
         if tag is not None:
             tag = recurse(str, tag, ctx)
         declared = ts.get_type(tag, ctx)
@@ -280,7 +280,7 @@ class TagSetFeature(Medley):
             actual_class = constructed_type(declared)
             if not issubclass(actual_class, base):
                 raise ValidationError(f"'{actual_class}' is not a subclass of '{base}'", ctx=ctx)
-        return recurse(strip(annotate(declared, t), TagSet), obj, ctx)
+        return recurse(strip(annotate(declared, t), TagSet), data, ctx)
 
     def schema(self, t: type[Any @ TagSet], ctx: Context):
         base, ts = decompose(t)

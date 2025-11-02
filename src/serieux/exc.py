@@ -73,18 +73,18 @@ def extract_information(ctx=None, frame=None):
         elif ci.ctx and (m := re.match(r"^((?:de)?serialize|schema)\[", frame.f_code.co_name)):
             ci.func = m.groups()[0]
             t1, obj1 = lcls.get("t", ABSENT), lcls.get("obj", ABSENT)
-            if isinstance(obj1, FileSource):
-                if obj1.field:  # pragma: no cover
-                    ci.path[:0] = obj1.field.split(".")
-                try:
-                    loc = obj1.format.locate(obj1.path, ci.path)
-                    ci.locs.insert(0, loc)
-                except FileNotFoundError:
-                    pass
+            obj2 = None
             if above is not None:
                 _, obj2 = above
                 if lnk := find_link(obj1, obj2):
                     ci.path.insert(0, lnk)
+            if obj1 is not obj2 and isinstance(obj1, FileSource):
+                try:
+                    fp = obj1.field.split(".") if obj1.field else []
+                    loc = obj1.format.locate(obj1.path, [*fp, *ci.path])
+                    ci.locs.insert(0, loc)
+                except FileNotFoundError:
+                    pass
             above = t1, obj1
         frame = frame.f_back
     return ci
