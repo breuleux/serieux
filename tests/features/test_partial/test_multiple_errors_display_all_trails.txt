@@ -1,0 +1,5 @@
+
+================================================================================
+[#0] [1m[33m.0.y[0m: Cannot deserialize string 'crap' into expected type 'int'.
+[#1] [1m[33m.1.x[0m: Cannot deserialize string 'oh' into expected type 'int'.
+[#2] [1m[33m.1.y[0m: Cannot deserialize string 'no' into expected type 'int'.

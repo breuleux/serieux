@@ -22,7 +22,7 @@ from .features.dotted import DottedNotation
 from .features.fromfile import IncludeFile
 from .features.interpol import Environment
 from .features.lazy import DeepLazy, Lazy, LazyProxy
-from .features.partial import Partial, Sources
+from .features.partial import AllTrails, Partial, Sources
 from .features.registered import AutoRegistered, Referenced, auto_singleton
 from .features.tagset import ReferencedClass, Tagged, TaggedSubclass, TaggedUnion
 from .impl import BaseImplementation
@@ -138,8 +138,8 @@ if sys.excepthook is sys.__excepthook__ and not os.getenv("SERIEUX_DISABLE_EXCEP
 
 __all__ = [
     "__version__",
-    "Trail",
     "AllowExtras",
+    "AllTrails",
     "Auto",
     "AutoRegistered",
     "auto_singleton",
@@ -184,6 +184,7 @@ __all__ = [
     "Tagged",
     "TaggedUnion",
     "TaggedSubclass",
+    "Trail",
     "ValidationError",
     "ValidationExceptionGroup",
     "WorkingDirectory",

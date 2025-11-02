@@ -39,6 +39,10 @@ class PartialBase:
     pass
 
 
+class AllTrails(Context):
+    pass
+
+
 class Sources:
     def __init__(self, *sources):
         self.sources = []
@@ -141,6 +145,11 @@ class PartialBuilding(Medley):
         if isinstance(rval, SerieuxError):
             raise rval
         return rval
+
+    @ovld(priority=HI4.next())
+    def deserialize(self, t: Any, obj: object, ctx: AllTrails, /):
+        data = obj if isinstance(obj, Sources) else Sources(obj)
+        return recurse(t, data, ctx - AllTrails)
 
 
 @model.register(priority=2)
