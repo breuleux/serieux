@@ -12,6 +12,7 @@ from serieux.model import AllowExtras
 
 from .common import has_312_features, one_test_per_assert
 from .definitions import (
+    Character,
     Color,
     Defaults,
     DIDHolder,
@@ -240,6 +241,20 @@ def test_deserialize_extra_fields_not_allowed():
 def test_deserialize_extra_fields_allowed():
     data = {"x": 1, "y": 2, "poop": 123}
     assert deserialize(AllowExtras[Point], data) == Point(1, 2)
+
+
+def test_deserialize_extra_fields_allowed_in_config():
+    data = {
+        "name": "Billy",
+        "age": 28,
+        "occupation": "Wizard",
+        "backstory": "Mysterious",
+        "splat": 99,
+        "splatity_splat": True,
+    }
+    assert deserialize(Character, data) == Character(
+        name="Billy", age=28, occupation="Wizard", backstory="Mysterious"
+    )
 
 
 def test_error_display(capsys, file_regression):

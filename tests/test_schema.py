@@ -10,7 +10,7 @@ from serieux.model import AllowExtras
 from serieux.schema import AnnotatedSchema, Schema
 
 from .common import has_312_features
-from .definitions import Color, Defaults, LTHolder, Pig, Point, Pointato
+from .definitions import Character, Color, Defaults, LTHolder, Pig, Point, Pointato
 
 
 def schema(t, root=False, ref_policy="norepeat"):
@@ -98,6 +98,20 @@ def test_schema_allow_extras_dataclass():
         "type": "object",
         "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
         "required": ["x", "y"],
+        "additionalProperties": True,
+    }
+
+
+def test_schema_allow_extras_in_config():
+    assert schema(Character) == {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer"},
+            "occupation": {"type": "string"},
+            "backstory": {"type": "string"},
+        },
+        "required": ["name", "age", "occupation", "backstory"],
         "additionalProperties": True,
     }
 

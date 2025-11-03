@@ -144,6 +144,9 @@ class Character:
     occupation: str
     backstory: str
 
+    class SerieuxConfig:
+        allow_extras = True
+
 
 @dataclass(kw_only=True)
 class Car:

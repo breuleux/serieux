@@ -106,6 +106,9 @@ def display_context_information(
         if isinstance(exc, IndividualSerieuxError) and exc.ctx:
             ctx = exc.ctx
             ci = exc.info
+        elif isinstance(exc, ValidationExceptionGroup):  # pragma: no cover
+            display(exc)
+            return
         else:
             tb = exc.__traceback__
             while tb:

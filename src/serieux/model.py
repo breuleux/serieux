@@ -168,7 +168,10 @@ def model(t: type[Any]):
             fields=[],
             constructor=None,
         )
-        _model_cache[t] = call_next(t)
+        m = _model_cache[t] = call_next(t)
+        if isinstance(cfg := getattr(t, "SerieuxConfig", None), type):
+            if (ae := getattr(cfg, "allow_extras", None)) is not None:
+                m.allow_extras = ae
     return _model_cache[t]
 
 
