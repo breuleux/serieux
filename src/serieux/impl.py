@@ -667,13 +667,15 @@ class BaseImplementation(Medley):
         for _, tls in tells:
             tls -= elim
 
-        if len(tells) == 1:
-            [[opt, tls]] = tells
-            fn = cls.deserialize.resolve(type[opt], All[obj], ctx)
-            if getattr(fn, "__codegen__", None):
-                # TODO: I'm not sure this is correct, because the first argument
-                # that will actually be given is t, not opt
-                return fn
+        # TODO: fix this behavior; test it on datetime|None, that's a failure case with
+        # this code
+        # if len(tells) == 1:
+        #     [[opt, tls]] = tells
+        #     fn = cls.deserialize.resolve(type[opt], All[obj], ctx)
+        #     if getattr(fn, "__codegen__", None):
+        #         # TODO: I'm not sure this is correct, because the first argument
+        #         # that will actually be given is t, not opt
+        #         return fn
 
         if sum(not tl for _, tl in tells) > 1:
             raise SchemaError(f"Cannot differentiate the possible union members in type '{t}'")
