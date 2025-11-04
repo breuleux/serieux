@@ -30,7 +30,7 @@ from .ctx import Context, Sourced, WorkingDirectory, empty
 from .exc import SchemaError, ValidationError
 from .instructions import pushdown
 from .model import FieldModelizable, ListModelizable, Modelizable, StringModelizable, model
-from .priority import LO4, LOW, MAX, MIN, STD, STD2, STD3
+from .priority import LO4, LO5, LOW, MAX, MIN, STD, STD2, STD3
 from .schema import AnnotatedSchema, Schema
 from .tell import tells as get_tells
 from .utils import (
@@ -158,7 +158,7 @@ class BaseImplementation(Medley):
             ctx=ctx,
         )
 
-    @ovld(priority=MIN)
+    @ovld(priority=LO5)
     def serialize(self, t: Indirect | TypeAliasType, obj: Any, ctx: Context, /):
         return recurse(t.__value__, obj, ctx)
 
@@ -198,7 +198,7 @@ class BaseImplementation(Medley):
             ctx=ctx,
         )
 
-    @ovld(priority=MIN)
+    @ovld(priority=LO5)
     def deserialize(self, t: Indirect | TypeAliasType, obj: Any, ctx: Context, /):
         return recurse(t.__value__, obj, ctx)
 
@@ -225,7 +225,7 @@ class BaseImplementation(Medley):
             holder.update(result)
         return self._schema_cache[t]
 
-    @ovld(priority=MIN)
+    @ovld(priority=LO5)
     def schema(self, t: Indirect | TypeAliasType, ctx: Context, /):  # pragma: no cover
         return recurse(t.__value__, ctx)
 
