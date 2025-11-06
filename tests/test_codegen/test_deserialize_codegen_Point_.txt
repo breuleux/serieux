@@ -14,5 +14,5 @@ def __GENERATED__(self, t, obj, ctx, /):
         v_y = x_y if type(x_y) is int else deserialize(self, int, x_y, ctx)
     if used != len(obj):
         extra = set(obj.keys()) - expected
-        raise ValidationError(f'Extra unrecognized fields were found for type `Point`: {extra}', ctx=ctx)
+        raise ValidationError(f'Extra unrecognized fields were found for type `{'Point'}`: {extra}', ctx=ctx)
     return Point(v_x, v_y)

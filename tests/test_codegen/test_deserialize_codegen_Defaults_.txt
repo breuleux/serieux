@@ -22,5 +22,5 @@ def __GENERATED__(self, t, obj, ctx, /):
         v_cool = x_cool if type(x_cool) is bool else deserialize(self, bool, x_cool, ctx)
     if used != len(obj):
         extra = set(obj.keys()) - expected
-        raise ValidationError(f'Extra unrecognized fields were found for type `Defaults`: {extra}', ctx=ctx)
+        raise ValidationError(f'Extra unrecognized fields were found for type `{'Defaults'}`: {extra}', ctx=ctx)
     return Defaults(v_name, v_aliases, cool=v_cool)

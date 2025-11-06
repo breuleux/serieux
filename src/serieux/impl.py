@@ -477,10 +477,11 @@ class BaseImplementation(Medley):
                         "if used != len($obj):",
                         [
                             "extra = set($obj.keys()) - $expected",
-                            f"raise $VE(f'Extra unrecognized fields were found for type `{clsstring(t)}`: {{extra}}', ctx=$ctx)",
+                            "raise $VE(f'Extra unrecognized fields were found for type `{$tn}`: {extra}', ctx=$ctx)",
                         ],
                     ],
                     VE=ValidationError,
+                    tn=clsstring(t),
                     expected={f.serialized_name for f in t.fields},
                 )
             )

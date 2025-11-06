@@ -8,5 +8,5 @@ def __GENERATED__(self, t, obj, ctx, /):
         v_countries = method_map[t_dict, type(x_countries), Context](self, dict1, x_countries, ctx)
     if used != len(obj):
         extra = set(obj.keys()) - expected
-        raise ValidationError(f'Extra unrecognized fields were found for type `World`: {extra}', ctx=ctx)
+        raise ValidationError(f'Extra unrecognized fields were found for type `{'World'}`: {extra}', ctx=ctx)
     return World(v_countries)
