@@ -1,0 +1,26 @@
+adapters:
+  adaptix:
+    $class: benchmarks.adapters.adaptix:AdaptixAdapter
+  apischema:
+    $class: benchmarks.adapters.apischema:ApischemaAdapter
+  marshmallow:
+    $class: benchmarks.adapters.marshmallow:MarshmallowAdapter
+  mashumaro:
+    $class: benchmarks.adapters.mashumaro:MashumaroAdapter
+  pydantic:
+    $class: benchmarks.adapters.pydantic:PydanticAdapter
+  serde:
+    $class: benchmarks.adapters.serde:SerdeAdapter
+  serieux:
+    $class: benchmarks.adapters.serieux:SerieuxAdapter
+
+data:
+  point: benchmarks.data.point:point
+  world: benchmarks.data.world:world
+  roboland: benchmarks.data.world:roboland
+  tree: benchmarks.data.tree:tree
+  big_world: benchmarks.data.world:big_world
+
+xfails:
+  - [mashumaro, tree]
+  - [serde, tree]
