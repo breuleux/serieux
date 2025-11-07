@@ -104,10 +104,10 @@ def display_context_information(
 ):
     ci = None
     if exc is not None:
-        if isinstance(exc, IndividualSerieuxError) and exc.ctx:
+        if isinstance(exc, SerieuxError) and exc.ctx:
             ctx = exc.ctx
             ci = exc.info
-        elif isinstance(exc, ValidationExceptionGroup):  # pragma: no cover
+        elif isinstance(exc, SerieuxExceptionGroup):  # pragma: no cover
             display(exc)
             return
         else:
@@ -173,14 +173,14 @@ def merge_errors(*errors):
             collected.extend(err.exceptions)
         elif isinstance(err, Exception):
             collected.append(err)
-    return ValidationExceptionGroup("Some errors occurred", collected) if collected else None
+    return SerieuxExceptionGroup("Some errors occurred", collected) if collected else None
 
 
-class SerieuxError(Exception):
+class BaseSerieuxError(Exception):
     pass
 
 
-class IndividualSerieuxError(SerieuxError):
+class SerieuxError(BaseSerieuxError):
     def __init__(self, message=None, *, ctx=None):
         super().__init__(message)
         self.info = extract_information(ctx)
@@ -199,11 +199,11 @@ class IndividualSerieuxError(SerieuxError):
             return f"At path {self.info.trail_string}: {self.message}"
 
 
-class NotGivenError(IndividualSerieuxError):
+class NotGivenError(SerieuxError):
     pass
 
 
-class MissingFieldError(IndividualSerieuxError):
+class MissingFieldError(SerieuxError):
     def __init__(self, t, field_name, *, ctx=None):
         self.t = t
         self.field_name = field_name
@@ -213,7 +213,7 @@ class MissingFieldError(IndividualSerieuxError):
         )
 
 
-class UnrecognizedFieldError(IndividualSerieuxError):
+class UnrecognizedFieldError(SerieuxError):
     def __init__(self, t, expected, found, *, ctx=None):
         self.t = t
         self.expected = set(expected)
@@ -225,7 +225,7 @@ class UnrecognizedFieldError(IndividualSerieuxError):
         )
 
 
-class WrappedSerieuxError(IndividualSerieuxError):
+class WrappedSerieuxError(SerieuxError):
     def __init__(self, message=None, *, exc=None, ctx=None):
         if message is None:
             message = f"{type(exc).__name__}: {exc}"
@@ -241,18 +241,18 @@ class SchemaError(WrappedSerieuxError):
     pass
 
 
-class ValidationExceptionGroup(SerieuxError, ExceptionGroup):
+class SerieuxExceptionGroup(BaseSerieuxError, ExceptionGroup):
     def derive(self, excs):  # pragma: no cover
-        return ValidationExceptionGroup(self.message, excs)
+        return SerieuxExceptionGroup(self.message, excs)
 
 
 def display(exc, file=sys.stderr):
-    if isinstance(exc, ValidationExceptionGroup):
+    if isinstance(exc, SerieuxExceptionGroup):
         for i, subexc in enumerate(exc.exceptions):
             print(f"[#{i}] ", end="", file=file)
             display(subexc, file)
     else:
-        if isinstance(exc, IndividualSerieuxError):
+        if isinstance(exc, SerieuxError):
             msg = exc.message
         else:
             msg = f"{type(exc).__name__}: {exc}"

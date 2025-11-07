@@ -6,10 +6,10 @@ from ovld import Medley, call_next, ovld, recurse
 
 from ..ctx import Context
 from ..exc import (
+    BaseSerieuxError,
     NotGivenError,
-    SerieuxError,
+    SerieuxExceptionGroup,
     ValidationError,
-    ValidationExceptionGroup,
     merge_errors,
 )
 from ..instructions import Instruction, T, has_instruction, strip
@@ -124,7 +124,7 @@ class PartialBuilding(Medley):
     def deserialize(self, t: type[Any @ Partial], obj: object, ctx: Context, /):
         try:
             return call_next(t, obj, ctx)
-        except SerieuxError as exc:
+        except BaseSerieuxError as exc:
             return exc
         except Exception as exc:
             return ValidationError(exc=exc)
@@ -136,13 +136,13 @@ class PartialBuilding(Medley):
         for src in obj.sources:
             try:
                 parts.append(recurse(t if is_partial else Partial[t], src, ctx))
-            except SerieuxError as exc:  # pragma: no cover
+            except BaseSerieuxError as exc:  # pragma: no cover
                 parts.append(exc)
         merged = reduce(merge, parts)
         if is_partial:
             return merged
         rval = instantiate(merged)
-        if isinstance(rval, SerieuxError):
+        if isinstance(rval, BaseSerieuxError):
             raise rval
         return rval
 
@@ -173,18 +173,18 @@ def merge(x: NotGivenError, y: object):  # pragma: no cover
 
 
 @ovld(priority=2)
-def merge(x: object, y: SerieuxError):
+def merge(x: object, y: BaseSerieuxError):
     return y
 
 
 @ovld(priority=2)
-def merge(x: SerieuxError, y: object):
+def merge(x: BaseSerieuxError, y: object):
     return x
 
 
 @ovld(priority=3)
-def merge(x: SerieuxError, y: SerieuxError):
-    return ValidationExceptionGroup("Some errors occurred", [x, y])
+def merge(x: BaseSerieuxError, y: BaseSerieuxError):
+    return SerieuxExceptionGroup("Some errors occurred", [x, y])
 
 
 @ovld(priority=1)
@@ -284,7 +284,7 @@ def instantiate(xs: list):
     err = None
     for v in xs:
         value = recurse(v)
-        if isinstance(value, SerieuxError):
+        if isinstance(value, BaseSerieuxError):
             err = merge_errors(err, value)
         else:
             rval.append(value)
@@ -299,7 +299,7 @@ def instantiate(xs: dict):
         if v is NOT_GIVEN:
             continue
         value = recurse(v)
-        if isinstance(value, SerieuxError):
+        if isinstance(value, BaseSerieuxError):
             err = merge_errors(err, value)
         else:
             rval[k] = value
@@ -310,7 +310,7 @@ def instantiate(xs: dict):
 def instantiate(p: PartialBase):
     dc = p._constructor
     args = recurse({f.name: getattr(p, f.name) for f in p._model.fields})
-    if isinstance(args, SerieuxError):
+    if isinstance(args, BaseSerieuxError):
         return args
     try:
         return dc(**args)
@@ -321,7 +321,7 @@ def instantiate(p: PartialBase):
 @ovld
 def instantiate(p: PartialListModelizable):
     elems = recurse(p.elements)
-    if isinstance(elems, SerieuxError):
+    if isinstance(elems, BaseSerieuxError):
         return elems
     return p._model.list_constructor(elems)
 
@@ -330,7 +330,7 @@ def instantiate(p: PartialListModelizable):
 def instantiate(x: LazyProxy):
     def do():
         rval = recurse(x._obj)
-        if isinstance(rval, SerieuxError):
+        if isinstance(rval, BaseSerieuxError):
             raise rval
         return rval
 

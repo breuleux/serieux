@@ -7,7 +7,7 @@ from ovld.dependent import Regexp
 
 from serieux import Serieux
 from serieux.ctx import Context, Trail
-from serieux.exc import SerieuxError, ValidationError
+from serieux.exc import BaseSerieuxError, ValidationError
 from serieux.features.partial import NOT_GIVEN, AllTrails, Partial, PartialBuilding, Sources
 
 from ..common import validation_errors
@@ -196,13 +196,13 @@ def test_merge_partial_with_object():
     assert load(RGB, Sources({"red": 0}, "#ffffff")) == RGB(255, 255, 255)
     assert load(RGB, Sources("#ffffff", {"red": 0})) == RGB(0, 255, 255)
 
-    with pytest.raises(SerieuxError, match="Cannot deserialize string"):
+    with pytest.raises(BaseSerieuxError, match="Cannot deserialize string"):
         load(RGB, Sources("#fffffX", {"red": 0}))
 
-    with pytest.raises(SerieuxError, match="Cannot deserialize"):
+    with pytest.raises(BaseSerieuxError, match="Cannot deserialize"):
         load(RGB, Sources({"red": 0}, "#fffffX"))
 
-    with pytest.raises(SerieuxError, match="Some errors occurred"):
+    with pytest.raises(BaseSerieuxError, match="Some errors occurred"):
         load(RGB, Sources("#fffffX", "#fffffX"))
 
 

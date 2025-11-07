@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from serieux import Serieux
-from serieux.exc import SerieuxError, display
+from serieux.exc import BaseSerieuxError, display
 
 
 @pytest.fixture
@@ -17,7 +17,7 @@ def datapath():
 
 @pytest.hookimpl()
 def pytest_exception_interact(node, call, report):
-    if issubclass(call.excinfo.type, SerieuxError):
+    if issubclass(call.excinfo.type, BaseSerieuxError):
         exc = call.excinfo.value
         io = StringIO()
         display(exc, file=io)
@@ -31,7 +31,7 @@ def pytest_exception_interact(node, call, report):
 @pytest.fixture
 def check_error_display(capsys, file_regression, datapath):
     @contextmanager
-    def check(message=None, exc_type=SerieuxError):
+    def check(message=None, exc_type=BaseSerieuxError):
         with pytest.raises(exc_type, match=message) as exc:
             yield
 

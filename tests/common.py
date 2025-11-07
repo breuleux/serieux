@@ -9,14 +9,14 @@ from textwrap import dedent
 import pytest
 from _pytest.assertion.rewrite import AssertionRewriter
 
-from serieux.exc import ValidationExceptionGroup
+from serieux.exc import SerieuxExceptionGroup
 
 
 @contextmanager
 def validation_errors(msgs):
     try:
         yield
-    except ValidationExceptionGroup as veg:
+    except SerieuxExceptionGroup as veg:
         for pth, msg in msgs.items():
             if not any(
                 (exc.info.trail_string == pth and msg in str(exc)) for exc in veg.exceptions

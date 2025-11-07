@@ -11,9 +11,10 @@ from typing import TYPE_CHECKING, TypeAlias
 from .auto import Auto
 from .ctx import Context, Patch, Patcher, Trail, WorkingDirectory
 from .exc import (
+    BaseSerieuxError,
     SerieuxError,
+    SerieuxExceptionGroup,
     ValidationError,
-    ValidationExceptionGroup,
     display_context_information,
 )
 from .features.clargs import CLIDefinition, CommandLineArguments, parse_cli
@@ -146,6 +147,7 @@ __all__ = [
     "AutoRegistered",
     "auto_singleton",
     "BaseImplementation",
+    "BaseSerieuxError",
     "CLIDefinition",
     "CommandLineArguments",
     "Comment",
@@ -190,6 +192,6 @@ __all__ = [
     "TaggedSubclass",
     "Trail",
     "ValidationError",
-    "ValidationExceptionGroup",
+    "SerieuxExceptionGroup",
     "WorkingDirectory",
 ]
