@@ -7,7 +7,7 @@ import pytest
 
 from serieux import deserialize
 from serieux.ctx import Trail, empty
-from serieux.exc import ValidationError, display
+from serieux.exc import MissingFieldError, UnrecognizedFieldError, ValidationError, display
 from serieux.model import AllowExtras
 
 from .common import has_312_features, one_test_per_assert
@@ -228,13 +228,13 @@ def test_deserialize_missing_field(ctx):
         {"x": 1, "y": 2},
         {"x": 3},
     ]
-    with pytest.raises(ValidationError, match=r"At path .1: Missing required field 'y'"):
+    with pytest.raises(MissingFieldError, match=r"At path .1: Missing required field 'y'"):
         deserialize(list[Point], pts, ctx)
 
 
 def test_deserialize_extra_fields_not_allowed():
     data = {"x": 1, "y": 2, "poop": 123}
-    with pytest.raises(ValidationError, match=r"Extra unrecognized fields.*Point.*poop"):
+    with pytest.raises(UnrecognizedFieldError, match=r"Extra unrecognized fields.*Point.*poop"):
         deserialize(Point, data)
 
 
@@ -262,7 +262,7 @@ def test_error_display(capsys, file_regression):
         {"x": 1, "y": 2},
         {"x": 3},
     ]
-    with pytest.raises(ValidationError, match=r"At path .1: Missing required field 'y'") as exc:
+    with pytest.raises(MissingFieldError, match=r"At path .1: Missing required field 'y'") as exc:
         deserialize(list[Point], pts)
 
     display(exc.value, sys.stderr)

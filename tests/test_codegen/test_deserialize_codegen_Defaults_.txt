@@ -3,7 +3,7 @@ def __GENERATED__(self, t, obj, ctx, /):
     try:
         x_name = obj['name']
     except KeyError:
-        raise ValidationError("Missing required field 'name' for type `Defaults`")
+        raise MissingFieldError(t, 'name', ctx=ctx)
     else:
         v_name = x_name if type(x_name) is str else deserialize(self, str, x_name, ctx)
     try:
@@ -21,6 +21,5 @@ def __GENERATED__(self, t, obj, ctx, /):
     else:
         v_cool = x_cool if type(x_cool) is bool else deserialize(self, bool, x_cool, ctx)
     if used != len(obj):
-        extra = set(obj.keys()) - expected
-        raise ValidationError(f'Extra unrecognized fields were found for type `{'Defaults'}`: {extra}', ctx=ctx)
+        raise UnrecognizedFieldError(t, expected, obj.keys(), ctx=ctx)
     return Defaults(v_name, v_aliases, cool=v_cool)

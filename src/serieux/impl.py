@@ -27,7 +27,7 @@ from ovld.utils import subtler_type
 from . import formats
 from .auto import Auto
 from .ctx import Context, Sourced, WorkingDirectory, empty
-from .exc import SchemaError, ValidationError
+from .exc import MissingFieldError, SchemaError, UnrecognizedFieldError, ValidationError
 from .instructions import pushdown
 from .model import FieldModelizable, ListModelizable, Modelizable, StringModelizable, model
 from .priority import LO4, LO5, LOW, MAX, MIN, STD, STD2, STD3
@@ -425,8 +425,13 @@ class BaseImplementation(Medley):
             )
 
             try_stmts = [Code(f"x_{n} = $obj[$pname]", pname=f.serialized_name)]
-            msg = f"Missing required field '{f.serialized_name}' for type `{clsstring(t)}`"
-            exc_stmts = [Code("raise $VE($msg)", msg=msg, ve=ValidationError)]
+            exc_stmts = [
+                Code(
+                    "raise $MFE($t, $field, ctx=$ctx)",
+                    field=f.serialized_name,
+                    MFE=MissingFieldError,
+                )
+            ]
             else_stmts = [
                 Code(
                     f"v_{n} = $expr",
@@ -476,11 +481,10 @@ class BaseImplementation(Medley):
                     [
                         "if used != len($obj):",
                         [
-                            "extra = set($obj.keys()) - $expected",
-                            "raise $VE(f'Extra unrecognized fields were found for type `{$tn}`: {extra}', ctx=$ctx)",
+                            "raise $UFE($t, $expected, $obj.keys(), ctx=$ctx)",
                         ],
                     ],
-                    VE=ValidationError,
+                    UFE=UnrecognizedFieldError,
                     tn=clsstring(t),
                     expected={f.serialized_name for f in t.fields},
                 )

@@ -7,6 +7,7 @@ from ovld.medley import ABSENT
 
 from .ctx import Context, Location, Trail, locate
 from .formats import FileSource
+from .utils import clsstring
 
 
 @dataclass
@@ -202,12 +203,29 @@ class NotGivenError(IndividualSerieuxError):
     pass
 
 
-class ValidationExceptionGroup(SerieuxError, ExceptionGroup):
-    def derive(self, excs):  # pragma: no cover
-        return ValidationExceptionGroup(self.message, excs)
+class MissingFieldError(IndividualSerieuxError):
+    def __init__(self, t, field_name, *, ctx=None):
+        self.t = t
+        self.field_name = field_name
+        super().__init__(
+            message=f"Missing required field '{self.field_name}' for type `{clsstring(t)}`",
+            ctx=ctx,
+        )
 
 
-class ValidationError(IndividualSerieuxError):
+class UnrecognizedFieldError(IndividualSerieuxError):
+    def __init__(self, t, expected, found, *, ctx=None):
+        self.t = t
+        self.expected = set(expected)
+        self.found = set(found)
+        self.unrecognized = found - expected
+        super().__init__(
+            message=f"Extra unrecognized fields were found for type `{clsstring(t)}`: {self.unrecognized}",
+            ctx=ctx,
+        )
+
+
+class WrappedSerieuxError(IndividualSerieuxError):
     def __init__(self, message=None, *, exc=None, ctx=None):
         if message is None:
             message = f"{type(exc).__name__}: {exc}"
@@ -215,12 +233,17 @@ class ValidationError(IndividualSerieuxError):
         self.exc = exc
 
 
-class SchemaError(IndividualSerieuxError):
-    def __init__(self, message=None, *, exc=None, ctx=None):
-        if message is None:  # pragma: no cover
-            message = f"{type(exc).__name__}: {exc}"
-        super().__init__(message=message, ctx=ctx)
-        self.exc = exc
+class ValidationError(WrappedSerieuxError):
+    pass
+
+
+class SchemaError(WrappedSerieuxError):
+    pass
+
+
+class ValidationExceptionGroup(SerieuxError, ExceptionGroup):
+    def derive(self, excs):  # pragma: no cover
+        return ValidationExceptionGroup(self.message, excs)
 
 
 def display(exc, file=sys.stderr):
