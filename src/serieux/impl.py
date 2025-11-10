@@ -553,7 +553,7 @@ class BaseImplementation(Medley):
 
     @classmethod
     def __generic_codegen_list(cls, method, m, obj, ctx):
-        builder = list if method == "serialize" else m.list_constructor
+        builder = m.list_extractor if method == "serialize" else m.list_constructor
         lt = m.element_field.type
         comp = "$lbody for IDX, X in enumerate($obj)"
         if builder is list:
@@ -561,7 +561,7 @@ class BaseImplementation(Medley):
         elif builder is set:
             code = f"{{{comp}}}"
         else:
-            code = f"$builder({comp})"
+            code = f"$builder([{comp}])"
         if hasattr(ctx, "follow"):
             ctx_expr = Code("$ctx.follow($objt, $obj, IDX)", objt=m.original_type)
         else:

@@ -93,6 +93,7 @@ class Model:
     element_field: Field = None
     constructor: Callable = None
     list_constructor: Callable = None
+    list_extractor: Callable = list
     from_string: Callable = None
     to_string: Callable = None
     regexp: re.Pattern = None
@@ -233,6 +234,7 @@ def model(sq: type[list] | type[set] | type[frozenset]):
         original_type=sq,
         element_field=Field(name="*", type=et),
         list_constructor=get_origin(sq) or sq,
+        list_extractor=list,
     )
 
 
