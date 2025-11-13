@@ -553,7 +553,7 @@ class BaseImplementation(Medley):
 
     @classmethod
     def __generic_codegen_list(cls, method, m, obj, ctx):
-        builder = m.list_extractor if method == "serialize" else m.list_constructor
+        builder = m.to_list if method == "serialize" else m.from_list
         lt = m.element_field.type
         comp = "$lbody for IDX, X in enumerate($obj)"
         if builder is list:

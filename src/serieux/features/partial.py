@@ -98,7 +98,7 @@ def partialize(t: type[ListModelizable]):
             return Model(
                 original_type=cls,
                 element_field=replace(ef, type=Partial[ef.type]),
-                list_constructor=lambda xs: PLM(list(xs)),
+                from_list=PLM,
             )
 
     return PLM
@@ -323,7 +323,7 @@ def instantiate(p: PartialListModelizable):
     elems = recurse(p.elements)
     if isinstance(elems, BaseSerieuxError):
         return elems
-    return p._model.list_constructor(elems)
+    return p._model.from_list(elems)
 
 
 @ovld

@@ -92,8 +92,8 @@ class Model:
     fields: list[Field] = None
     element_field: Field = None
     constructor: Callable = None
-    list_constructor: Callable = None
-    list_extractor: Callable = list
+    from_list: Callable = None
+    to_list: Callable = list
     from_string: Callable = None
     to_string: Callable = None
     regexp: re.Pattern = None
@@ -103,8 +103,8 @@ class Model:
     def __post_init__(self):
         if isinstance(self.regexp, str):
             self.regexp = re.compile(self.regexp)
-        if self.element_field is not None and self.list_constructor is None:  # pragma: no cover
-            self.list_constructor = self.constructor
+        if self.element_field is not None and self.from_list is None:  # pragma: no cover
+            self.from_list = self.constructor
 
     def accepts(self, other):
         ot = strip(self.original_type)
@@ -233,8 +233,8 @@ def model(sq: type[list] | type[set] | type[frozenset]):
     return Model(
         original_type=sq,
         element_field=Field(name="*", type=et),
-        list_constructor=get_origin(sq) or sq,
-        list_extractor=list,
+        from_list=get_origin(sq) or sq,
+        to_list=list,
     )
 
 

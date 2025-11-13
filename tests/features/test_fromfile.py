@@ -321,7 +321,7 @@ class Loves:
         return Model(
             original_type=cls,
             element_field=Field(name="*", type=str),
-            list_constructor=lambda xs: Loves(list(xs)),
+            from_list=Loves,
         )
 
 
