@@ -320,7 +320,7 @@ class Loves:
     def serieux_model(cls, call_next):
         return Model(
             original_type=cls,
-            element_field=Field(name="*", type=str),
+            element_field=Field(type=str),
             from_list=Loves,
         )
 

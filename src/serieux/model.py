@@ -52,7 +52,7 @@ def ListModelizable(t):
 
 @dataclass(kw_only=True)
 class Field:
-    name: str
+    name: str = None
     type: type
     description: str = None
     metadata: dict[str, object] = field(default_factory=dict)
@@ -232,7 +232,7 @@ def model(sq: type[list] | type[set] | type[frozenset]):
     (et,) = get_args(sq) or [object]
     return Model(
         original_type=sq,
-        element_field=Field(name="*", type=et),
+        element_field=Field(type=et),
         from_list=get_origin(sq) or sq,
         to_list=list,
     )
