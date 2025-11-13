@@ -164,7 +164,7 @@ def test_deserialize_invalid(datapath, check_error_display):
 
 
 def test_deserialize_invalid_indirect(datapath, check_error_display):
-    with check_error_display("Some errors occurred"):
+    with check_error_display("Cannot deserialize string"):
         deserialize(World, datapath / "world-invalid.yaml", Trail())
 
 

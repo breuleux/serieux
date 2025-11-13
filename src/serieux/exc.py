@@ -173,7 +173,13 @@ def merge_errors(*errors):
             collected.extend(err.exceptions)
         elif isinstance(err, Exception):
             collected.append(err)
-    return SerieuxExceptionGroup("Some errors occurred", collected) if collected else None
+    match collected:
+        case ():  # pragma: no cover
+            return None
+        case (err,):
+            return err
+        case many:
+            return SerieuxExceptionGroup("Some errors occurred", many)
 
 
 class BaseSerieuxError(Exception):
