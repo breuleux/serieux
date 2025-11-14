@@ -89,6 +89,7 @@ partial = "serieux.features.partial:PartialBuilding"
 registered = "serieux.features.registered:RegisteredHandler"
 tagset = "serieux.features.tagset:TagSetFeature"
 usermeth = "serieux.features.usermeth:UserMethods"
+filebacked = "serieux.features.filebacked:FileBackedFeature"
 
 [project.entry-points."serieux.optional_features"]
 autotag = "serieux.features.autotag:AutoTagAny"
