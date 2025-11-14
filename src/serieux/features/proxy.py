@@ -2,12 +2,19 @@ from functools import cached_property
 
 
 class ProxyBase:
+    __special_attributes__ = {"_obj", "_computing", "_evaluate", "_type", "__dict__", "_"}
+
     def __getattribute__(self, name):
-        if name in ("_obj", "_computing", "_evaluate", "_type", "__dict__", "_"):
+        if name in type(self).__special_attributes__:
             return object.__getattribute__(self, name)
         elif name == "__class__":
             return object.__getattribute__(self, "_type") or type(self)
         return getattr(self._obj, name)
+
+    def __setattr__(self, name, value):
+        if name in type(self).__special_attributes__:
+            return object.__setattr__(self, name, value)
+        return setattr(self._obj, name, value)
 
     def __str__(self):
         return str(self._obj)

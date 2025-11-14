@@ -1,5 +1,7 @@
 from serieux.features.proxy import CommentProxy, LazyProxy
 
+from ..definitions import Point
+
 
 def test_lazy_proxy():
     lazy_value = LazyProxy(lambda: 42)
@@ -8,6 +10,14 @@ def test_lazy_proxy():
     assert lazy_value == 42
     assert str(lazy_value) == "42"
     assert repr(lazy_value) == "42"
+
+
+def test_lazy_setattr():
+    pt = Point(1, 2)
+    lpt = LazyProxy(lambda: pt)
+    lpt.x = 333
+    assert lpt.x == 333
+    assert pt.x == 333
 
 
 def test_lazy_arithmetic():
