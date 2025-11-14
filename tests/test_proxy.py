@@ -1,6 +1,6 @@
-from serieux.features.proxy import LazyProxy
+from serieux.proxy import LazyProxy
 
-from ..definitions import Point
+from .definitions import Point
 
 
 def test_lazy_proxy():

@@ -15,7 +15,7 @@ from ..exc import (
 from ..instructions import Instruction, T, has_instruction, strip
 from ..model import FieldModelizable, ListModelizable, Model, model
 from ..priority import HI4
-from .proxy import LazyProxy
+from ..proxy import LazyProxy
 
 #############
 # Constants #

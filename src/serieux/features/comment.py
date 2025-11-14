@@ -7,8 +7,8 @@ from ..ctx import Context
 from ..exc import ValidationError
 from ..instructions import BaseInstruction
 from ..priority import HI6
+from ..proxy import ProxyBase
 from ..schema import AnnotatedSchema
-from .proxy import ProxyBase
 from .tagset import value_field
 
 #############

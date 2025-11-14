@@ -5,7 +5,7 @@ from ovld import Medley, call_next, ovld, recurse
 from ..ctx import Context
 from ..instructions import Instruction, T, pushdown
 from ..priority import HI5
-from .proxy import LazyProxy
+from ..proxy import LazyProxy
 
 #############
 # Constants #

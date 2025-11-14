@@ -22,13 +22,14 @@ from .features.comment import Comment, CommentRec
 from .features.dotted import DottedNotation
 from .features.fromfile import IncludeFile
 from .features.interpol import Environment
-from .features.lazy import DeepLazy, Lazy, LazyProxy
+from .features.lazy import DeepLazy, Lazy
 from .features.partial import AllTrails, Partial, Sources
 from .features.registered import AutoRegistered, Referenced, auto_singleton
 from .features.tagset import ReferencedClass, Tagged, TaggedSubclass, TaggedUnion
 from .impl import BaseImplementation
 from .instructions import Instruction
 from .model import AllowExtras, Field, FieldModelizable, Model, Modelizable, StringModelizable
+from .proxy import LazyProxy
 from .schema import RefPolicy, Schema
 from .utils import JSON, check_signature
 from .version import version as __version__
