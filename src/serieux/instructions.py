@@ -22,7 +22,7 @@ class InstructionMC(type):
         if get_origin(t) is not Annotated:
             return
         for x in t.__metadata__:
-            if isinstance(x, cls):
+            if isinstance(x, cls) or x is cls:
                 yield x
 
     @property

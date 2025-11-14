@@ -124,8 +124,6 @@ class RegisteredHandler(Medley):
 @model.register
 def _(t: type[Any @ BaseRegistry]):  # noqa: F821
     rg = BaseRegistry.extract(t)
-    if not rg:
-        return None
     return Model(
         original_type=t,
         from_string=rg.from_symbol,
