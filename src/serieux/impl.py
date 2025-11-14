@@ -553,9 +553,13 @@ class BaseImplementation(Medley):
 
     @classmethod
     def __generic_codegen_list(cls, method, m, obj, ctx):
-        builder = m.to_list if method == "serialize" else m.from_list
+        builder = list if method == "serialize" else m.from_list
+        extractor = m.to_list if method == "serialize" else None
         lt = m.element_field.type
-        comp = "$lbody for IDX, X in enumerate($obj)"
+        if extractor is None:
+            comp = "$lbody for IDX, X in enumerate($obj)"
+        else:
+            comp = "$lbody for IDX, X in enumerate($extractor($obj))"
         if builder is list:
             code = f"[{comp}]"
         elif builder is set:
@@ -570,6 +574,7 @@ class BaseImplementation(Medley):
             code,
             lbody=cls.subcode(method, lt, "X", ctx, ctx_expr=ctx_expr),
             builder=builder,
+            extractor=extractor,
         )
 
     @code_generator(priority=STD)

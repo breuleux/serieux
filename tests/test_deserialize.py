@@ -23,6 +23,7 @@ from .definitions import (
     Point,
     Point3D,
     Pointato,
+    Thingies,
 )
 
 here = Path(__file__).parent
@@ -326,3 +327,8 @@ def test_deserialize_kwonly_fields():
     data = {"id": 42, "horsepower": 300}
     car = deserialize(IdentifiedCar, data)
     assert car == IdentifiedCar(42, horsepower=300)
+
+
+def test_error_deserialize_list_modelizable():
+    th = ["hello", "world"]
+    assert deserialize(Thingies, th) == Thingies(["hello", "world"])

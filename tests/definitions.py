@@ -6,6 +6,8 @@ from enum import Enum
 from numbers import Number
 from pathlib import Path
 
+from serieux import Field, Model
+
 
 @dataclass
 class Tree:
@@ -167,3 +169,17 @@ class File:
 
     def __post_init__(self):
         self.fd = open(self.path, "r")
+
+
+@dataclass
+class Thingies:
+    things: list[str]
+
+    @classmethod
+    def serieux_model(cls, call_next):
+        return Model(
+            original_type=cls,
+            element_field=Field(type=str),
+            from_list=cls,
+            to_list=lambda x: x.things,
+        )

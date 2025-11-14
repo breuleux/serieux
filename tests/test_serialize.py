@@ -8,7 +8,7 @@ from serieux.ctx import Context, Trail
 from serieux.exc import ValidationError
 
 from .common import has_312_features, one_test_per_assert
-from .definitions import Color, DIDHolder, DotDict, File, Level, LTHolder, Point
+from .definitions import Color, DIDHolder, DotDict, File, Level, LTHolder, Point, Thingies
 
 
 @one_test_per_assert
@@ -274,3 +274,8 @@ def test_serialize_recursive_type_2():
         {"x": 1, "y": 1},
         [{"x": 2, "y": 2}, [{"x": 3, "y": 3}], {"x": 4, "y": 4}],
     ]
+
+
+def test_error_serialize_list_modelizable():
+    th = Thingies(["hello", "world"])
+    assert serialize(Thingies, th) == ["hello", "world"]
