@@ -5,8 +5,13 @@ import pytest
 
 from serieux import Serieux
 from serieux.exc import ValidationError
-from serieux.features.comment import Comment, CommentedObjects, CommentRec, comment_field
-from serieux.features.proxy import CommentProxy
+from serieux.features.comment import (
+    Comment,
+    CommentedObjects,
+    CommentProxy,
+    CommentRec,
+    comment_field,
+)
 from serieux.features.tagset import value_field
 
 featured = (Serieux + CommentedObjects)()
@@ -18,6 +23,25 @@ deserialize = featured.deserialize
 class Person:
     name: str
     age: int
+
+
+def test_commented_proxy():
+    obj = [1, 2, 3]
+    comment = "This is a comment"
+    proxy = CommentProxy(obj, comment)
+
+    # The proxy should behave like the original object
+    assert proxy[0] == 1
+    assert list(proxy) == [1, 2, 3]
+    assert 2 in proxy
+    assert str(proxy) == str(obj)
+    assert repr(proxy) == repr(obj)
+
+    # The comment should be accessible via the "_" attribute
+    assert proxy._ == comment
+
+    # The underlying object should be accessible via _obj
+    assert proxy._obj is obj
 
 
 def test_comment_serialize_int():

@@ -1,4 +1,4 @@
-from serieux.features.proxy import CommentProxy, LazyProxy
+from serieux.features.proxy import LazyProxy
 
 from ..definitions import Point
 
@@ -54,22 +54,3 @@ def test_lazy_list():
     assert lazy_list[0] == 1
     assert list(lazy_list) == [1, 2, 3]
     assert 2 in lazy_list
-
-
-def test_commented_proxy():
-    obj = [1, 2, 3]
-    comment = "This is a comment"
-    proxy = CommentProxy(obj, comment)
-
-    # The proxy should behave like the original object
-    assert proxy[0] == 1
-    assert list(proxy) == [1, 2, 3]
-    assert 2 in proxy
-    assert str(proxy) == str(obj)
-    assert repr(proxy) == repr(obj)
-
-    # The comment should be accessible via the "_" attribute
-    assert proxy._ == comment
-
-    # The underlying object should be accessible via _obj
-    assert proxy._obj is obj

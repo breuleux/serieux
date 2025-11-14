@@ -131,10 +131,3 @@ class LazyProxy(ProxyBase):
         finally:
             self._computing = False
         return rval
-
-
-class CommentProxy(ProxyBase):
-    def __init__(self, obj, comment):
-        self._obj = obj
-        self._type = type(obj)
-        self._ = comment

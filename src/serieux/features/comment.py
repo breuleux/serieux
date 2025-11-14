@@ -8,7 +8,7 @@ from ..exc import ValidationError
 from ..instructions import BaseInstruction
 from ..priority import HI6
 from ..schema import AnnotatedSchema
-from .proxy import CommentProxy
+from .proxy import ProxyBase
 from .tagset import value_field
 
 #############
@@ -17,6 +17,13 @@ from .tagset import value_field
 
 
 comment_field = "$comment"
+
+
+class CommentProxy(ProxyBase):
+    def __init__(self, obj, comment):
+        self._obj = obj
+        self._type = type(obj)
+        self._ = comment
 
 
 @dataclass(frozen=True)
