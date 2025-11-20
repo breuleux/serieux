@@ -8,6 +8,7 @@ from ovld import Medley, call_next, ovld, recurse
 from ovld.dependent import Regexp
 
 from ..ctx import Context, Patch, Patcher
+from ..exc import ValidationError
 from ..instructions import Instruction, T
 from ..priority import STD
 
@@ -89,6 +90,10 @@ class Encrypt(Medley):
     ):
         obj = ctx.decrypt(obj)
         return call_next(Secret.strip(t), obj, ctx - EncryptionKey)
+
+    @ovld(priority=PRIO2)
+    def deserialize(self, t: type[Any @ Secret], obj: Regexp[rf"^{crypt_prefix}.*"], ctx: Context):
+        raise ValidationError("Found an encrypted field, but no encryption key was given.")
 
     @ovld(priority=PRIO1)
     def deserialize(self, t: type[Any @ Secret], obj: Any, ctx: EncryptionKey + Patcher):

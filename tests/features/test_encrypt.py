@@ -6,6 +6,7 @@ import pytest
 
 from serieux import Serieux
 from serieux.ctx import Patcher
+from serieux.exc import ValidationError
 from serieux.features.encrypt import Encrypt, EncryptionKey, Secret, crypt_prefix
 
 featured = (Serieux + Encrypt)()
@@ -93,6 +94,16 @@ def test_wrong_password_decryption(ekey, bad_ekey):
     # Try to deserialize with wrong password - should fail
     with pytest.raises(Exception):
         deserialize(User, serialized, bad_ekey)
+
+
+def test_decryption_no_key(ekey):
+    user = User(name="charlie", password="my_secret")
+
+    serialized = serialize(User, user, ekey)
+
+    # Try to deserialize without an encryption key - should fail
+    with pytest.raises(ValidationError):
+        deserialize(User, serialized)
 
 
 def test_no_password_decryption(ekey, no_ekey):
