@@ -4,6 +4,7 @@ import pytest
 
 from serieux import Serieux
 from serieux.features.filebacked import FileBacked, FileBackedFeature
+from serieux.tell import tells
 
 from ..definitions import Point
 
@@ -166,3 +167,7 @@ def test_filebacked_schema():
         "required": ["point"],
         "additionalProperties": False,
     }
+
+
+def test_filebacked_tells():
+    assert tells(expected=Point @ FileBacked(), given=str) == set()

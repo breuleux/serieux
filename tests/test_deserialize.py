@@ -1,5 +1,6 @@
 import sys
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -8,6 +9,7 @@ import pytest
 from serieux import deserialize
 from serieux.ctx import Trail, empty
 from serieux.exc import MissingFieldError, UnrecognizedFieldError, ValidationError, display
+from serieux.features.partial import Partial
 from serieux.model import AllowExtras
 
 from .common import has_312_features, one_test_per_assert
@@ -100,6 +102,13 @@ def test_deserialize_union():
     assert deserialize(str | int, 3) == 3
     assert deserialize(str | int, "wow") == "wow"
     assert deserialize(Point | int, 3) == 3
+
+
+def test_deserialize_optional():
+    ts = 1763667454
+    dt = datetime.fromtimestamp(ts)
+    assert deserialize(datetime | None, ts) == dt
+    assert deserialize(Partial[datetime | None], ts) == dt
 
 
 @dataclass

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from types import NoneType
 from typing import Annotated, Any
@@ -94,3 +95,8 @@ def tells(expected: type[Annotated], given: Any):
 @ovld(priority=-1)
 def tells(expected: Any, given: Any):
     return None
+
+
+@ovld
+def tells(expected: type[datetime], given: type[int] | type[float]):
+    return set()

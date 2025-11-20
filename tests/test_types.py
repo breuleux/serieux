@@ -81,6 +81,8 @@ def test_schema_datetime():
 
 def test_tells_datetime():
     assert tells(datetime, str) == set()
+    assert tells(datetime, int) == set()
+    assert tells(datetime, float) == set()
 
 
 ##################

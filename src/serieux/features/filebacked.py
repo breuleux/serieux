@@ -7,6 +7,8 @@ from ovld import Medley
 from ..ctx import Context
 from ..instructions import BaseInstruction
 from ..proxy import ProxyBase
+from ..tell import tells
+from .partial import Partial
 
 
 @dataclass(frozen=True)
@@ -84,9 +86,16 @@ class FileBackedFeature(Medley):
         return str(obj._wrapper.path)
 
     def deserialize(self, t: type[Any @ FileBacked], obj: str | Path, ctx: Context):
+        # Merging doesn't make sense here so Partial will just cause problems
+        t = Partial.strip(t)
         value_type, fb = FileBacked.decompose(t)
         constructor = BackedProxy if fb.proxy else BackedObject
         return constructor(Path(obj), value_type, self, ctx, default_factory=fb.default_factory)
 
     def schema(self, t: type[Any @ FileBacked], ctx: Context):
         return {"type": "string"}
+
+
+@tells.register
+def _(expected: type[Any @ FileBacked], given: type[str]):
+    return set()

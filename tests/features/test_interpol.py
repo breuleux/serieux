@@ -135,6 +135,7 @@ def test_env_types():
     assert deserialize(int, "${env:INT}", vars) == 42
     assert deserialize(int | None, "${env:INT}", vars) == 42
     assert deserialize(int | None, "${env:EMPTY}", vars) is None
+    assert deserialize(int | None, "${env:NULL}", vars) is None
     assert deserialize(float, "${env:FLOAT}", vars) == 3.14
     assert deserialize(str, "${env:STR}", vars) == "hello"
     assert deserialize(list[str], "${env:LIST}", vars) == ["a", "b", "c"]
