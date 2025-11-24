@@ -16,8 +16,13 @@ class UserMethods(Medley):
         def cn(t, obj, ctx, *, from_top=False):
             return recurse(t, obj, ctx) if from_top else call_next(t, obj, ctx)
 
+        cn.serieux = self
+
         try:
-            return t.serieux_deserialize(obj, ctx, cn)
+            # NOTE: we want to preserve the type arguments, but if f is a classmethod,
+            # C[T].f == C.f, which will receive C as its first argument. Here we simply
+            # make sure that f will indeed receive C[T].
+            return t.serieux_deserialize.__func__(t, obj, ctx, cn)
         except ResolutionError:
             # If t implements serieux_deserialize with ovld and no method matches, it will
             # throw a ResolutionError and we simply resume our search down the stack.
@@ -28,8 +33,10 @@ class UserMethods(Medley):
         def cn(t, obj, ctx, *, from_top=False):
             return recurse(t, obj, ctx) if from_top else call_next(t, obj, ctx)
 
+        cn.serieux = self
+
         try:
-            return t.serieux_serialize(obj, ctx, cn)
+            return t.serieux_serialize.__func__(t, obj, ctx, cn)
         except ResolutionError:
             return call_next(t, obj, ctx)
 
@@ -38,8 +45,10 @@ class UserMethods(Medley):
         def cn(t, ctx, *, from_top=False):
             return recurse(t, ctx) if from_top else call_next(t, ctx)
 
+        cn.serieux = self
+
         try:
-            return t.serieux_schema(ctx, cn)
+            return t.serieux_schema.__func__(t, ctx, cn)
         except ResolutionError:  # pragma: no cover
             return call_next(t, ctx)
 
