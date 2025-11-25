@@ -1,32 +1,46 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, get_args
 
-from ovld import Medley
+from ovld import Medley, ovld
 
 from ..ctx import Context
 from ..instructions import BaseInstruction
+from ..priority import STD
 from ..proxy import ProxyBase
 from ..tell import tells
 from .partial import Partial
 
 
 @dataclass(frozen=True)
-class FileBacked(BaseInstruction):
-    default_factory: Callable | None = None
-    proxy: bool = False
+class DefaultFactory(BaseInstruction):
+    factory: Callable
 
 
-@dataclass
-class BackedObject:
+class FileBacked[T]:
     path: Path
-    value_type: type
+    value_type: type[T]
     serieux: object
     context: Context
     default_factory: Callable = None
-    value: object = None
+    value: T = None
 
-    def __post_init__(self):
+    def __init__(
+        self,
+        path: Path,
+        value_type: type,
+        serieux: object,
+        context: Context,
+        default_factory: Callable = None,
+    ):
+        self.path = path
+        value_type, df = DefaultFactory.decompose(value_type)
+        value_type = Partial.strip(value_type)
+        self.value_type = value_type
+        self.serieux = serieux
+        self.context = context
+        self.default_factory = default_factory or (df and df.factory)
+        self.value = None
         self.load()
 
     def load(self):
@@ -45,8 +59,31 @@ class BackedObject:
 
     __repr__ = __str__
 
+    @classmethod
+    def serieux_deserialize(cls, obj, ctx, call_next):
+        (vt,) = get_args(cls)
+        return cls(
+            path=Path(obj),
+            value_type=vt,
+            serieux=call_next.serieux,
+            context=ctx,
+        )
 
-class BackedProxy(ProxyBase):
+    @classmethod
+    def serieux_serialize(cls, obj, ctx, call_next):
+        return str(obj.path)
+
+    @classmethod
+    def serieux_schema(cls, ctx, call_next):
+        return {"type": "string"}
+
+
+@dataclass(frozen=True)
+class FileProxy(BaseInstruction):
+    default_factory: Callable | None = None
+
+
+class FileBackedProxy(ProxyBase):
     __special_attributes__ = {
         *ProxyBase.__special_attributes__,
         "_wrapper",
@@ -56,7 +93,7 @@ class BackedProxy(ProxyBase):
     }
 
     def __init__(self, *args, **kwargs):
-        self._wrapper = BackedObject(*args, **kwargs)
+        self._wrapper = FileBacked(*args, **kwargs)
 
     @property
     def _obj(self):
@@ -78,24 +115,33 @@ class BackedProxy(ProxyBase):
     __repr__ = __str__
 
 
-class FileBackedFeature(Medley):
-    def serialize(self, t: type[Any @ FileBacked], obj: BackedObject, ctx: Context):
-        return str(obj.path)
+PRIO = STD.next()
 
-    def serialize(self, t: type[Any @ FileBacked], obj: BackedProxy, ctx: Context):
+
+class FileBackedFeature(Medley):
+    @ovld(priority=PRIO)
+    def serialize(self, t: type[Any @ FileProxy], obj: FileBackedProxy, ctx: Context):
         return str(obj._wrapper.path)
 
-    def deserialize(self, t: type[Any @ FileBacked], obj: str | Path, ctx: Context):
+    @ovld(priority=PRIO)
+    def deserialize(self, t: type[Any @ FileProxy], obj: str | Path, ctx: Context):
         # Merging doesn't make sense here so Partial will just cause problems
         t = Partial.strip(t)
-        value_type, fb = FileBacked.decompose(t)
-        constructor = BackedProxy if fb.proxy else BackedObject
-        return constructor(Path(obj), value_type, self, ctx, default_factory=fb.default_factory)
+        value_type, fb = FileProxy.decompose(t)
+        return FileBackedProxy(
+            Path(obj), value_type, self, ctx, default_factory=fb.default_factory
+        )
 
-    def schema(self, t: type[Any @ FileBacked], ctx: Context):
+    @ovld(priority=PRIO)
+    def schema(self, t: type[Any @ FileProxy], ctx: Context):
         return {"type": "string"}
 
 
 @tells.register
-def _(expected: type[Any @ FileBacked], given: type[str]):
+def _(expected: type[Any @ FileProxy], given: type[str]):
+    return set()
+
+
+@tells.register
+def _(expected: type[FileBacked], given: type[str]):
     return set()
