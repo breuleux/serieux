@@ -10,8 +10,11 @@ from ..model import Model, model
 from ..priority import STD4
 
 
+PRIO = STD4.next()
+
+
 class UserMethods(Medley):
-    @ovld(priority=STD4)
+    @ovld(priority=PRIO)
     def deserialize(self, t: type[HasMethod["serieux_deserialize"]], obj: Any, ctx: Context):  # noqa: F821
         def cn(t, obj, ctx, *, from_top=False):
             return recurse(t, obj, ctx) if from_top else call_next(t, obj, ctx)
@@ -28,7 +31,7 @@ class UserMethods(Medley):
             # throw a ResolutionError and we simply resume our search down the stack.
             return call_next(t, obj, ctx)
 
-    @ovld(priority=STD4)
+    @ovld(priority=PRIO)
     def serialize(self, t: type[HasMethod["serieux_serialize"]], obj: Any, ctx: Context):  # noqa: F821
         def cn(t, obj, ctx, *, from_top=False):
             return recurse(t, obj, ctx) if from_top else call_next(t, obj, ctx)
@@ -40,7 +43,7 @@ class UserMethods(Medley):
         except ResolutionError:
             return call_next(t, obj, ctx)
 
-    @ovld(priority=STD4)
+    @ovld(priority=PRIO)
     def schema(self, t: type[HasMethod["serieux_schema"]], ctx: Context):  # noqa: F821
         def cn(t, ctx, *, from_top=False):
             return recurse(t, ctx) if from_top else call_next(t, ctx)
