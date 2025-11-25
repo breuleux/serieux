@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, get_args
+from typing import Any, Callable, Generic, TypeVar, get_args
 
 from ovld import Medley, ovld
 
@@ -17,9 +17,12 @@ class DefaultFactory(BaseInstruction):
     factory: Callable
 
 
-class FileBacked[T]:
+T = TypeVar("T")
+
+
+class FileBacked(Generic[T]):
     path: Path
-    value_type: type[T]
+    value_type: type
     serieux: object
     context: Context
     default_factory: Callable = None
