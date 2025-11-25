@@ -197,7 +197,13 @@ def model(dc: type[Dataclass]):
 
         vardoc = attributes.get(field.name, None) or VariableDoc("", {})
         meta = {**field.metadata, **vardoc.metadata}
-        if meta.get("ignore", False):
+        match meta.get("serieux", None):
+            case str() as s:
+                meta["serieux"] = s.split()
+            case None:
+                meta["serieux"] = []
+
+        if meta.get("ignore", False) or "ignore" in meta["serieux"]:
             return None
 
         return Field(

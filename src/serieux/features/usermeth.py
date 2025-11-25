@@ -9,7 +9,6 @@ from ..ctx import Context
 from ..model import Model, model
 from ..priority import STD4
 
-
 PRIO = STD4.next()
 
 

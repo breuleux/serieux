@@ -164,7 +164,7 @@ class IdentifiedCar(Car):
 class File:
     path: Path
 
-    # [ignore]
+    # [serieux: ignore]
     fd: object = None
 
     def __post_init__(self):
