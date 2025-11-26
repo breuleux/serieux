@@ -6,7 +6,7 @@ from ovld import Medley, ovld
 
 from ..ctx import Context
 from ..instructions import BaseInstruction
-from ..priority import STD
+from ..priority import HI1, STD
 from ..proxy import ProxyBase
 from ..tell import tells
 from .partial import Partial
@@ -140,11 +140,11 @@ class FileBackedFeature(Medley):
         return {"type": "string"}
 
 
-@tells.register
+@tells.register(priority=HI1.next())
 def _(expected: type[Any @ FileProxy], given: type[str]):
     return set()
 
 
-@tells.register
+@tells.register(priority=HI1.next())
 def _(expected: type[FileBacked], given: type[str]):
     return set()

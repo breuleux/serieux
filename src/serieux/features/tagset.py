@@ -11,6 +11,7 @@ from ..ctx import Context
 from ..exc import ValidationError
 from ..instructions import BaseInstruction, Instruction, T, annotate, pushdown, strip
 from ..model import constructed_type
+from ..priority import HI2
 from ..schema import AnnotatedSchema
 from ..tell import KeyValueTell, tells
 
@@ -309,7 +310,7 @@ class TagSetFeature(Medley):
             return {"oneOf": subschemas}
 
 
-@tells.register(priority=1)
+@tells.register(priority=HI2.next())
 def tells(expected: type[Any @ TagSet], given: type[dict]):
     base, ts = decompose(expected)
     return {KeyValueTell(tag_field, tag) for tag, _ in ts.iterate(base)}
