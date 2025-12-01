@@ -8,6 +8,7 @@ from ovld import Code, ovld, recurse
 
 from .instructions import pushdown
 from .model import FieldModelizable, ListModelizable, StringModelizable, model
+from .priority import LO1, LO2
 
 
 class Tell:
@@ -87,12 +88,12 @@ def tells(expected: type[ListModelizable], given: type[list]):
     return set()
 
 
-@ovld
+@ovld(priority=LO1)
 def tells(expected: type[Annotated], given: Any):
     return recurse(pushdown(expected), given)
 
 
-@ovld(priority=-1)
+@ovld(priority=LO2)
 def tells(expected: Any, given: Any):
     return None
 
