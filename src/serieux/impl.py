@@ -215,15 +215,16 @@ class BaseImplementation(Medley):
 
     @ovld(priority=MAX)
     def schema(self, t: Any, ctx: Context, /):
-        if t not in self._schema_cache:
-            self._schema_cache[t] = holder = Schema(t)
+        key = (t, type(ctx))
+        if key not in self._schema_cache:
+            self._schema_cache[key] = holder = Schema(t)
             try:
                 result = call_next(t, ctx)
             except Exception:
-                del self._schema_cache[t]
+                del self._schema_cache[key]
                 raise
             holder.update(result)
-        return self._schema_cache[t]
+        return self._schema_cache[key]
 
     @ovld(priority=LO5)
     def schema(self, t: Indirect | TypeAliasType, ctx: Context, /):  # pragma: no cover
