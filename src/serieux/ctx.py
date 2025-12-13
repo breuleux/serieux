@@ -26,6 +26,10 @@ class EmptyContext(Context):
         return other
 
 
+class OmitDefaults(Context):
+    pass
+
+
 class Trail(Context):
     full_trail: tuple = ()
 

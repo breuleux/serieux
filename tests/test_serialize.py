@@ -4,11 +4,21 @@ import pytest
 from ovld import Medley
 
 from serieux import Serieux, dump, load, serialize
-from serieux.ctx import Context, Trail
+from serieux.ctx import Context, OmitDefaults, Trail
 from serieux.exc import ValidationError
 
 from .common import has_312_features, one_test_per_assert
-from .definitions import Color, DIDHolder, DotDict, File, Level, LTHolder, Point, Thingies
+from .definitions import (
+    Color,
+    Defaults,
+    DIDHolder,
+    DotDict,
+    File,
+    Level,
+    LTHolder,
+    Point,
+    Thingies,
+)
 
 
 @one_test_per_assert
@@ -279,3 +289,40 @@ def test_serialize_recursive_type_2():
 def test_error_serialize_list_modelizable():
     th = Thingies(["hello", "world"])
     assert serialize(Thingies, th) == ["hello", "world"]
+
+
+def test_serialize_defaults_with_omit_defaults_context():
+    # Test with default values - serialize normally includes all fields
+    obj_with_defaults = Defaults("Alice")
+    assert serialize(Defaults, obj_with_defaults) == {
+        "name": "Alice",
+        "aliases": [],
+        "cool": False,
+    }
+
+    # Test with OmitDefaults context - should omit fields that have default values
+    assert serialize(Defaults, obj_with_defaults, OmitDefaults()) == {
+        "name": "Alice",
+    }
+
+    # Test with non-default values - should serialize normally
+    obj_with_custom_values = Defaults("Bob", aliases=["Robert", "Bobby"], cool=True)
+    assert serialize(Defaults, obj_with_custom_values) == {
+        "name": "Bob",
+        "aliases": ["Robert", "Bobby"],
+        "cool": True,
+    }
+
+    # Test with OmitDefaults context but non-default values - should include all fields
+    assert serialize(Defaults, obj_with_custom_values, OmitDefaults()) == {
+        "name": "Bob",
+        "aliases": ["Robert", "Bobby"],
+        "cool": True,
+    }
+
+    # Test partial default values with OmitDefaults
+    obj_partial = Defaults("Charlie", cool=True)
+    assert serialize(Defaults, obj_partial, OmitDefaults()) == {
+        "name": "Charlie",
+        "cool": True,
+    }

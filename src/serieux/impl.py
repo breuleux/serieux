@@ -26,7 +26,7 @@ from ovld.utils import subtler_type
 
 from . import formats
 from .auto import Auto
-from .ctx import Context, Sourced, WorkingDirectory, empty
+from .ctx import Context, OmitDefaults, Sourced, WorkingDirectory, empty
 from .exc import MissingFieldError, SchemaError, UnrecognizedFieldError, ValidationError
 from .instructions import pushdown
 from .model import FieldModelizable, ListModelizable, Modelizable, StringModelizable, model
@@ -389,6 +389,15 @@ class BaseImplementation(Medley):
                     "serialize", f.type, Code(f"$obj.{f.property_name}"), ctx, ctx_expr=ctx_expr
                 ),
             )
+            if issubclass(ctx, OmitDefaults):
+                if f.default is not MISSING:
+                    test = Code(f"$obj.{f.property_name} != $dflt", dflt=f.default)
+                elif f.default_factory is not MISSING:
+                    test = Code(f"$obj.{f.property_name} != $dfltf()", dfltf=f.default_factory)
+                else:
+                    test = None
+                if test:
+                    stmt = Code(["if $test:", [stmt]], test=test)
             stmts.append(stmt)
         final = "return __RET"
         stmts.append(final)
