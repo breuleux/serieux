@@ -4,7 +4,7 @@ import pytest
 from ovld import Medley
 
 from serieux import Serieux, dump, load, serialize
-from serieux.ctx import Context, OmitDefaults, Trail
+from serieux.ctx import Context, ModifyContext, OmitDefaults, Trail
 from serieux.exc import ValidationError
 
 from .common import has_312_features, one_test_per_assert
@@ -325,4 +325,16 @@ def test_serialize_defaults_with_omit_defaults_context():
     assert serialize(Defaults, obj_partial, OmitDefaults()) == {
         "name": "Charlie",
         "cool": True,
+    }
+
+
+def test_serialize_modify_context():
+    alice = Defaults("Alice")
+    assert serialize(Defaults @ ModifyContext(OmitDefaults()), alice) == {
+        "name": "Alice",
+    }
+    assert serialize(Defaults @ ModifyContext(sub=OmitDefaults()), alice, OmitDefaults()) == {
+        "name": "Alice",
+        "aliases": [],
+        "cool": False,
     }

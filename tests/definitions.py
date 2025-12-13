@@ -7,6 +7,7 @@ from numbers import Number
 from pathlib import Path
 
 from serieux import Field, Model
+from serieux.ctx import Context
 
 
 @dataclass
@@ -183,3 +184,34 @@ class Thingies:
             from_list=cls,
             to_list=lambda x: x.things,
         )
+
+
+class PrefixContext(Context):
+    prefix: str
+
+
+@dataclass
+class ContextSwitched:
+    word: str
+
+    @classmethod
+    def serieux_serialize(cls, obj, ctx, call_next):
+        if isinstance(ctx, PrefixContext):
+            return {"word": f"{ctx.prefix}{obj.word}"}
+        else:
+            return {"word": obj.word}
+
+    @classmethod
+    def serieux_deserialize(cls, obj, ctx, call_next):
+        word = obj["word"]
+        if isinstance(ctx, PrefixContext) and word.startswith(ctx.prefix):
+            word = word[len(ctx.prefix) :]
+        return cls(word=word)
+
+    @classmethod
+    def serieux_schema(cls, ctx, call_next):
+        if isinstance(ctx, PrefixContext):
+            word_schema = {"type": "string", "pattern": f"^{ctx.prefix}.*"}
+        else:
+            word_schema = {"type": "string"}
+        return {"type": "object", "properties": {"word": word_schema}}

@@ -5,12 +5,23 @@ from typing import Literal
 import pytest
 
 from serieux import schema as _schema
+from serieux.ctx import ModifyContext
 from serieux.exc import ValidationError
 from serieux.model import AllowExtras
 from serieux.schema import AnnotatedSchema, Schema
 
 from .common import has_312_features
-from .definitions import Character, Color, Defaults, LTHolder, Pig, Point, Pointato
+from .definitions import (
+    Character,
+    Color,
+    ContextSwitched,
+    Defaults,
+    LTHolder,
+    Pig,
+    Point,
+    Pointato,
+    PrefixContext,
+)
 
 
 def schema(t, root=False, ref_policy="norepeat"):
@@ -426,3 +437,17 @@ def test_schema_blooper():
 def test_schema_pointato():
     with pytest.raises(ValidationError, match="Did you mean for it to be a dataclass"):
         schema(Pointato)
+
+
+def test_schema_modify_context_with_contextswitched():
+    sch1 = schema(ContextSwitched)
+    assert sch1 == {
+        "type": "object",
+        "properties": {"word": {"type": "string"}},
+    }
+
+    sch2 = schema(ContextSwitched @ ModifyContext(PrefixContext("test_")))
+    assert sch2 == {
+        "type": "object",
+        "properties": {"word": {"type": "string", "pattern": "^test_.*"}},
+    }

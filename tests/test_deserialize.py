@@ -7,7 +7,7 @@ from typing import Any, Literal
 import pytest
 
 from serieux import deserialize
-from serieux.ctx import Trail, empty
+from serieux.ctx import ModifyContext, Trail, empty
 from serieux.exc import MissingFieldError, UnrecognizedFieldError, ValidationError, display
 from serieux.features.partial import Partial
 from serieux.model import AllowExtras
@@ -16,6 +16,7 @@ from .common import has_312_features, one_test_per_assert
 from .definitions import (
     Character,
     Color,
+    ContextSwitched,
     Defaults,
     DIDHolder,
     DotDict,
@@ -25,6 +26,7 @@ from .definitions import (
     Point,
     Point3D,
     Pointato,
+    PrefixContext,
     Thingies,
 )
 
@@ -341,3 +343,32 @@ def test_deserialize_kwonly_fields():
 def test_error_deserialize_list_modelizable():
     th = ["hello", "world"]
     assert deserialize(Thingies, th) == Thingies(["hello", "world"])
+
+
+def test_deserialize_modify_context_with_contextswitched():
+    # Without context modification, should deserialize without prefix removal
+    assert deserialize(ContextSwitched, {"word": "hello"}) == ContextSwitched("hello")
+
+    # With ModifyContext to add PrefixContext, should remove prefix
+    assert deserialize(
+        ContextSwitched @ ModifyContext(PrefixContext("test_")), {"word": "test_hello"}
+    ) == ContextSwitched("hello")
+
+    # With ModifyContext to replace context with PrefixContext
+    assert deserialize(
+        ContextSwitched @ ModifyContext(replace=PrefixContext("new_")), {"word": "new_hello"}
+    ) == ContextSwitched("hello")
+
+    # With ModifyContext to subtract PrefixContext (when one already exists)
+    assert deserialize(
+        ContextSwitched @ ModifyContext(sub=PrefixContext("old_")),
+        {"word": "hello"},
+        PrefixContext("old_"),
+    ) == ContextSwitched("hello")
+
+    # Without PrefixContext, word with prefix pattern should stay as is
+    assert deserialize(
+        ContextSwitched @ ModifyContext(sub=PrefixContext("old_")),
+        {"word": "test_hello"},
+        PrefixContext("old_"),
+    ) == ContextSwitched("test_hello")

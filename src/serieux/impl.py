@@ -26,11 +26,11 @@ from ovld.utils import subtler_type
 
 from . import formats
 from .auto import Auto
-from .ctx import Context, OmitDefaults, Sourced, WorkingDirectory, empty
+from .ctx import Context, ModifyContext, OmitDefaults, Sourced, WorkingDirectory, empty
 from .exc import MissingFieldError, SchemaError, UnrecognizedFieldError, ValidationError
 from .instructions import pushdown
 from .model import FieldModelizable, ListModelizable, Modelizable, StringModelizable, model
-from .priority import LO4, LO5, LOW, MAX, MIN, STD, STD2, STD3
+from .priority import HI2, LO4, LO5, LOW, MAX, MIN, STD, STD2, STD3
 from .schema import AnnotatedSchema, Schema
 from .tell import tells as get_tells
 from .utils import (
@@ -842,3 +842,22 @@ class BaseImplementation(Medley):
                 msg += f" `{clsstring(t)}` appears to have type annotations on some fields, but it is not a dataclass. Did you mean for it to be a dataclass?"
             raise ValidationError(msg, ctx=ctx)
         return recurse(Annotated[t, Auto(call=False, embed_self=False, force=True)], ctx)
+
+    ##########################################
+    # Implementations: Standard instructions #
+    ##########################################
+
+    @ovld(priority=HI2)
+    def serialize(self, t: type[Any @ ModifyContext], obj: Any, ctx: Context):
+        t, mod = ModifyContext.decompose(t)
+        return self.serialize(t, obj, mod.modify(ctx))
+
+    @ovld(priority=HI2)
+    def deserialize(self, t: type[Any @ ModifyContext], obj: Any, ctx: Context):
+        t, mod = ModifyContext.decompose(t)
+        return self.deserialize(t, obj, mod.modify(ctx))
+
+    @ovld(priority=HI2)
+    def schema(self, t: type[Any @ ModifyContext], ctx: Context):
+        t, mod = ModifyContext.decompose(t)
+        return self.schema(t, mod.modify(ctx))

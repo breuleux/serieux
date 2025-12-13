@@ -10,6 +10,7 @@ from typing import Any, Callable
 from ovld.medley import ChainAll, KeepLast, Medley
 
 from .formats.abc import FileFormat
+from .instructions import BaseInstruction
 
 logger = logging.getLogger(__name__)
 
@@ -166,3 +167,17 @@ class Patcher(Trail):
 
 
 empty = EmptyContext()
+
+
+@dataclass(eq=False)
+class ModifyContext(BaseInstruction):
+    add: Context = field(default_factory=EmptyContext)
+    sub: Context = None
+    replace: Context = None
+
+    def modify(self, ctx):
+        if self.replace is not None:
+            ctx = self.replace
+        if self.sub:
+            ctx -= self.sub
+        return ctx + self.add
