@@ -64,6 +64,7 @@ class FileBacked(Generic[T]):
 
     @classmethod
     def serieux_deserialize(cls, obj, ctx, call_next):
+        cls = Partial.strip(cls)
         (vt,) = get_args(cls)
         return cls(
             path=Path(obj),
