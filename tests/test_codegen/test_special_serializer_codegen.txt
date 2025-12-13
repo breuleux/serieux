@@ -1,4 +1,5 @@
 def __GENERATED__(self, t, obj, ctx, /):
-    v_x = method_map[t_int, type(__TMP := obj.x), Context](self, int, __TMP, ctx)
-    v_y = method_map[t_int1, type(__TMP := obj.y), Context](self, int, __TMP, ctx)
-    return {'x': v_x, 'y': v_y}
+    __RET = {}
+    __RET['x'] = method_map[t_int, type(__TMP := obj.x), Context](self, int, __TMP, ctx)
+    __RET['y'] = method_map[t_int1, type(__TMP := obj.y), Context](self, int, __TMP, ctx)
+    return __RET

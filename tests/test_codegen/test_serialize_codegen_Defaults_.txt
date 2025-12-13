@@ -1,5 +1,6 @@
 def __GENERATED__(self, t, obj, ctx, /):
-    v_name = obj.name if type(__TMP := obj.name) is str else serialize(self, str, __TMP, ctx)
-    v_aliases = method_map[t_list, type(__TMP := obj.aliases), Context](self, list1, __TMP, ctx)
-    v_cool = obj.cool if type(__TMP := obj.cool) is bool else serialize(self, bool, __TMP, ctx)
-    return {'name': v_name, 'aliases': v_aliases, 'cool': v_cool}
+    __RET = {}
+    __RET['name'] = obj.name if type(__TMP := obj.name) is str else serialize(self, str, __TMP, ctx)
+    __RET['aliases'] = method_map[t_list, type(__TMP := obj.aliases), Context](self, list1, __TMP, ctx)
+    __RET['cool'] = obj.cool if type(__TMP := obj.cool) is bool else serialize(self, bool, __TMP, ctx)
+    return __RET

@@ -1,3 +1,4 @@
 def __GENERATED__(self, t, obj, ctx, /):
-    v_countries = method_map[t_dict, type(__TMP := obj.countries), Context](self, dict1, __TMP, ctx)
-    return {'countries': v_countries}
+    __RET = {}
+    __RET['countries'] = method_map[t_dict, type(__TMP := obj.countries), Context](self, dict1, __TMP, ctx)
+    return __RET

@@ -1,4 +1,5 @@
 def __GENERATED__(self, t, obj, ctx, /):
-    v_x = obj.x if type(__TMP := obj.x) is int else serialize(self, int, __TMP, ctx)
-    v_y = obj.y if type(__TMP := obj.y) is int else serialize(self, int, __TMP, ctx)
-    return {'x': v_x, 'y': v_y}
+    __RET = {}
+    __RET['x'] = obj.x if type(__TMP := obj.x) is int else serialize(self, int, __TMP, ctx)
+    __RET['y'] = obj.y if type(__TMP := obj.y) is int else serialize(self, int, __TMP, ctx)
+    return __RET

@@ -370,7 +370,7 @@ class BaseImplementation(Medley):
         t = model(orig_t)
         if not t.accepts(obj):
             return None
-        stmts = []
+        stmts = ["__RET = {}"]
         follow = hasattr(ctx, "follow")
         for f in t.fields:
             if f.property_name is None:
@@ -383,22 +383,14 @@ class BaseImplementation(Medley):
                 else Code("$ctx")
             )
             stmt = Code(
-                f"v_{f.name} = $setter",
+                "__RET[$fname] = $setter",
+                fname=f.name,
                 setter=cls.subcode(
                     "serialize", f.type, Code(f"$obj.{f.property_name}"), ctx, ctx_expr=ctx_expr
                 ),
             )
             stmts.append(stmt)
-        final = Code(
-            "return {$[, ]parts}",
-            parts=[
-                Code(
-                    f"$fname: v_{f.name}",
-                    fname=f.serialized_name,
-                )
-                for f in t.fields
-            ],
-        )
+        final = "return __RET"
         stmts.append(final)
         return Def(stmts, VE=ValidationError)
 
