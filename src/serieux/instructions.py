@@ -10,20 +10,13 @@ class InstructionMC(type):
         return Annotated[t, cls]
 
     def decompose(cls, t, all=False):
-        method = cls.extract_all if all else cls.extract
-        return strip(t, cls), method(t)
+        return decompose(cls, t, all=all)
 
     def extract(cls, t):
-        for x in cls.extract_all(t):
-            return x
-        return None
+        return extract(cls, t)
 
     def extract_all(cls, t):
-        if get_origin(t) is not Annotated:
-            return
-        for x in t.__metadata__:
-            if isinstance(x, cls) or x is cls:
-                yield x
+        return extract_all(cls, t)
 
     @property
     def annotation_priority(cls):
@@ -66,6 +59,25 @@ def annotate(cls, annotations):
         return cls
     else:
         return Annotated[(cls, *annotations)]
+
+
+def decompose(cls, t, all=False):
+    method = cls.extract_all if all else cls.extract
+    return strip(t, cls), method(t)
+
+
+def extract(cls, t):
+    for x in extract_all(cls, t):
+        return x
+    return None
+
+
+def extract_all(cls, t):
+    if get_origin(t) is not Annotated:
+        return
+    for x in t.__metadata__:
+        if isinstance(x, cls) or x is cls:
+            yield x
 
 
 def strip(cls, to_remove=None):
