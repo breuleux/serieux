@@ -4,7 +4,7 @@ from typing import Any, Callable, Generic, TypeVar, get_args
 
 from ovld import Medley, ovld
 
-from ..ctx import Context
+from ..ctx import Context, WorkingDirectory
 from ..instructions import BaseInstruction
 from ..priority import HI1, STD
 from ..proxy import ProxyBase
@@ -66,8 +66,12 @@ class FileBacked(Generic[T]):
     def serieux_deserialize(cls, obj, ctx, call_next):
         cls = Partial.strip(cls)
         (vt,) = get_args(cls)
+        if isinstance(ctx, WorkingDirectory):
+            obj = ctx.directory / obj
+        else:
+            obj = Path(obj)
         return cls(
-            path=Path(obj),
+            path=obj,
             value_type=vt,
             serieux=call_next.serieux,
             context=ctx,
