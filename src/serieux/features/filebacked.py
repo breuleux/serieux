@@ -1,3 +1,4 @@
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Generic, TypeVar, get_args
@@ -25,6 +26,8 @@ class FileBacked(Generic[T]):
     value_type: type
     serieux: object
     context: Context
+    timestamp: float = None
+    refresh: bool = False
     default_factory: Callable = None
     value: T = None
 
@@ -34,6 +37,7 @@ class FileBacked(Generic[T]):
         value_type: type,
         serieux: object,
         context: Context,
+        refresh: bool = False,
         default_factory: Callable = None,
     ):
         self.path = path
@@ -42,39 +46,55 @@ class FileBacked(Generic[T]):
         self.value_type = value_type
         self.serieux = serieux
         self.context = context
+        self.refresh = refresh
         self.default_factory = default_factory or (df and df.factory)
-        self.value = None
+        self._value = None
+        self.timestamp = None
         self.load()
+
+    @property
+    def value(self):
+        if self.refresh and self.path.exists():
+            file_mtime = self.path.stat().st_mtime
+            if file_mtime > self.timestamp:
+                self.load()
+        return self._value
 
     def load(self):
         if self.path.exists():
-            self.value = self.serieux.deserialize(self.value_type, self.path, self.context)
+            self._value = self.serieux.deserialize(self.value_type, self.path, self.context)
+            self.timestamp = self.path.stat().st_mtime
         elif self.default_factory:
-            self.value = self.default_factory()
+            self._value = self.default_factory()
+            self.timestamp = time.time()
         else:
             raise FileNotFoundError(self.path)
 
     def save(self):
-        self.serieux.dump(self.value_type, self.value, self.context, dest=self.path)
+        self.serieux.dump(self.value_type, self._value, self.context, dest=self.path)
+        self.timestamp = time.time()
 
     def __str__(self):
-        return f"{self.value}@{self.path}"
+        return f"{self._value}@{self.path}"
 
     __repr__ = __str__
 
     @classmethod
     def serieux_deserialize(cls, obj, ctx, call_next):
         cls = Partial.strip(cls)
+        cls, fopt = FileBackedOptions.decompose(cls)
         (vt,) = get_args(cls)
         if isinstance(ctx, WorkingDirectory):
             obj = ctx.directory / obj
         else:
             obj = Path(obj)
+        extra = vars(fopt) if fopt else {}
         return cls(
             path=obj,
             value_type=vt,
             serieux=call_next.serieux,
             context=ctx,
+            **extra,
         )
 
     @classmethod
@@ -87,8 +107,14 @@ class FileBacked(Generic[T]):
 
 
 @dataclass(frozen=True)
-class FileProxy(BaseInstruction):
+class FileBackedOptions(BaseInstruction):
     default_factory: Callable | None = None
+    refresh: bool = False
+
+
+@dataclass(frozen=True)
+class FileProxy(FileBackedOptions):
+    pass
 
 
 class FileBackedProxy(ProxyBase):
@@ -100,8 +126,9 @@ class FileBackedProxy(ProxyBase):
         "save",
     }
 
-    def __init__(self, *args, **kwargs):
-        self._wrapper = FileBacked(*args, **kwargs)
+    def __init__(self, path, value_type, *args, **kwargs):
+        self._wrapper = FileBacked(path, value_type, *args, **kwargs)
+        self._type = value_type
 
     @property
     def _obj(self):
@@ -137,7 +164,12 @@ class FileBackedFeature(Medley):
         t = Partial.strip(t)
         value_type, fb = FileProxy.decompose(t)
         return FileBackedProxy(
-            Path(obj), value_type, self, ctx, default_factory=fb.default_factory
+            Path(obj),
+            value_type,
+            self,
+            ctx,
+            default_factory=fb.default_factory,
+            refresh=fb.refresh,
         )
 
     @ovld(priority=PRIO)

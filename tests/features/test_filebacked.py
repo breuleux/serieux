@@ -1,3 +1,4 @@
+import time
 from dataclasses import dataclass
 
 import pytest
@@ -7,6 +8,7 @@ from serieux.features.filebacked import (
     DefaultFactory,
     FileBacked,
     FileBackedFeature,
+    FileBackedOptions,
     FileProxy,
 )
 from serieux.tell import tells
@@ -184,3 +186,53 @@ def test_filebacked_schema():
 def test_fileproxy_schema():
     schema = srx.schema(Point @ FileProxy).compile(root=False)
     assert schema == {"type": "string"}
+
+
+def test_filebacked_refresh(tmp_path):
+    point_file = tmp_path / "point.yaml"
+
+    # Write initial point
+    srx.dump(Point, Point(1, 2), dest=point_file)
+
+    # FileBacked should load initial value
+    fb = srx.deserialize(FileBacked[Point], str(point_file))
+    fbr = srx.deserialize(FileBacked[Point] @ FileBackedOptions(refresh=True), str(point_file))
+    assert fb.value == Point(1, 2)
+    assert fbr.value == Point(1, 2)
+
+    # Change the point file after a small delay
+    time.sleep(0.01)
+    srx.dump(Point, Point(9, 10), dest=point_file)
+    assert fb.value == Point(1, 2)
+    assert fbr.value == Point(9, 10)
+
+    # Change the point again
+    time.sleep(0.01)
+    srx.dump(Point, Point(99, -3), dest=point_file)
+    assert fb.value == Point(1, 2)
+    assert fbr.value == Point(99, -3)
+
+
+def test_filebacked_refresh_proxy(tmp_path):
+    point_file = tmp_path / "point.yaml"
+
+    # Write initial point
+    srx.dump(Point, Point(1, 2), dest=point_file)
+
+    # FileBacked should load initial value
+    fb = srx.deserialize(Point @ FileProxy(), str(point_file))
+    fbr = srx.deserialize(Point @ FileProxy(refresh=True), str(point_file))
+    assert fb == Point(1, 2)
+    assert fbr == Point(1, 2)
+
+    # Change the point file after a small delay
+    time.sleep(0.01)
+    srx.dump(Point, Point(9, 10), dest=point_file)
+    assert fb == Point(1, 2)
+    assert fbr == Point(9, 10)
+
+    # Change the point again
+    time.sleep(0.01)
+    srx.dump(Point, Point(99, -3), dest=point_file)
+    assert fb == Point(1, 2)
+    assert fbr == Point(99, -3)
