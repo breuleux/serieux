@@ -84,7 +84,7 @@ class FileBacked(Generic[T]):
         cls = Partial.strip(cls)
         cls, fopt = FileBackedOptions.decompose(cls)
         (vt,) = get_args(cls)
-        if isinstance(ctx, WorkingDirectory):
+        if isinstance(ctx, WorkingDirectory):  # pragma: no cover
             obj = ctx.directory / obj
         else:
             obj = Path(obj)
