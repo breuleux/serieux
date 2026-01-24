@@ -8,15 +8,18 @@ from ovld.dependent import HasKey
 from ..ctx import Context, Sourced, WorkingDirectory
 from ..exc import ValidationError
 from ..formats import FileSource
-from ..priority import HI1, MIN, STD3
+from ..priority import HI1, MIN, STD5
 from ..utils import clsstring
 from .partial import PartialBuilding, Sources
 
 include_field = "$include"
 
 
+PRIO = STD5.next()
+
+
 class FromFile(PartialBuilding):
-    @ovld(priority=STD3)
+    @ovld(priority=PRIO)
     def deserialize(self, t: Any, obj: FileSource, ctx: Context):
         pth = obj.path
         if isinstance(ctx, WorkingDirectory):
@@ -35,7 +38,7 @@ class FromFile(PartialBuilding):
         )
         return recurse(t, data, ctx)
 
-    @ovld(priority=STD3)
+    @ovld(priority=PRIO)
     def deserialize(self, t: Any, obj: Path, ctx: Context):
         return recurse(t, FileSource(obj), ctx)
 

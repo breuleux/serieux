@@ -85,7 +85,7 @@ def strip(cls, to_remove=None):
         if to_remove is None:
             return True
         if isinstance(to_remove, type):
-            return isinstance(a, to_remove)
+            return isinstance(a, to_remove) or (isinstance(a, type) and issubclass(a, to_remove))
         else:
             return a == to_remove
 

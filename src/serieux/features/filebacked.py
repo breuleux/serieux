@@ -6,8 +6,8 @@ from typing import Any, Callable, Generic, TypeVar, get_args
 from ovld import Medley, ovld
 
 from ..ctx import Context, WorkingDirectory
-from ..instructions import BaseInstruction
-from ..priority import HI1, STD
+from ..instructions import BaseInstruction, strip
+from ..priority import HI1
 from ..proxy import ProxyBase
 from ..tell import tells
 from .partial import Partial
@@ -43,6 +43,7 @@ class FileBacked(Generic[T]):
         self.path = path
         value_type, df = DefaultFactory.decompose(value_type)
         value_type = Partial.strip(value_type)
+        value_type = strip(value_type, FileBackedOptions)
         self.value_type = value_type
         self.serieux = serieux
         self.context = context
@@ -78,32 +79,6 @@ class FileBacked(Generic[T]):
         return f"{self._value}@{self.path}"
 
     __repr__ = __str__
-
-    @classmethod
-    def serieux_deserialize(cls, obj, ctx, call_next):
-        cls = Partial.strip(cls)
-        cls, fopt = FileBackedOptions.decompose(cls)
-        (vt,) = get_args(cls)
-        if isinstance(ctx, WorkingDirectory):  # pragma: no cover
-            obj = ctx.directory / obj
-        else:
-            obj = Path(obj)
-        extra = vars(fopt) if fopt else {}
-        return cls(
-            path=obj,
-            value_type=vt,
-            serieux=call_next.serieux,
-            context=ctx,
-            **extra,
-        )
-
-    @classmethod
-    def serieux_serialize(cls, obj, ctx, call_next):
-        return str(obj.path)
-
-    @classmethod
-    def serieux_schema(cls, ctx, call_next):
-        return {"type": "string"}
 
 
 @dataclass(frozen=True)
@@ -150,13 +125,36 @@ class FileBackedProxy(ProxyBase):
     __repr__ = __str__
 
 
-PRIO = STD.next()
+PRIO = HI1.next()
 
 
 class FileBackedFeature(Medley):
     @ovld(priority=PRIO)
+    def serialize(self, t: type[FileBacked], obj: FileBacked, ctx):
+        return str(obj.path)
+
+    @ovld(priority=PRIO)
     def serialize(self, t: type[Any @ FileProxy], obj: FileBackedProxy, ctx: Context):
         return str(obj._wrapper.path)
+
+    @ovld(priority=PRIO)
+    def deserialize(
+        self, t: type[FileBacked] | type[FileBacked @ FileBackedOptions], obj: Path | str, ctx
+    ):
+        cls, fopt = FileBackedOptions.decompose(t)
+        (vt,) = get_args(cls)
+        if isinstance(ctx, WorkingDirectory):  # pragma: no cover
+            obj = ctx.directory / obj
+        else:
+            obj = Path(obj)
+        extra = vars(fopt) if fopt else {}
+        return cls(
+            path=obj,
+            value_type=vt,
+            serieux=self,
+            context=ctx,
+            **extra,
+        )
 
     @ovld(priority=PRIO)
     def deserialize(self, t: type[Any @ FileProxy], obj: str | Path, ctx: Context):
@@ -171,6 +169,10 @@ class FileBackedFeature(Medley):
             default_factory=fb.default_factory,
             refresh=fb.refresh,
         )
+
+    @ovld(priority=PRIO)
+    def schema(self, t: type[FileBacked], ctx):
+        return {"type": "string"}
 
     @ovld(priority=PRIO)
     def schema(self, t: type[Any @ FileProxy], ctx: Context):

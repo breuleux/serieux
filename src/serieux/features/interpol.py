@@ -135,13 +135,13 @@ class Environment(Trail):
 
 
 class Interpolation(Medley):
-    @ovld(priority=HI1(3))
+    @ovld(priority=HI1(3).next())
     def deserialize(self, t: Any, obj: object, ctx: Environment):
         rval = call_next(t, obj, ctx)
         ctx.refs[ctx.trail] = rval
         return rval
 
-    @ovld(priority=HI1(2))
+    @ovld(priority=HI1(2).next())
     def deserialize(self, t: Any, obj: str, ctx: Environment):
         match ctx.interpolation_pattern.split(obj):
             case [s]:
