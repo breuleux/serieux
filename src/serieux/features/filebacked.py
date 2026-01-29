@@ -6,7 +6,7 @@ from typing import Any, Callable, Generic, TypeVar, get_args, get_origin
 from ovld import Medley, ovld
 
 from ..ctx import Context, WorkingDirectory
-from ..instructions import BaseInstruction, strip
+from ..instructions import BaseInstruction
 from ..priority import HI1
 from ..proxy import ProxyBase
 from ..tell import tells
@@ -20,10 +20,6 @@ class DefaultFactory(BaseInstruction):
 
 T = TypeVar("T")
 MISSING = object()
-
-
-def _to_default_factory(t):
-    return get_origin(t) or t
 
 
 class FileBacked(Generic[T]):
@@ -46,16 +42,12 @@ class FileBacked(Generic[T]):
         default_factory: Callable = None,
     ):
         self.path = path
-        value_type, df = DefaultFactory.decompose(value_type)
         value_type = Partial.strip(value_type)
-        value_type = strip(value_type, FileBackedOptions)
         self.value_type = value_type
         self.serieux = serieux
         self.context = context
         self.refresh = refresh
-        self.default_factory = (
-            default_factory or (df and df.factory) or _to_default_factory(value_type)
-        )
+        self.default_factory = default_factory or get_origin(value_type) or value_type
         self._value = None
         self.timestamp = None
         self.load()
@@ -75,7 +67,7 @@ class FileBacked(Generic[T]):
         elif self.default_factory:
             self._value = self.default_factory()
             self.timestamp = time.time()
-        else:
+        else:  # pragma: no cover
             raise FileNotFoundError(self.path)
 
     def save(self, new_value=MISSING):

@@ -5,7 +5,6 @@ import pytest
 
 from serieux import Serieux
 from serieux.features.filebacked import (
-    DefaultFactory,
     FileBacked,
     FileBackedFeature,
     FileBackedOptions,
@@ -66,7 +65,10 @@ def test_filebacked_serialize(tmp_path):
 def test_filebacked_default_factory(tmp_path):
     point_file = tmp_path / "nonexistent.yaml"
 
-    pf = srx.deserialize(FileBacked[Point @ DefaultFactory(lambda: Point(5, 10))], str(point_file))
+    pf = srx.deserialize(
+        FileBacked[Point] @ FileBackedOptions(default_factory=lambda: Point(5, 10)),
+        str(point_file),
+    )
 
     assert pf.value.x == 5
     assert pf.value.y == 10
