@@ -131,6 +131,13 @@ class FileBackedProxy(ProxyBase):
 PRIO = HI1.next()
 
 
+def _to_path(obj, ctx):
+    if isinstance(ctx, WorkingDirectory):  # pragma: no cover
+        return ctx.directory / obj
+    else:
+        return Path(obj)
+
+
 class FileBackedFeature(Medley):
     @ovld(priority=PRIO)
     def serialize(self, t: type[FileBacked], obj: FileBacked, ctx):
@@ -146,13 +153,9 @@ class FileBackedFeature(Medley):
     ):
         cls, fopt = FileBackedOptions.decompose(t)
         (vt,) = get_args(cls)
-        if isinstance(ctx, WorkingDirectory):  # pragma: no cover
-            obj = ctx.directory / obj
-        else:
-            obj = Path(obj)
         extra = vars(fopt) if fopt else {}
         return cls(
-            path=obj,
+            path=_to_path(obj, ctx),
             value_type=vt,
             serieux=self,
             context=ctx,
@@ -165,7 +168,7 @@ class FileBackedFeature(Medley):
         t = Partial.strip(t)
         value_type, fb = FileProxy.decompose(t)
         return FileBackedProxy(
-            Path(obj),
+            _to_path(obj, ctx),
             value_type,
             self,
             ctx,
