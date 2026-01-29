@@ -19,6 +19,7 @@ class DefaultFactory(BaseInstruction):
 
 
 T = TypeVar("T")
+MISSING = object()
 
 
 class FileBacked(Generic[T]):
@@ -71,7 +72,9 @@ class FileBacked(Generic[T]):
         else:
             raise FileNotFoundError(self.path)
 
-    def save(self):
+    def save(self, new_value=MISSING):
+        if new_value is not MISSING:
+            self._value = new_value
         self.serieux.dump(self.value_type, self._value, self.context, dest=self.path)
         self.timestamp = time.time()
 
@@ -116,8 +119,8 @@ class FileBackedProxy(ProxyBase):
     def load(self):
         return self._wrapper.load()
 
-    def save(self):
-        return self._wrapper.save()
+    def save(self, new_value=MISSING):
+        return self._wrapper.save(new_value)
 
     def __str__(self):
         return str(self._wrapper)

@@ -48,6 +48,12 @@ def test_filebacked_deserialize(tmp_path):
     assert reloaded.x == 15
     assert reloaded.y == 25
 
+    pf.save(Point(7, 19))
+
+    reloaded = srx.deserialize(Point, point_file)
+    assert reloaded.x == 7
+    assert reloaded.y == 19
+
 
 def test_filebacked_serialize(tmp_path):
     point_file = tmp_path / "point.yaml"
