@@ -1,7 +1,7 @@
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Generic, TypeVar, get_args
+from typing import Any, Callable, Generic, TypeVar, get_args, get_origin
 
 from ovld import Medley, ovld
 
@@ -20,6 +20,10 @@ class DefaultFactory(BaseInstruction):
 
 T = TypeVar("T")
 MISSING = object()
+
+
+def _to_default_factory(t):
+    return get_origin(t) or t
 
 
 class FileBacked(Generic[T]):
@@ -49,7 +53,9 @@ class FileBacked(Generic[T]):
         self.serieux = serieux
         self.context = context
         self.refresh = refresh
-        self.default_factory = default_factory or (df and df.factory)
+        self.default_factory = (
+            default_factory or (df and df.factory) or _to_default_factory(value_type)
+        )
         self._value = None
         self.timestamp = None
         self.load()

@@ -120,10 +120,17 @@ def test_filebacked_proxy_default_factory(tmp_path):
     assert reloaded.y == 7
 
 
-def test_fileproxy_no_default_raises(tmp_path):
+def test_fileproxy_no_default_good(tmp_path):
     point_file = tmp_path / "missing.yaml"
 
-    with pytest.raises(FileNotFoundError):
+    lp = srx.deserialize(list[Point] @ FileProxy(), str(point_file))
+    assert lp == []
+
+
+def test_fileproxy_no_default_bad(tmp_path):
+    point_file = tmp_path / "missing.yaml"
+
+    with pytest.raises(TypeError, match="missing 2 required positional arguments"):
         srx.deserialize(ConfigNoDefault, {"point": str(point_file)})
 
 
