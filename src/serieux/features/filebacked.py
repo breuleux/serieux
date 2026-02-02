@@ -6,7 +6,7 @@ from typing import Any, Callable, Generic, TypeVar, get_args, get_origin
 from ovld import Medley, ovld
 
 from ..ctx import Context, WorkingDirectory
-from ..instructions import BaseInstruction
+from ..instructions import BaseInstruction, strip
 from ..priority import HI1
 from ..proxy import ProxyBase
 from ..tell import tells
@@ -47,7 +47,8 @@ class FileBacked(Generic[T]):
         self.serieux = serieux
         self.context = context
         self.refresh = refresh
-        self.default_factory = default_factory or get_origin(value_type) or value_type
+        stripped = strip(value_type)
+        self.default_factory = default_factory or get_origin(stripped) or stripped
         self._value = None
         self.timestamp = None
         self.load()
@@ -150,7 +151,7 @@ class FileBackedFeature(Medley):
         self, t: type[FileBacked] | type[FileBacked @ FileBackedOptions], obj: Path | str, ctx
     ):
         cls, fopt = FileBackedOptions.decompose(t)
-        (vt,) = get_args(cls)
+        (vt,) = get_args(strip(cls))
         extra = vars(fopt) if fopt else {}
         return cls(
             path=_to_path(obj, ctx),
