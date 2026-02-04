@@ -8,7 +8,14 @@ from ovld.dependent import Regexp
 from serieux import Serieux
 from serieux.ctx import Context, Trail
 from serieux.exc import BaseSerieuxError, ValidationError
-from serieux.features.partial import NOT_GIVEN, AllTrails, Partial, PartialBuilding, Sources
+from serieux.features.partial import (
+    NOT_GIVEN,
+    AllTrails,
+    Override,
+    Partial,
+    PartialBuilding,
+    Sources,
+)
 
 from ..common import validation_errors
 from ..definitions import Defaults, Elf, Player, Point
@@ -177,9 +184,9 @@ def test_partial_defaults():
 
 @dataclass
 class RGB:
-    red: int
-    green: int
-    blue: int
+    red: int = 0
+    green: int = 0
+    blue: int = 0
 
 
 @Serieux.extend
@@ -208,3 +215,23 @@ def test_merge_partial_with_object():
 
 def test_partial_string_modelizable():
     assert load(Partial[date], "2023-05-15") == date(2023, 5, 15)
+
+
+def test_partial_override():
+    base = {"red": 10, "green": 20, "blue": 30}
+    new = {"red": 100}
+
+    result = load(RGB, Sources(base, new))
+    assert result == RGB(100, 20, 30)
+
+    result = load(RGB, Sources(new, base))
+    assert result == RGB(10, 20, 30)
+
+    result = load(RGB, Sources(base, Override(new)))
+    assert result == RGB(100, 0, 0)
+
+    result = load(RGB, Sources(Override(new), base))
+    assert result == RGB(100, 0, 0)
+
+    result = load(RGB, Sources(Override(new), Override(base)))
+    assert result == RGB(10, 20, 30)

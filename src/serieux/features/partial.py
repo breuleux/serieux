@@ -43,6 +43,11 @@ class AllTrails(Context):
     pass
 
 
+@dataclass
+class Override:
+    value: object
+
+
 class Sources:
     def __init__(self, *sources):
         self.sources = []
@@ -151,6 +156,10 @@ class PartialBuilding(Medley):
         data = obj if isinstance(obj, Sources) else Sources(obj)
         return recurse(t, data, ctx - AllTrails)
 
+    @ovld(priority=HI4.next())
+    def deserialize(self, t: Any, obj: Override, ctx: Context, /):
+        return Override(recurse(Partial.strip(t), obj.value, ctx))
+
 
 @model.register(priority=2)
 def _(p: type[Any @ Partial]):
@@ -200,6 +209,21 @@ def merge(x: NOT_GIVEN_T, y: object):
 @ovld(priority=1)
 def merge(x: NOT_GIVEN_T, y: NOT_GIVEN_T):
     return NOT_GIVEN
+
+
+@ovld(priority=1)
+def merge(x: object, y: Override):
+    return y
+
+
+@ovld(priority=1)
+def merge(x: Override, y: object):
+    return x
+
+
+@ovld(priority=1)
+def merge(x: Override, y: Override):
+    return y
 
 
 @ovld
@@ -335,6 +359,11 @@ def instantiate(x: LazyProxy):
         return rval
 
     return LazyProxy(do, x._type)
+
+
+@ovld
+def instantiate(x: Override):
+    return x.value
 
 
 @ovld
