@@ -148,7 +148,7 @@ class Patcher(Trail):
             patch = Patch(patch, ctx=self)
         elif not patch.ctx:  # pragma: no cover
             patch = replace(patch, ctx=self)
-        if start := (loc := locate(patch.ctx)) and loc.start:
+        if (start := (loc := locate(patch.ctx)) and loc.start) is not None:
             self.patches[start] = patch
 
     def apply_patches(self, file_remap=None):

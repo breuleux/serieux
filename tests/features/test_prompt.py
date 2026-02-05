@@ -86,3 +86,41 @@ def test_prompt_with_patcher(tmp_path):
     # Verify the file was modified
     modified_content = yaml_file.read_text()
     assert modified_content == MODIFIED_YAML
+
+
+TEST_YAML2 = """
+name:
+  $include: "test.txt"
+age: 31
+mad: true
+"""
+
+
+TEST_TXT = """${prompt:}"""
+
+
+def test_patch_txt(tmp_path):
+    from .test_fromfile import deserialize
+
+    # Create a YAML file with a prompt directive
+    yaml_file = tmp_path / "test.yaml"
+    yaml_file.write_text(TEST_YAML2)
+    txt_file = tmp_path / "test.txt"
+    txt_file.write_text(TEST_TXT)
+
+    # Create a prompter that returns fixed values
+    prompter = _prompter({"NAME of the person": "Jane Doe"})
+
+    # Deserialize with Patcher
+    ctx = Promptable(prompt_function=prompter) + Patcher()
+    result = deserialize(Person, yaml_file, ctx)
+
+    # Verify the deserialized result
+    assert result == Person(name="Jane Doe", age=31, mad=True)
+
+    assert txt_file.read_text() == "${prompt:}"
+
+    # Apply patches
+    ctx.apply_patches()
+
+    assert txt_file.read_text() == "Jane Doe"
