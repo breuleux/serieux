@@ -1,2 +1,2 @@
 countries:
-  france: world.yaml@countries.france
+  france: world.yaml:countries.france

@@ -13,6 +13,7 @@ from .features.encrypt import EncryptionKey
 from .features.fromfile import IncludeFile
 from .features.prompt import Promptable
 from .features.registered import Referenced
+from .formats import FileSource
 from .model import field_at
 
 srx = serieux + IncludeFile()
@@ -73,7 +74,7 @@ class FileOperation:
 
     # Input file
     # [alias: -f]
-    file: Path
+    file: FileSource
 
     def load(self, base_ctx=empty):
         ctx = Promptable() + base_ctx

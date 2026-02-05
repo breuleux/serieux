@@ -17,7 +17,7 @@ class FileSource:
 
     @classmethod
     def serieux_from_string(cls, incl):
-        pth, at, fld = incl.partition("@")
+        pth, at, fld = incl.partition(":")
         return cls(Path(pth.strip()), field=fld if at else None)
 
 
