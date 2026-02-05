@@ -96,6 +96,7 @@ class Sourced(WorkingDirectory):
     origin: Path = None
     format: FileFormat = None
     source_trail: tuple = ()
+    inner_trail: tuple = ()
 
     def __post_init__(self):
         if self.directory is None:
@@ -108,7 +109,7 @@ class Sourced(WorkingDirectory):
             if trail[:pfx] != self.source_trail:  # pragma: no cover
                 return None
             trail = trail[pfx:]
-            return self.format.locate(self.origin, trail)
+            return self.format.locate(self.origin, self.inner_trail + trail)
         return None  # pragma: no cover
 
 

@@ -27,14 +27,17 @@ class FromFile(PartialBuilding):
         if not pth.exists():
             raise ValidationError(f"File '{pth.absolute()}' does not exist", ctx=ctx)
         data = obj.format.load(pth)
+        inner_trail = ()
         if obj.field:
-            for f in obj.field.split("."):
+            inner_trail = obj.field.split(".")
+            for f in inner_trail:
                 data = data[f]
         ctx = ctx + Sourced(
             origin=pth,
             directory=pth.parent.absolute(),
             format=obj.format,
             source_trail=getattr(ctx, "trail", ()),
+            inner_trail=tuple(inner_trail),
         )
         return recurse(t, data, ctx)
 
