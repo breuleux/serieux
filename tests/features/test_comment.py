@@ -3,13 +3,14 @@ from typing import Annotated
 
 import pytest
 
-from serieux import Serieux
+from serieux import Serieux, schema
 from serieux.exc import ValidationError
 from serieux.features.comment import (
     Comment,
     CommentedObjects,
     CommentProxy,
     CommentRec,
+    StripComments,
     comment_field,
 )
 from serieux.features.tagset import value_field
@@ -161,3 +162,22 @@ def test_commentrec_serialize():
     deserialized = deserialize(CommentRec[Person, str], expected)
     assert deserialized == person
     assert deserialized.age._ == "v. young"
+
+
+def test_strip_comments_serialize():
+    sc = StripComments()
+    person = Person("David", CommentProxy(40, "v. young"))
+    assert serialize(CommentRec[Person, str], person, sc) == serialize(Person, person, sc)
+
+
+def test_strip_comments_deserialize():
+    sc = StripComments()
+    person = {"name": "David", "age": {value_field: 40, comment_field: "v. young"}}
+    des = deserialize(CommentRec[Person, str], person, sc)
+    assert type(des.age) is int
+
+
+def test_strip_comments_schema():
+    sc = StripComments()
+    assert schema(Comment[Person, str], sc).compile() == schema(Person, sc).compile()
+    assert schema(CommentRec[Person, str], sc).compile() == schema(Person, sc).compile()

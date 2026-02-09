@@ -42,6 +42,10 @@ class CommentRec(Comment):
     inherit: bool = True
 
 
+class StripComments(Context):
+    """Context to ignore the data commenting feature."""
+
+
 ###################
 # Implementations #
 ###################
@@ -52,6 +56,8 @@ class CommentedObjects(Medley):
     def serialize(self, t: type[Any @ Comment], obj: CommentProxy, ctx: Context):
         base, instr = Comment.decompose(t)
         rval = recurse(base, obj._obj, ctx)
+        if isinstance(ctx, StripComments):
+            return rval
         comment = recurse(instr.comment_type, obj._, ctx)
         if not isinstance(rval, dict):
             rval = {value_field: rval}
@@ -61,7 +67,7 @@ class CommentedObjects(Medley):
     @ovld(priority=HI6)
     def serialize(self, t: type[Any @ Comment], obj: object, ctx: Context):
         instr = Comment.extract(t)
-        if instr.required:
+        if instr.required and not isinstance(ctx, StripComments):
             raise ValidationError("Comment is required but object is not a CommentProxy", ctx=ctx)
         return call_next(t, obj, ctx)
 
@@ -83,13 +89,15 @@ class CommentedObjects(Medley):
         if value_field in obj:
             obj = obj.pop(value_field)
         main = recurse(base, obj, ctx)
+        if isinstance(ctx, StripComments):
+            return main
         comment = recurse(instr.comment_type, comment, ctx)
         return CommentProxy(main, comment)
 
     @ovld(priority=HI6)
     def deserialize(self, t: type[Any @ Comment], obj: object, ctx: Context):
         instr = Comment.extract(t)
-        if instr.required:
+        if instr.required and not isinstance(ctx, StripComments):
             raise ValidationError(
                 f"Comment is required but input is not a dictionary with '{comment_field}' field",
                 ctx=ctx,
@@ -100,6 +108,8 @@ class CommentedObjects(Medley):
     def schema(self, t: type[Any @ Comment], ctx: Context):
         base, instr = Comment.decompose(t)
         base_schema = recurse(base, ctx)
+        if isinstance(ctx, StripComments):
+            return base_schema
         comment_schema = recurse(instr.comment_type, ctx)
         if base_schema.get("type", None) == "object":
             return AnnotatedSchema(
