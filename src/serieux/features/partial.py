@@ -127,8 +127,17 @@ def partialize(t: object):
 class PartialBuilding(Medley):
     @ovld(priority=HI4.next())
     def deserialize(self, t: type[Any @ Partial], obj: object, ctx: Context, /):
+        merge_strategy = None
+        if type(obj) is dict:
+            if "$merge" in obj:
+                obj = dict(obj)
+                merge_strategy = obj.pop("$merge")
+
         try:
-            return call_next(t, obj, ctx)
+            value = call_next(t, obj, ctx)
+            if merge_strategy is not None:
+                value._serieux_merge_strategy = merge_strategy
+            return value
         except BaseSerieuxError as exc:
             return exc
         except Exception as exc:
@@ -171,44 +180,57 @@ def _(p: type[Any @ Partial]):
 ######################
 
 
-@ovld(priority=2)
+@ovld(priority=4)
 def merge(x: object, y: NotGivenError):
     return x
 
 
-@ovld(priority=2)
+@ovld(priority=4)
 def merge(x: NotGivenError, y: object):  # pragma: no cover
     return y
 
 
-@ovld(priority=2)
+@ovld(priority=4)
 def merge(x: object, y: BaseSerieuxError):
     return y
 
 
-@ovld(priority=2)
+@ovld(priority=4)
 def merge(x: BaseSerieuxError, y: object):
     return x
 
 
-@ovld(priority=3)
+@ovld(priority=5)
 def merge(x: BaseSerieuxError, y: BaseSerieuxError):
     return SerieuxExceptionGroup("Some errors occurred", [x, y])
 
 
-@ovld(priority=1)
+@ovld(priority=3)
 def merge(x: object, y: NOT_GIVEN_T):
     return x
 
 
-@ovld(priority=1)
+@ovld(priority=3)
 def merge(x: NOT_GIVEN_T, y: object):
     return y
 
 
-@ovld(priority=1)
+@ovld(priority=3)
 def merge(x: NOT_GIVEN_T, y: NOT_GIVEN_T):
     return NOT_GIVEN
+
+
+@ovld(priority=2)
+def merge(x: object, y: object):
+    xms = getattr(x, "_serieux_merge_strategy", None)
+    yms = getattr(y, "_serieux_merge_strategy", None)
+    match xms or yms:
+        case None:
+            return call_next(x, y)
+        case "override":
+            return y
+        case _:  # pragma: no cover
+            return call_next(x, y)
 
 
 @ovld(priority=1)

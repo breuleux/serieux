@@ -235,3 +235,19 @@ def test_partial_override():
 
     result = load(RGB, Sources(Override(new), Override(base)))
     assert result == RGB(10, 20, 30)
+
+
+def test_merge_override():
+    base = {"red": 10, "green": 20, "blue": 30}
+    new = {"$merge": "override", "red": 100}
+
+    result = load(RGB, Sources(base, new))
+    assert result == RGB(100, 0, 0)
+
+
+def test_merge_override_left():
+    base = {"$merge": "override", "red": 10, "green": 20, "blue": 30}
+    new = {"red": 100}
+
+    result = load(RGB, Sources(base, new))
+    assert result == RGB(100, 0, 0)
