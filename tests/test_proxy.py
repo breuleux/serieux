@@ -47,6 +47,11 @@ def test_lazy_comparisons():
     assert lazy_value >= 42
 
 
+def test_lazy_misc():
+    laz = LazyProxy(lambda: 37.5)
+    assert f"{laz:.3f}" == "37.500"
+
+
 def test_lazy_list():
     lazy_list = LazyProxy(lambda: [1, 2, 3])
 

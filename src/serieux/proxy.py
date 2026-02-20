@@ -109,6 +109,9 @@ class ProxyBase:
     def __abs__(self):
         return abs(self._obj)
 
+    def __format__(self, fmt):
+        return format(self._obj, fmt)
+
     def __call__(self, *args, **kwargs):
         return self._obj(*args, **kwargs)
 
