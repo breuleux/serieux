@@ -255,7 +255,7 @@ def decompose(annt):
 
 
 class TagSetFeature(Medley):
-    @ovld(priority=10)
+    @ovld(priority=HI2.next())
     def serialize(self, t: type[Any @ TagSet], obj: object, ctx: Context, /):
         base, ts = decompose(t)
         if base is not Any and not isinstance(obj, base):
