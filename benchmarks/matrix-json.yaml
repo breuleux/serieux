@@ -1,4 +1,4 @@
-adapters: matrix.yaml@adapters
+adapters: matrix.yaml:adapters
 
 data:
   roboland: benchmarks.data.world:roboland

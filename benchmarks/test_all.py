@@ -22,9 +22,9 @@ def bench(path):
 def test_serialize(case, benchmark):
     case.xfail_guard()
     data_ser = serialize(case.data)
-    fn = case.adapter.deserializer_for_type(type(case.data))
-    result = benchmark(fn, data_ser)
-    assert result == case.data
+    fn = case.adapter.serializer_for_type(type(case.data))
+    result = benchmark(fn, case.data)
+    assert result == data_ser
 
 
 @bench(here / "matrix-json.yaml")
