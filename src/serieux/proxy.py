@@ -16,6 +16,11 @@ class ProxyBase:
             return object.__setattr__(self, name, value)
         return setattr(self._obj, name, value)
 
+    def __delattr__(self, name):
+        if name in type(self).__special_attributes__:
+            return object.__delattr__(self, name)
+        return delattr(self._obj, name)
+
     def __str__(self):
         return str(self._obj)
 
@@ -49,6 +54,12 @@ class ProxyBase:
     def __getitem__(self, key):
         return self._obj[key]
 
+    def __setitem__(self, key, value):
+        self._obj[key] = value
+
+    def __delitem__(self, key):
+        del self._obj[key]
+
     def __iter__(self):
         return iter(self._obj)
 
@@ -57,6 +68,42 @@ class ProxyBase:
 
     def __contains__(self, item):
         return item in self._obj
+
+    def __reversed__(self):
+        return reversed(self._obj)
+
+    def __index__(self):
+        return self._obj.__index__()
+
+    def __enter__(self):
+        return self._obj.__enter__()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return self._obj.__exit__(exc_type, exc_val, exc_tb)
+
+    def __int__(self):
+        return int(self._obj)
+
+    def __float__(self):
+        return float(self._obj)
+
+    def __complex__(self):
+        return complex(self._obj)
+
+    def __round__(self, ndigits=None):
+        return round(self._obj, ndigits) if ndigits is not None else round(self._obj)
+
+    def __trunc__(self):
+        return self._obj.__trunc__()
+
+    def __floor__(self):
+        return self._obj.__floor__()
+
+    def __ceil__(self):
+        return self._obj.__ceil__()
+
+    def __bytes__(self):
+        return bytes(self._obj)
 
     def __add__(self, other):
         return self._obj + other
@@ -100,6 +147,51 @@ class ProxyBase:
     def __rpow__(self, other):
         return other**self._obj
 
+    def __divmod__(self, other):
+        return divmod(self._obj, other)
+
+    def __rdivmod__(self, other):
+        return divmod(other, self._obj)
+
+    def __matmul__(self, other):
+        return self._obj @ other
+
+    def __rmatmul__(self, other):
+        return other @ self._obj
+
+    def __lshift__(self, other):
+        return self._obj << other
+
+    def __rshift__(self, other):
+        return self._obj >> other
+
+    def __and__(self, other):
+        return self._obj & other
+
+    def __or__(self, other):
+        return self._obj | other
+
+    def __xor__(self, other):
+        return self._obj ^ other
+
+    def __rlshift__(self, other):
+        return other << self._obj
+
+    def __rrshift__(self, other):
+        return other >> self._obj
+
+    def __rand__(self, other):
+        return other & self._obj
+
+    def __ror__(self, other):
+        return other | self._obj
+
+    def __rxor__(self, other):
+        return other ^ self._obj
+
+    def __invert__(self):
+        return ~self._obj
+
     def __neg__(self):
         return -self._obj
 
@@ -114,6 +206,16 @@ class ProxyBase:
 
     def __call__(self, *args, **kwargs):
         return self._obj(*args, **kwargs)
+
+    def __copy__(self):
+        import copy
+
+        return copy.copy(self._obj)
+
+    def __deepcopy__(self, memo):
+        import copy
+
+        return copy.deepcopy(self._obj, memo)
 
 
 class LazyProxy(ProxyBase):
