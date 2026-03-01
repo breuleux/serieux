@@ -44,6 +44,10 @@ from .utils import (
 )
 
 
+def _noop(*args, **kwargs):  # pragma: no cover
+    return None
+
+
 class BaseImplementation(Medley):
     validate_serialize: CodegenParameter[bool] = True
     validate_deserialize: CodegenParameter[bool] = True
@@ -406,12 +410,14 @@ class BaseImplementation(Medley):
 
     @code_generator(priority=STD)
     def deserialize(cls, t: type[FieldModelizable], obj: dict, ctx: Context, /):
+        full_t = t
         (orig_t,) = get_args(t)
         t = model(orig_t)
-        forbid_extras = not t.allow_extras
+        extra_proc = cls.process_extra_fields.__ovld__.resolve(full_t, dict, ctx)
+        check_extras = extra_proc is not _noop
         follow = hasattr(ctx, "follow")
         stmts = []
-        if forbid_extras:
+        if check_extras:
             stmts.append(f"used = {sum(1 for f in t.fields if f.required)}")
         args = []
 
@@ -448,12 +454,12 @@ class BaseImplementation(Medley):
             ]
 
             if f.default is not MISSING:
-                if forbid_extras:
+                if check_extras:
                     try_stmts.append("used += 1")
                 exc_stmts = [Code(f"v_{n} = $dflt", dflt=f.default)]
 
             elif f.default_factory is not MISSING:
-                if forbid_extras:
+                if check_extras:
                     try_stmts.append("used += 1")
                 exc_stmts = [Code(f"v_{n} = $dflt()", dflt=f.default_factory)]
 
@@ -477,18 +483,14 @@ class BaseImplementation(Medley):
                 arg = f"v_{f.name}"
             args.append(arg)
 
-        if forbid_extras:
+        if check_extras:
             stmts.append(
                 Code(
                     [
                         "if used != len($obj):",
-                        [
-                            "raise $UFE($t, $expected, $obj.keys(), ctx=$ctx)",
-                        ],
+                        ["$process_extra_fields(self, $t, $obj, $ctx)"],
                     ],
-                    UFE=UnrecognizedFieldError,
-                    tn=clsstring(t),
-                    expected={f.serialized_name for f in t.fields},
+                    process_extra_fields=extra_proc,
                 )
             )
 
@@ -861,3 +863,22 @@ class BaseImplementation(Medley):
     def schema(self, t: type[Any @ ModifyContext], ctx: Context):
         t, mod = ModifyContext.decompose(t)
         return self.schema(t, mod.modify(ctx))
+
+    ##########
+    # Others #
+    ##########
+
+    @code_generator(priority=LOW)
+    def process_extra_fields(self, t: type[Any], obj: dict, ctx: Context):
+        (t,) = get_args(t)
+        mt = model(t)
+        if mt and not mt.allow_extras:
+
+            def default_process_extra_fields(self, t, obj, ctx):
+                raise UnrecognizedFieldError(t, expected, obj.keys(), ctx=ctx)
+
+            expected = {f.serialized_name for f in mt.fields}
+            return default_process_extra_fields
+
+        else:
+            return _noop

@@ -7,5 +7,5 @@ def __GENERATED__(self, t, obj, ctx, /):
     else:
         v_countries = method_map[t_dict, type(x_countries), Context](self, dict1, x_countries, ctx)
     if used != len(obj):
-        raise UnrecognizedFieldError(t, expected, obj.keys(), ctx=ctx)
+        default_process_extra_fields(self, t, obj, ctx)
     return World(v_countries)

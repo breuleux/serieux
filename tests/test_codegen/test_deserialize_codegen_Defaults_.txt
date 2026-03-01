@@ -21,5 +21,5 @@ def __GENERATED__(self, t, obj, ctx, /):
     else:
         v_cool = x_cool if type(x_cool) is bool else deserialize(self, bool, x_cool, ctx)
     if used != len(obj):
-        raise UnrecognizedFieldError(t, expected, obj.keys(), ctx=ctx)
+        default_process_extra_fields(self, t, obj, ctx)
     return Defaults(v_name, v_aliases, cool=v_cool)
