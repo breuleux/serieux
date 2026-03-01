@@ -18,7 +18,7 @@ from ovld import Dataclass, Lambda, call_next, class_check, ovld, recurse, subcl
 
 from .docstrings import VariableDoc, get_attribute_docstrings
 from .exc import ValidationError
-from .instructions import Instruction, T, inherit, strip
+from .instructions import Instruction, T, inherit, pushdown, strip
 from .utils import UnionAlias, clsstring, evaluate_hint
 
 UNDEFINED = object()
@@ -255,7 +255,7 @@ def model(t: type[Annotated]):
     if t is Annotated:  # pragma: no cover
         # This is hit in Python <= 3.12
         return None
-    m = recurse(strip(t))
+    m = recurse(pushdown(t))
     if m and m.fields is not None:
         return Model(
             original_type=m.original_type,

@@ -164,6 +164,24 @@ def test_commentrec_serialize():
     assert deserialized.age._ == "v. young"
 
 
+def test_commentrec_list():
+    david = Person("David", CommentProxy(40, "v. young"))
+    helen = Person("Helen", CommentProxy(80, "v. old"))
+    people = [david, helen]
+
+    serialized = serialize(CommentRec[list[Person], str], people)
+    expected = [
+        {"name": "David", "age": {value_field: 40, comment_field: "v. young"}},
+        {"name": "Helen", "age": {value_field: 80, comment_field: "v. old"}},
+    ]
+    assert serialized == expected
+
+    deserialized = deserialize(CommentRec[list[Person], str], expected)
+    assert deserialized == people
+    assert deserialized[0].age._ == "v. young"
+    assert deserialized[1].age._ == "v. old"
+
+
 def test_strip_comments_serialize():
     sc = StripComments()
     person = Person("David", CommentProxy(40, "v. young"))
