@@ -21,20 +21,13 @@ PRIO = STD5.next()
 class FromFile(PartialBuilding):
     @ovld(priority=PRIO)
     def deserialize(self, t: Any, obj: FileSource, ctx: Context):
-        pth = obj.path
         if isinstance(ctx, WorkingDirectory):
-            pth = ctx.directory / pth.expanduser()
-        if not pth.exists():
-            raise ValidationError(f"File '{pth.absolute()}' does not exist", ctx=ctx)
-        data = obj.format.load(pth)
-        inner_trail = ()
-        if obj.field:
-            inner_trail = obj.field.split(".")
-            for f in inner_trail:
-                data = data[f]
+            obj = replace(obj, path=ctx.directory / obj.path.expanduser())
+        inner_trail = obj.field.split(".") if obj.field else ()
+        data = obj.load()
         ctx = ctx + Sourced(
-            origin=pth,
-            directory=pth.parent.absolute(),
+            origin=obj.path,
+            directory=obj.path.parent.absolute(),
             format=obj.format,
             source_trail=getattr(ctx, "trail", ()),
             inner_trail=tuple(inner_trail),

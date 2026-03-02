@@ -15,6 +15,17 @@ class FileSource:
         if not isinstance(self.format, FileFormat):
             self.format = find(self.path, suffix=self.format)
 
+    def load(self):
+        if not self.path.exists():
+            from ..exc import ValidationError
+
+            raise ValidationError(f"File '{self.path.absolute()}' does not exist")
+        data = self.format.load(self.path)
+        if self.field:
+            for f in self.field.split("."):
+                data = data[f]
+        return data
+
     @classmethod
     def serieux_from_string(cls, incl):
         pth, at, fld = incl.partition(":")
