@@ -18,6 +18,7 @@ from ovld import (
     code_generator,
     ovld,
     recurse,
+    subclasscheck,
 )
 from ovld.codegen import Function
 from ovld.medley import KeepLast, use_combiner
@@ -875,7 +876,25 @@ class BaseImplementation(Medley):
         if mt and not mt.allow_extras:
 
             def default_process_extra_fields(self, t, obj, ctx):
-                raise UnrecognizedFieldError(t, expected, obj.keys(), ctx=ctx)
+                from .features.tagset import tag_field
+
+                error = UnrecognizedFieldError(t, expected, obj.keys(), ctx=ctx)
+                if error.unrecognized == {tag_field}:
+                    import sys
+
+                    item = obj[tag_field]
+                    mod_name, _, class_name = item.partition(":")
+                    mod = sys.modules.get(mod_name, None)
+                    declared = mod and getattr(mod, class_name, None)
+                    if not declared or not subclasscheck(t, declared):
+                        import warnings
+
+                        warnings.warn(
+                            f"The type declared in the configuration, '{clsstring(declared) if declared else item}', does not match the expected type '{clsstring(t)}'.",
+                            UserWarning,
+                        )
+                    return
+                raise error
 
             expected = {f.serialized_name for f in mt.fields}
             return default_process_extra_fields

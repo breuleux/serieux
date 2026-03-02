@@ -1,4 +1,5 @@
 import sys
+import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -253,6 +254,20 @@ def test_deserialize_extra_fields_not_allowed():
 def test_deserialize_extra_fields_allowed():
     data = {"x": 1, "y": 2, "poop": 123}
     assert deserialize(AllowExtras[Point], data) == Point(1, 2)
+
+
+def test_deserialize_extra_fields_tag_field():
+    data = {"x": 1, "y": 2, "$class": "tests.definitions:Point"}
+    assert deserialize(Point, data) == Point(1, 2)
+
+
+def test_deserialize_extra_fields_tag_field_inconsistent():
+    for kls in ["pifPof", "pif:Pof", "tests.definitions:Elf"]:
+        data = {"x": 1, "y": 2, "$class": kls}
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            assert deserialize(Point, data) == Point(1, 2)
+            assert any("does not match the expected type" in str(warning.message) for warning in w)
 
 
 def test_deserialize_extra_fields_allowed_in_config():
