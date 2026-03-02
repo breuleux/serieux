@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from . import CommandLineArguments, TaggedUnion, deserialize, schema, serieux
+from . import CommandLineArguments, TaggedSubclass, TaggedUnion, deserialize, schema, serieux
 from .auto import Auto
 from .ctx import Patcher, empty
 from .features.encrypt import EncryptionKey
@@ -64,17 +64,17 @@ def enter_password():  # pragma: no cover
 
 @dataclass(kw_only=True)
 class FileOperation:
+    # Input file
+    # [positional]
+    file: FileSource
+
     # A module:symbol reference for the schema
     # [alias: -m]
-    model: Referenced[Any]
+    model: Referenced[Any] = TaggedSubclass[Any]
 
     # Encryption password
     # [alias: -p]
     password: str = None
-
-    # Input file
-    # [alias: -f]
-    file: FileSource
 
     def load(self, base_ctx=empty):
         ctx = Promptable() + base_ctx
