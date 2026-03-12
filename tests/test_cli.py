@@ -13,6 +13,7 @@ from serieux.__main__ import (
     value_at,
 )
 from serieux.features.encrypt import crypt_prefix
+from serieux.formats import FileSource
 from tests.definitions import Pig, Point, World
 from tests.features.test_encrypt import User
 
@@ -42,7 +43,7 @@ def test_model_at():
 def test_dump_command(capsys, datapath, file_regression):
     dumper = Dump(
         model=World,
-        file=datapath / "world.yaml",
+        file=FileSource(datapath / "world.yaml"),
         format="yaml",
         password="NOT_USED",
     )
@@ -55,7 +56,7 @@ def test_dump_command_out(tmp_path, datapath, file_regression):
     out_file = tmp_path / "dump.yaml"
     dumper = Dump(
         model=World,
-        file=datapath / "world.yaml",
+        file=FileSource(datapath / "world.yaml"),
         format="yaml",
         password="NOT_USED",
         out=out_file,
@@ -70,7 +71,7 @@ def test_dump_command_encrypted(tmp_path, datapath):
     out_file = tmp_path / "dump.yaml"
     dumper = Dump(
         model=list[User],
-        file=datapath / "users-encrypted.yaml",
+        file=FileSource(datapath / "users-encrypted.yaml"),
         format="yaml",
         password="gaga",
         out=out_file,
@@ -87,7 +88,7 @@ def test_dump_command_encrypted_env_password(tmp_path, datapath, monkeypatch):
     monkeypatch.setenv("SERIEUX_PASSWORD", "gaga")
     dumper = Dump(
         model=list[User],
-        file=datapath / "users-encrypted.yaml",
+        file=FileSource(datapath / "users-encrypted.yaml"),
         format="yaml",
         out=out_file,
     )
@@ -101,7 +102,7 @@ def test_dump_command_encrypted_env_password(tmp_path, datapath, monkeypatch):
 def test_dump_command_wrong_password(datapath):
     dumper = Dump(
         model=list[User],
-        file=datapath / "users-encrypted.yaml",
+        file=FileSource(datapath / "users-encrypted.yaml"),
         format="yaml",
         password="WRONG",
     )
@@ -113,7 +114,7 @@ def test_check_command(datapath):
     for sel, code in [("weight", 0), ("beautiful", 1), ("inexistent", 2)]:
         checker = Check(
             model=Pig,
-            file=datapath / "beastfly.yaml",
+            file=FileSource(datapath / "beastfly.yaml"),
             select=sel,
             password="NOT_USED",
         )
@@ -143,7 +144,7 @@ def test_patch_command(tmp_path, datapath):
     out_file = tmp_path / "encrypted.yaml"
     patcher = Patch(
         model=list[User],
-        file=datapath / "users.yaml",
+        file=FileSource(datapath / "users.yaml"),
         password="gaga",
         out=out_file,
     )
@@ -170,7 +171,7 @@ def test_patch_command_inplace(tmp_path, datapath):
 
     patcher = Patch(
         model=list[User],
-        file=out_file,
+        file=FileSource(out_file),
         password="gaga",
         out=out_file,
     )

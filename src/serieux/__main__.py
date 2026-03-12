@@ -151,7 +151,7 @@ class Patch(FileOperation):
     def __call__(self):
         patcher = Patcher()
         self.load(base_ctx=patcher)
-        remap = {self.file: self.out} if self.out else None
+        remap = {self.file.path: self.out} if self.out else None
         patcher.apply_patches(file_remap=remap)
 
         if patcher.patches:
