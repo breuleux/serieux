@@ -79,9 +79,14 @@ def linearize(ft: type[UnionAlias], owner: type, fld: Field, path: str):
                 options[tag] = recurse(cls, path)
         return [LinearTagged(owner=owner, field=fld, path=path, options=options)]
 
-    # Optional[FieldModelizable] → flatten transparently
-    if len(non_none) == 1 and issubclass(non_none[0], FieldModelizable):
-        return recurse(non_none[0], path)
+    # Optional[T] with a single non-None member
+    if len(non_none) == 1:
+        inner = non_none[0]
+        # Pure struct (not string-serializable) → flatten transparently
+        if issubclass(inner, FieldModelizable) and not issubclass(inner, StringModelizable):
+            return recurse(inner, path)
+        # Leaf (StringModelizable, primitive, etc.) → dispatch through 4-arg form
+        return recurse(inner, owner, fld, path)
 
     # Plain union → LinearChoice, one list per member
     options = [recurse(a, owner, fld, path) for a in non_none]
