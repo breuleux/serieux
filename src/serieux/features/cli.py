@@ -94,10 +94,21 @@ class CliField(CliBase):
     negation_strings: list[str] = field(default_factory=list)  # --no-X for bool fields
 
 
+@dataclass
+class CliGroup:
+    """Compiled CLI items for one branch of a tagged union, with its associated type."""
+    type: type
+    items: list[CliBase]
+
+    @property
+    def description(self) -> str | None:
+        return getattr(self.type, "__doc__", None)
+
+
 @dataclass(kw_only=True)
 class CliTagged(CliBase):
     """A tagged-union selector."""
-    tag_options: dict[str, list[CliBase]]  # tag → pre-compiled branch items
+    tag_options: dict[str, CliGroup]  # tag → pre-compiled branch group
 
 
 @dataclass(kw_only=True)
@@ -188,7 +199,7 @@ def _to_cli(item: LinearField, short_counts: dict) -> CliBase:
 def _to_cli(item: LinearTagged, short_counts: dict) -> CliBase:
     pos = _is_positional(item)
     mv = "{" + ",".join(item.options.keys()) + "}"
-    tag_opts = {tag: compile_cli(branch) for tag, branch in item.options.items()}
+    tag_opts = {tag: CliGroup(type=group.type, items=compile_cli(group.items)) for tag, group in item.options.items()}
 
     if pos:
         return CliTagged(
@@ -323,9 +334,12 @@ def _help_lines(items: list[CliBase], color: bool, indent: int = 0, col_width: i
         lines.append(f"{pad}{sig}{' ' * max(1, col_width - raw_len)}{desc_str}")
 
         if isinstance(cli, CliTagged):
-            for tag, branch_items in cli.tag_options.items():
-                lines.append(f"{pad}  {_c(_YL, tag + ':', color)}")
-                lines += _help_lines(branch_items, color, indent + 2, col_width)
+            for tag, group in cli.tag_options.items():
+                tag_desc = (group.description or "").strip()
+                tag_label = _c(_YL, tag + ":", color)
+                desc_part = f"  {tag_desc}" if tag_desc else ""
+                lines.append(f"{pad}  {tag_label}{desc_part}")
+                lines += _help_lines(group.items, color, indent + 2, col_width)
 
     return lines
 
@@ -433,6 +447,7 @@ class ChoiceState:
 
 
 def _parse(root_type: type, argv: list[str], description: str = None) -> dict:
+    description = description or getattr(root_type, "__doc__", None)
     cli_items = compile_cli(linearize(root_type))
 
     options: dict[str, CliBase] = {}
@@ -482,7 +497,7 @@ def _parse(root_type: type, argv: list[str], description: str = None) -> dict:
         if tagged in active:
             active.remove(tagged)
         # Register branch items with priority (they override any existing short names).
-        for cli in tagged.tag_options[tag]:
+        for cli in tagged.tag_options[tag].items:
             if cli.positional:
                 pos_queue.insert(0, cli)
             else:

@@ -120,13 +120,13 @@ def test_tagged_union_options():
     items = linearize(Pet)
     t = next(i for i in items if isinstance(i, LinearTagged))
 
-    cat_items = t.options["cat"]
+    cat_items = t.options["cat"].items
     assert len(cat_items) == 1
     assert isinstance(cat_items[0], LinearField)
     assert cat_items[0].path == "animal.indoor"
     assert cat_items[0].type is bool
 
-    dog_items = t.options["dog"]
+    dog_items = t.options["dog"].items
     assert len(dog_items) == 1
     assert dog_items[0].path == "animal.breed"
     assert dog_items[0].type is str
@@ -210,8 +210,8 @@ def test_direct_tagset():
     t = tagged[0]
     assert t.path == "vehicle"
     assert set(t.options.keys()) == {"car", "bike"}
-    assert t.options["car"][0].path == "vehicle.horsepower"
-    assert t.options["bike"][0].path == "vehicle.gears"
+    assert t.options["car"].items[0].path == "vehicle.horsepower"
+    assert t.options["bike"].items[0].path == "vehicle.gears"
 
 
 # ── Enum is a leaf ───────────────────────────────────────────────────────────

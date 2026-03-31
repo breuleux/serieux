@@ -22,6 +22,14 @@ serieux = (Serieux + FromArguments)()
 deserialize = serieux.deserialize
 
 
+def check(command, expected, interface=None):
+    if interface is None:
+        interface = type(expected)
+    args = command.split()
+    got = deserialize(interface, CommandLineArguments(args))
+    assert got == expected
+
+
 # ── fixture types ─────────────────────────────────────────────────────────────
 
 
@@ -89,69 +97,40 @@ class WithBool:
 
 
 def test_flat():
-    result = parse_cli(Person, ["--name", "Alice", "--age", "30"])
-    assert result == {"name": "Alice", "age": 30}
+    check("--name Alice --age 30", Person(name="Alice", age=30))
 
 
 def test_flat_via_deserialize():
-    result = deserialize(Person, CommandLineArguments(["--name", "Bob", "--age", "25"]))
-    assert result == Person(name="Bob", age=25)
+    check("--name Bob --age 25", Person(name="Bob", age=25))
 
 
 # ── nested flatten ────────────────────────────────────────────────────────────
 
 
 def test_nested_full_path():
-    result = parse_cli(
-        Employee,
-        [
-            "--person.name",
-            "Alice",
-            "--person.age",
-            "40",
-            "--address.street",
-            "Main St",
-            "--address.city",
-            "Paris",
-        ],
+    check(
+        "--person.name Alice --person.age 40 --address.street MainSt --address.city Paris",
+        Employee(Person("Alice", 40), Address("MainSt", "Paris")),
     )
-    assert result == {
-        "person": {"name": "Alice", "age": 40},
-        "address": {"street": "Main St", "city": "Paris"},
-    }
 
 
 def test_nested_short_name_conflict():
-    # Both person.name and... well, Employee has no top-level 'name', no conflict.
-    # street and city are unambiguous short names.
-    result = parse_cli(
-        Employee,
-        [
-            "--person.name",
-            "Alice",
-            "--age",
-            "40",
-            "--street",
-            "Main St",
-            "--city",
-            "Paris",
-        ],
+    # street and city are unambiguous short names; person.age is unambiguous as --age.
+    check(
+        "--person.name Alice --age 40 --street MainSt --city Paris",
+        Employee(Person("Alice", 40), Address("MainSt", "Paris")),
     )
-    assert result["person"]["name"] == "Alice"
-    assert result["address"]["city"] == "Paris"
 
 
 # ── tagged union (option-style) ───────────────────────────────────────────────
 
 
 def test_tagged_option():
-    result = parse_cli(Pet, ["--animal", "cat", "--indoor", "--name", "Whiskers"])
-    assert result == {"animal": {"$class": "cat", "indoor": True}, "name": "Whiskers"}
+    check("--animal cat --indoor --name Whiskers", Pet(Cat(indoor=True), "Whiskers"))
 
 
 def test_tagged_option_dog():
-    result = parse_cli(Pet, ["--animal", "dog", "--breed", "Labrador", "--name", "Rex"])
-    assert result == {"animal": {"$class": "dog", "breed": "Labrador"}, "name": "Rex"}
+    check("--animal dog --breed Labrador --name Rex", Pet(Dog("Labrador"), "Rex"))
 
 
 def test_tagged_unknown_tag():
@@ -163,13 +142,11 @@ def test_tagged_unknown_tag():
 
 
 def test_tagged_positional():
-    result = parse_cli(Command, ["cat", "--indoor", "--owner", "Alice"])
-    assert result == {"subcommand": {"$class": "cat", "indoor": True}, "owner": "Alice"}
+    check("cat --indoor --owner Alice", Command(Cat(indoor=True), "Alice"))
 
 
 def test_tagged_positional_dog():
-    result = parse_cli(Command, ["dog", "--breed", "Poodle", "--owner", "Bob"])
-    assert result == {"subcommand": {"$class": "dog", "breed": "Poodle"}, "owner": "Bob"}
+    check("dog --breed Poodle --owner Bob", Command(Dog("Poodle"), "Bob"))
 
 
 # ── name conflict: priority after LinearTagged ────────────────────────────────
@@ -195,8 +172,7 @@ class Contest:
 def test_tagged_name_priority():
     # Before tag selection, 'name' is ambiguous (alpha.name vs beta.name).
     # After 'alpha' is selected, 'name' maps unambiguously to alpha.name.
-    result = parse_cli(Contest, ["--entry", "alpha", "--name", "Alice", "--score", "10"])
-    assert result == {"entry": {"$class": "alpha", "name": "Alice", "score": 10}}
+    check("--entry alpha --name Alice --score 10", Contest(Alpha("Alice", 10)))
 
 
 # ── single-letter options use one dash ───────────────────────────────────────
@@ -210,27 +186,21 @@ class Flags:
 
 
 def test_single_letter_option():
-    result = parse_cli(Flags, ["-x", "1.5", "-y", "2.5"])
-    assert result == {"x": 1.5, "y": 2.5}
+    check("-x 1.5 -y 2.5", Flags(x=1.5, y=2.5))
 
 
 def test_single_letter_mixed_with_long():
-    result = parse_cli(Flags, ["-x", "3.0", "-y", "4.0", "--verbose"])
-    assert result["x"] == 3.0
-    assert result["verbose"] is True
+    check("-x 3.0 -y 4.0 --verbose", Flags(x=3.0, y=4.0, verbose=True))
 
 
 def test_compact_bool_flags():
-    # -vv treated as two bool flags chained (if v were bool twice — use verbose here as single)
-    # More realistic: a type with two bool flags
     @dataclass
     class Multi:
         a: bool = False
         b: bool = False
         n: str = ""
 
-    result = parse_cli(Multi, ["-ab"])
-    assert result == {"a": True, "b": True}
+    check("-ab", Multi(a=True, b=True))
 
 
 def test_compact_bool_then_value():
@@ -239,26 +209,22 @@ def test_compact_bool_then_value():
         v: bool = False
         o: str = ""
 
-    result = parse_cli(Multi, ["-vo", "out.txt"])
-    assert result == {"v": True, "o": "out.txt"}
+    check("-vo out.txt", Multi(v=True, o="out.txt"))
 
 
 def test_compact_value_inline():
-    # -oout.txt: -o is non-bool, so "out.txt" is its value
     @dataclass
     class Multi:
         o: str = ""
 
-    result = parse_cli(Multi, ["-oout.txt"])
-    assert result == {"o": "out.txt"}
+    check("-oout.txt", Multi(o="out.txt"))
 
 
 # ── positional field ──────────────────────────────────────────────────────────
 
 
 def test_positional_field():
-    result = parse_cli(Word, ["hello"])
-    assert result == {"word": "hello"}
+    check("hello", Word(word="hello"))
 
 
 def test_positional_missing():
@@ -278,52 +244,41 @@ def test_unknown_option():
 
 
 def test_bool_flag_true():
-    result = parse_cli(WithBool, ["--verbose"])
-    assert result["verbose"] is True
+    check("--verbose", WithBool(verbose=True))
 
 
 def test_bool_flag_no():
-    result = parse_cli(WithBool, ["--no-verbose"])
-    assert result["verbose"] is False
+    check("--no-verbose", WithBool(verbose=False))
 
 
 # ── StringModelizable leaf (date) ─────────────────────────────────────────────
 
 
 def test_string_modelizable():
-    result = parse_cli(WithDate, ["--born", "2000-01-15", "--label", "bday"])
-    assert result == {"born": "2000-01-15", "label": "bday"}
+    check("--born 2000-01-15 --label bday", WithDate(born=date(2000, 1, 15), label="bday"))
 
 
 # ── full round-trip via deserialize ──────────────────────────────────────────
 
 
 def test_roundtrip_tagged():
-    result = deserialize(
-        Pet, CommandLineArguments(["--animal", "dog", "--breed", "Husky", "--name", "Bolt"])
-    )
-    assert result == Pet(animal=Dog(breed="Husky"), name="Bolt")
+    check("--animal dog --breed Husky --name Bolt", Pet(Dog("Husky"), "Bolt"))
 
 
 def test_roundtrip_nested():
+    # "Oak Ave" contains a space so command.split() cannot be used here
     result = deserialize(
         Employee,
         CommandLineArguments(
             [
-                "--person.name",
-                "Carol",
-                "--person.age",
-                "35",
-                "--address.street",
-                "Oak Ave",
-                "--address.city",
-                "Lyon",
+                "--person.name", "Carol",
+                "--person.age", "35",
+                "--address.street", "Oak Ave",
+                "--address.city", "Lyon",
             ]
         ),
     )
-    assert result == Employee(
-        person=Person(name="Carol", age=35), address=Address(street="Oak Ave", city="Lyon")
-    )
+    assert result == Employee(Person("Carol", 35), Address("Oak Ave", "Lyon"))
 
 
 # ── LinearChoice (plain untagged Union) ───────────────────────────────────────
@@ -352,13 +307,11 @@ class ConflictingTypes:
 
 
 def test_choice_cat_branch():
-    result = deserialize(PetUnion, CommandLineArguments(["--indoor", "--age", "3"]))
-    assert result == PetUnion(animal=Cat2(indoor=True, age=3))
+    check("--indoor --age 3", PetUnion(Cat2(indoor=True, age=3)))
 
 
 def test_choice_dog_branch():
-    result = deserialize(PetUnion, CommandLineArguments(["--breed", "Poodle", "--age", "5"]))
-    assert result == PetUnion(animal=Dog2(breed="Poodle", age=5))
+    check("--breed Poodle --age 5", PetUnion(Dog2(breed="Poodle", age=5)))
 
 
 def test_choice_tracker_narrows_on_unique_option():

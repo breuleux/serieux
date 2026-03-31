@@ -25,11 +25,19 @@ class LinearField(LinearBase):
     type: type
 
 
+@dataclass
+class LinearGroup:
+    """A group of LinearBase items for one branch of a tagged union, with its associated type."""
+
+    type: type
+    items: list[LinearBase]
+
+
 @dataclass(kw_only=True)
 class LinearTagged(LinearBase):
     """A tagged-union branch point in the linearized representation."""
 
-    options: dict[str, list[LinearBase]]
+    options: dict[str, LinearGroup]
 
 
 @dataclass(kw_only=True)
@@ -60,7 +68,7 @@ def linearize(t: type[FieldModelizable], prefix: str = ""):
 def linearize(ft: type[Any @ TagSet], owner: type, fld: Field, path: str):
     """Field type is directly annotated with a TagSet."""
     base, ts = decompose(ft)
-    options = {tag: recurse(cls, path) for tag, cls in ts.iterate(base)}
+    options = {tag: LinearGroup(type=cls, items=recurse(cls, path)) for tag, cls in ts.iterate(base)}
     return [LinearTagged(owner=owner, field=fld, path=path, options=options)]
 
 
@@ -76,7 +84,7 @@ def linearize(ft: type[UnionAlias], owner: type, fld: Field, path: str):
         for arg in tagged:
             base, ts = decompose(arg)
             for tag, cls in ts.iterate(base):
-                options[tag] = recurse(cls, path)
+                options[tag] = LinearGroup(type=cls, items=recurse(cls, path))
         return [LinearTagged(owner=owner, field=fld, path=path, options=options)]
 
     # Optional[T] with a single non-None member
