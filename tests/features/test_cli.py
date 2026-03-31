@@ -7,13 +7,15 @@ import pytest
 
 from serieux import Serieux
 from serieux.features.cli import (
+    ChoiceState,
+    CliChoice,
     CommandLineArguments,
     FromArguments,
     ParseError,
-    _build_choice_tracker,
+    compile_cli,
     parse_cli,
 )
-from serieux.features.linearize import linearize
+from serieux.features.linearize import LinearChoice, linearize
 from serieux.features.tagset import TaggedUnion
 
 serieux = (Serieux + FromArguments)()
@@ -360,34 +362,29 @@ def test_choice_dog_branch():
 
 
 def test_choice_tracker_narrows_on_unique_option():
-    items = linearize(PetUnion)
-    options = {}
-    choice_items = [i for i in items if hasattr(i, "options") and isinstance(i.options, list)]
-    assert len(choice_items) == 1
-    tracker = _build_choice_tracker(choice_items[0], options)
+    cli_items = compile_cli(linearize(PetUnion))
+    choices = [c for c in cli_items if isinstance(c, CliChoice)]
+    assert len(choices) == 1
+    state = ChoiceState(choices[0])
 
-    assert tracker.possible == {0, 1}  # both branches possible initially
+    assert state.possible == {0, 1}  # both branches possible initially
 
     # 'indoor' only exists in Cat2 (branch 0)
-    tracker.observe("animal.indoor")
-    assert tracker.possible == {0}
+    state.observe("animal.indoor")
+    assert state.possible == {0}
 
 
 def test_choice_tracker_shared_option_keeps_both():
-    items = linearize(PetUnion)
-    options = {}
-    choice_items = [i for i in items if hasattr(i, "options") and isinstance(i.options, list)]
-    tracker = _build_choice_tracker(choice_items[0], options)
+    cli_items = compile_cli(linearize(PetUnion))
+    choices = [c for c in cli_items if isinstance(c, CliChoice)]
+    state = ChoiceState(choices[0])
 
     # 'age' is shared by both branches — possible stays full
-    tracker.observe("animal.age")
-    assert tracker.possible == {0, 1}
+    state.observe("animal.age")
+    assert state.possible == {0, 1}
 
 
 def test_choice_conflicting_types_raises():
-    # int | str for the same path would be caught at build time
-    items = linearize(ConflictingTypes)
-    options = {}
-    choice_items = [i for i in items if hasattr(i, "options") and isinstance(i.options, list)]
+    # int | str for the same path is caught at compile time
     with pytest.raises(ParseError, match="conflicting types"):
-        _build_choice_tracker(choice_items[0], options)
+        compile_cli(linearize(ConflictingTypes))
