@@ -28,7 +28,16 @@ from .features.registered import AutoRegistered, Referenced, auto_singleton
 from .features.tagset import ReferencedClass, Tagged, TaggedSubclass, TaggedUnion
 from .impl import BaseImplementation
 from .instructions import Instruction
-from .model import AllowExtras, Field, FieldModelizable, Model, Modelizable, StringModelizable
+from .model import (
+    AllowExtras,
+    Field,
+    FieldModelizable,
+    ListModelizable,
+    Model,
+    Modelizable,
+    StringModelizable,
+    model,
+)
 from .proxy import LazyProxy
 from .schema import RefPolicy, Schema
 from .utils import JSON, check_signature
@@ -167,7 +176,9 @@ __all__ = [
     "JSON",
     "Lazy",
     "LazyProxy",
+    "ListModelizable",
     "load",
+    "model",
     "Model",
     "FieldModelizable",
     "Modelizable",
