@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from enum import Enum
-from typing import Optional, Union
+from typing import Annotated, Optional, Union
 
 from serieux.features.linearize import LinearChoice, LinearField, LinearTagged, linearize
 from serieux.features.tagset import TagDict, TaggedUnion
@@ -195,9 +195,6 @@ class Car:
 @dataclass
 class Bike:
     gears: int
-
-
-from typing import Annotated
 
 
 @dataclass

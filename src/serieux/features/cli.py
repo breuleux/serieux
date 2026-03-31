@@ -14,7 +14,7 @@ from ovld import Medley, ovld, recurse
 from ..ctx import Context
 from ..model import ListModelizable, model
 from .dotted import unflatten
-from .linearize import LinearBase, LinearField, LinearTagged, linearize
+from .linearize import LinearBase, LinearChoice, LinearField, LinearTagged, linearize
 from .tagset import tag_field
 
 
@@ -56,12 +56,57 @@ def _is_positional(item: LinearBase) -> bool:
 
 
 def _split(items):
-    """Partition linearized items into (option-style, positionals)."""
+    """Partition linearized items into (option-style, positionals, choices)."""
     opts = [
         i for i in items if isinstance(i, (LinearField, LinearTagged)) and not _is_positional(i)
     ]
     pos = [i for i in items if isinstance(i, (LinearField, LinearTagged)) and _is_positional(i)]
-    return opts, pos
+    choices = [i for i in items if isinstance(i, LinearChoice)]
+    return opts, pos, choices
+
+
+@dataclass
+class ChoiceTracker:
+    """Tracks which branches of a LinearChoice remain consistent as options are parsed."""
+
+    choice: LinearChoice
+    # full option path → frozenset of branch indices that contain it
+    option_to_branches: dict[str, frozenset]
+    possible: set  # branch indices still consistent with observed options
+
+    def observe(self, path: str) -> None:
+        """Narrow possible branches when an option at *path* is seen."""
+        if path in self.option_to_branches:
+            self.possible &= self.option_to_branches[path]
+
+
+def _build_choice_tracker(choice: LinearChoice, options: dict) -> ChoiceTracker:
+    """Register all branch options (no priority) and return a ChoiceTracker.
+
+    Raises ParseError if the same option name appears in two branches with
+    different types, as it would be impossible to discriminate.
+    """
+    path_to_type: dict[str, type] = {}
+    option_to_branches: dict[str, set] = {}
+
+    for i, branch in enumerate(choice.options):
+        branch_opts, _, _ = _split(branch)
+        for item in branch_opts:
+            if isinstance(item, LinearField):
+                if item.path in path_to_type and path_to_type[item.path] is not item.type:
+                    raise ParseError(
+                        f"Option '{item.path}' has conflicting types across union branches "
+                        f"({path_to_type[item.path].__name__} vs {item.type.__name__})"
+                    )
+                path_to_type[item.path] = item.type
+                option_to_branches.setdefault(item.path, set()).add(i)
+        _register(branch_opts, options, priority=False)
+
+    return ChoiceTracker(
+        choice=choice,
+        option_to_branches={k: frozenset(v) for k, v in option_to_branches.items()},
+        possible=set(range(len(choice.options))),
+    )
 
 
 def _register(items, options: dict, priority: bool = False) -> None:
@@ -126,18 +171,39 @@ def _convert(ft: type, raw: str) -> Any:
     return raw
 
 
+# ── field-value setter ───────────────────────────────────────────────────────
+
+
+def _set_field(entry: LinearField, value_str: str, result: dict, observe_all) -> None:
+    ft = entry.type
+    if issubclass(ft, ListModelizable) or entry.field.metadata.get("action") == "append":
+        m = model(ft)
+        elem_ft = m.element_field.type if (m and m.element_field) else str
+        converted = _convert(elem_ft, value_str)
+        existing = result.get(entry.path, [])
+        result[entry.path] = (existing if isinstance(existing, list) else [existing]) + [converted]
+    else:
+        result[entry.path] = _convert(ft, value_str)
+    observe_all(entry.path)
+
+
 # ── core parser ──────────────────────────────────────────────────────────────
 
 
 def _parse(root_type: type, argv: list[str]) -> dict:
     items = linearize(root_type)
-    opt_items, pos_items = _split(items)
+    opt_items, pos_items, choice_items = _split(items)
 
     options: dict[str, LinearBase | tuple] = {}
     _register(opt_items, options, priority=False)
     pos_queue: list[LinearBase] = list(pos_items)
+    trackers: list[ChoiceTracker] = [_build_choice_tracker(c, options) for c in choice_items]
 
     result: dict[str, Any] = {}
+
+    def observe_all(path: str) -> None:
+        for tracker in trackers:
+            tracker.observe(path)
 
     def activate_tagged(tagged: LinearTagged, tag: str) -> None:
         if tag not in tagged.options:
@@ -145,7 +211,7 @@ def _parse(root_type: type, argv: list[str]) -> dict:
                 f"Unknown tag {tag!r} for '{tagged.path}'. Valid tags: {list(tagged.options)}"
             )
         result[f"{tagged.path}.{tag_field}"] = tag
-        branch_opts, branch_pos = _split(tagged.options[tag])
+        branch_opts, branch_pos, branch_choices = _split(tagged.options[tag])
         _register(branch_opts, options, priority=True)
         pos_queue[:0] = branch_pos  # new positionals take precedence
 
@@ -153,8 +219,8 @@ def _parse(root_type: type, argv: list[str]) -> dict:
     while i < len(argv):
         token = argv[i]
 
-        if token.startswith("--"):
-            key = token[2:]
+        if token.startswith("--") or (token.startswith("-") and len(token) == 2):
+            key = token[1:] if len(token) == 2 else token[2:]
             if key not in options:
                 raise ParseError(f"Unknown option: {token!r}")
 
@@ -164,6 +230,7 @@ def _parse(root_type: type, argv: list[str]) -> dict:
             if isinstance(entry, tuple):
                 item, value = entry
                 result[item.path] = value
+                observe_all(item.path)
                 i += 1
                 continue
 
@@ -171,36 +238,48 @@ def _parse(root_type: type, argv: list[str]) -> dict:
                 if i + 1 >= len(argv):
                     raise ParseError(f"Expected tag value after {token!r}")
                 activate_tagged(entry, argv[i + 1])
+                observe_all(entry.path)
                 i += 2
 
-            else:  # LinearField
-                ft = entry.type
+            elif entry.type is bool:
+                result[entry.path] = True
+                observe_all(entry.path)
+                i += 1
 
-                if ft is bool:
-                    # --flag alone sets True; value-less
+            else:
+                if i + 1 >= len(argv):
+                    raise ParseError(f"Expected value after {token!r}")
+                _set_field(entry, argv[i + 1], result, observe_all)
+                i += 2
+
+        elif token.startswith("-") and len(token) > 2:
+            # Compact single-dash flags: -xyz
+            # If -x is bool: set x=True and continue with -yz.
+            # If -x is non-bool: yz is x's value.
+            rest = token[1:]
+            while rest:
+                ch = rest[0]
+                rest = rest[1:]
+                if ch not in options:
+                    raise ParseError(f"Unknown option: -{ch!r}")
+                entry = options[ch]
+                if isinstance(entry, tuple):  # bool negation
+                    item, value = entry
+                    result[item.path] = value
+                    observe_all(item.path)
+                elif isinstance(entry, LinearField) and entry.type is bool:
                     result[entry.path] = True
-                    i += 1
-
-                elif (
-                    issubclass(ft, ListModelizable)
-                    or entry.field.metadata.get("action") == "append"
-                ):
-                    if i + 1 >= len(argv):
-                        raise ParseError(f"Expected value after {token!r}")
-                    m = model(ft)
-                    elem_ft = m.element_field.type if (m and m.element_field) else str
-                    converted = _convert(elem_ft, argv[i + 1])
-                    existing = result.get(entry.path, [])
-                    result[entry.path] = (
-                        existing if isinstance(existing, list) else [existing]
-                    ) + [converted]
-                    i += 2
-
+                    observe_all(entry.path)
                 else:
-                    if i + 1 >= len(argv):
-                        raise ParseError(f"Expected value after {token!r}")
-                    result[entry.path] = _convert(ft, argv[i + 1])
-                    i += 2
+                    # Non-bool: remaining chars are the value, or next token if none left
+                    if not rest:
+                        i += 1
+                        if i >= len(argv):
+                            raise ParseError(f"Expected value after -{ch!r}")
+                        rest = argv[i]
+                    _set_field(entry, rest, result, observe_all)
+                    rest = ""
+            i += 1
 
         else:
             # Positional token
@@ -210,8 +289,10 @@ def _parse(root_type: type, argv: list[str]) -> dict:
 
             if isinstance(item, LinearTagged):
                 activate_tagged(item, token)
+                observe_all(item.path)
             else:
                 result[item.path] = _convert(item.type, token)
+                observe_all(item.path)
             i += 1
 
     return unflatten(result)

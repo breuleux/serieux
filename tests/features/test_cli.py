@@ -6,7 +6,14 @@ from datetime import date
 import pytest
 
 from serieux import Serieux
-from serieux.features.cli import CommandLineArguments, FromArguments, ParseError, parse_cli
+from serieux.features.cli import (
+    CommandLineArguments,
+    FromArguments,
+    ParseError,
+    _build_choice_tracker,
+    parse_cli,
+)
+from serieux.features.linearize import linearize
 from serieux.features.tagset import TaggedUnion
 
 serieux = (Serieux + FromArguments)()
@@ -190,6 +197,60 @@ def test_tagged_name_priority():
     assert result == {"entry": {"$class": "alpha", "name": "Alice", "score": 10}}
 
 
+# ── single-letter options use one dash ───────────────────────────────────────
+
+
+@dataclass
+class Flags:
+    x: float
+    y: float
+    verbose: bool = False
+
+
+def test_single_letter_option():
+    result = parse_cli(Flags, ["-x", "1.5", "-y", "2.5"])
+    assert result == {"x": 1.5, "y": 2.5}
+
+
+def test_single_letter_mixed_with_long():
+    result = parse_cli(Flags, ["-x", "3.0", "-y", "4.0", "--verbose"])
+    assert result["x"] == 3.0
+    assert result["verbose"] is True
+
+
+def test_compact_bool_flags():
+    # -vv treated as two bool flags chained (if v were bool twice — use verbose here as single)
+    # More realistic: a type with two bool flags
+    @dataclass
+    class Multi:
+        a: bool = False
+        b: bool = False
+        n: str = ""
+
+    result = parse_cli(Multi, ["-ab"])
+    assert result == {"a": True, "b": True}
+
+
+def test_compact_bool_then_value():
+    @dataclass
+    class Multi:
+        v: bool = False
+        o: str = ""
+
+    result = parse_cli(Multi, ["-vo", "out.txt"])
+    assert result == {"v": True, "o": "out.txt"}
+
+
+def test_compact_value_inline():
+    # -oout.txt: -o is non-bool, so "out.txt" is its value
+    @dataclass
+    class Multi:
+        o: str = ""
+
+    result = parse_cli(Multi, ["-oout.txt"])
+    assert result == {"o": "out.txt"}
+
+
 # ── positional field ──────────────────────────────────────────────────────────
 
 
@@ -261,3 +322,72 @@ def test_roundtrip_nested():
     assert result == Employee(
         person=Person(name="Carol", age=35), address=Address(street="Oak Ave", city="Lyon")
     )
+
+
+# ── LinearChoice (plain untagged Union) ───────────────────────────────────────
+
+
+@dataclass
+class Cat2:
+    indoor: bool = True
+    age: int = 5
+
+
+@dataclass
+class Dog2:
+    breed: str = "unknown"
+    age: int = 3
+
+
+@dataclass
+class PetUnion:
+    animal: Cat2 | Dog2
+
+
+@dataclass
+class ConflictingTypes:
+    value: int | str
+
+
+def test_choice_cat_branch():
+    result = deserialize(PetUnion, CommandLineArguments(["--indoor", "--age", "3"]))
+    assert result == PetUnion(animal=Cat2(indoor=True, age=3))
+
+
+def test_choice_dog_branch():
+    result = deserialize(PetUnion, CommandLineArguments(["--breed", "Poodle", "--age", "5"]))
+    assert result == PetUnion(animal=Dog2(breed="Poodle", age=5))
+
+
+def test_choice_tracker_narrows_on_unique_option():
+    items = linearize(PetUnion)
+    options = {}
+    choice_items = [i for i in items if hasattr(i, "options") and isinstance(i.options, list)]
+    assert len(choice_items) == 1
+    tracker = _build_choice_tracker(choice_items[0], options)
+
+    assert tracker.possible == {0, 1}  # both branches possible initially
+
+    # 'indoor' only exists in Cat2 (branch 0)
+    tracker.observe("animal.indoor")
+    assert tracker.possible == {0}
+
+
+def test_choice_tracker_shared_option_keeps_both():
+    items = linearize(PetUnion)
+    options = {}
+    choice_items = [i for i in items if hasattr(i, "options") and isinstance(i.options, list)]
+    tracker = _build_choice_tracker(choice_items[0], options)
+
+    # 'age' is shared by both branches — possible stays full
+    tracker.observe("animal.age")
+    assert tracker.possible == {0, 1}
+
+
+def test_choice_conflicting_types_raises():
+    # int | str for the same path would be caught at build time
+    items = linearize(ConflictingTypes)
+    options = {}
+    choice_items = [i for i in items if hasattr(i, "options") and isinstance(i.options, list)]
+    with pytest.raises(ParseError, match="conflicting types"):
+        _build_choice_tracker(choice_items[0], options)
