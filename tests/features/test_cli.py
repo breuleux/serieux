@@ -15,7 +15,7 @@ from serieux.features.cli import (
     compile_cli,
     parse_cli,
 )
-from serieux.features.linearize import LinearChoice, linearize
+from serieux.features.linearize import linearize
 from serieux.features.tagset import TaggedUnion
 
 serieux = (Serieux + FromArguments)()
@@ -271,10 +271,14 @@ def test_roundtrip_nested():
         Employee,
         CommandLineArguments(
             [
-                "--person.name", "Carol",
-                "--person.age", "35",
-                "--address.street", "Oak Ave",
-                "--address.city", "Lyon",
+                "--person.name",
+                "Carol",
+                "--person.age",
+                "35",
+                "--address.street",
+                "Oak Ave",
+                "--address.city",
+                "Lyon",
             ]
         ),
     )

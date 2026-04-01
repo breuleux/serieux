@@ -61,8 +61,10 @@ def _is_remainder(item: LinearBase) -> bool:
 
 def _split(items: list) -> tuple:
     """Partition linearized items into (option-style, positionals, choices)."""
-    opts = [i for i in items if isinstance(i, (LinearField, LinearTagged)) and not _is_positional(i)]
-    pos  = [i for i in items if isinstance(i, (LinearField, LinearTagged)) and _is_positional(i)]
+    opts = [
+        i for i in items if isinstance(i, (LinearField, LinearTagged)) and not _is_positional(i)
+    ]
+    pos = [i for i in items if isinstance(i, (LinearField, LinearTagged)) and _is_positional(i)]
     choices = [i for i in items if isinstance(i, LinearChoice)]
     return opts, pos, choices
 
@@ -77,19 +79,21 @@ def _dash(name: str) -> str:
 @dataclass(kw_only=True)
 class CliBase:
     """Base class for compiled CLI items."""
-    field: Any          # serieux Field
-    path: str           # dotted field path
-    option_strings: list[str]   # [] if positional; short name first, then full path, then aliases
+
+    field: Any  # serieux Field
+    path: str  # dotted field path
+    option_strings: list[str]  # [] if positional; short name first, then full path, then aliases
     positional: bool
-    min_args: int       # minimum values to consume (0 for bool flags, remainder)
+    min_args: int  # minimum values to consume (0 for bool flags, remainder)
     max_args: int | None  # maximum values; None = unbounded
-    remainder: bool     # consume ALL remaining args (including option-looking tokens)
-    metavar: str        # display placeholder in help
+    remainder: bool  # consume ALL remaining args (including option-looking tokens)
+    metavar: str  # display placeholder in help
 
 
 @dataclass(kw_only=True)
 class CliField(CliBase):
     """A scalar or list field."""
+
     type: type
     negation_strings: list[str] = field(default_factory=list)  # --no-X for bool fields
 
@@ -97,6 +101,7 @@ class CliField(CliBase):
 @dataclass
 class CliGroup:
     """Compiled CLI items for one branch of a tagged union, with its associated type."""
+
     type: type
     items: list[CliBase]
 
@@ -108,14 +113,16 @@ class CliGroup:
 @dataclass(kw_only=True)
 class CliTagged(CliBase):
     """A tagged-union selector."""
+
     tag_options: dict[str, CliGroup]  # tag → pre-compiled branch group
 
 
 @dataclass(kw_only=True)
 class CliChoice(CliBase):
     """A plain (untagged) union — options drawn from all branches simultaneously."""
-    choice_options: list[list[CliBase]]         # one sub-list per branch
-    option_to_branches: dict[str, frozenset]    # path → frozenset of branch indices
+
+    choice_options: list[list[CliBase]]  # one sub-list per branch
+    option_to_branches: dict[str, frozenset]  # path → frozenset of branch indices
 
 
 # ── Compilation helpers ──────────────────────────────────────────────────────
@@ -166,11 +173,14 @@ def _to_cli(item: LinearField, short_counts: dict) -> CliBase:
 
     if pos:
         return CliField(
-            field=item.field, path=item.path,
-            option_strings=[], positional=True,
+            field=item.field,
+            path=item.path,
+            option_strings=[],
+            positional=True,
             min_args=0 if rem else 1,
             max_args=None if rem else 1,
-            remainder=rem, metavar=mv,
+            remainder=rem,
+            metavar=mv,
             type=ft,
         )
 
@@ -178,19 +188,27 @@ def _to_cli(item: LinearField, short_counts: dict) -> CliBase:
 
     if ft is bool:
         return CliField(
-            field=item.field, path=item.path,
-            option_strings=opts, positional=False,
-            min_args=0, max_args=0,
-            remainder=False, metavar="",
+            field=item.field,
+            path=item.path,
+            option_strings=opts,
+            positional=False,
+            min_args=0,
+            max_args=0,
+            remainder=False,
+            metavar="",
             type=ft,
             negation_strings=[f"no-{o}" for o in opts],
         )
 
     return CliField(
-        field=item.field, path=item.path,
-        option_strings=opts, positional=False,
-        min_args=1, max_args=None if is_list else 1,
-        remainder=False, metavar=mv,
+        field=item.field,
+        path=item.path,
+        option_strings=opts,
+        positional=False,
+        min_args=1,
+        max_args=None if is_list else 1,
+        remainder=False,
+        metavar=mv,
         type=ft,
     )
 
@@ -199,21 +217,34 @@ def _to_cli(item: LinearField, short_counts: dict) -> CliBase:
 def _to_cli(item: LinearTagged, short_counts: dict) -> CliBase:
     pos = _is_positional(item)
     mv = "{" + ",".join(item.options.keys()) + "}"
-    tag_opts = {tag: CliGroup(type=group.type, items=compile_cli(group.items)) for tag, group in item.options.items()}
+    tag_opts = {
+        tag: CliGroup(type=group.type, items=compile_cli(group.items))
+        for tag, group in item.options.items()
+    }
 
     if pos:
         return CliTagged(
-            field=item.field, path=item.path,
-            option_strings=[], positional=True,
-            min_args=1, max_args=1, remainder=False, metavar=mv,
+            field=item.field,
+            path=item.path,
+            option_strings=[],
+            positional=True,
+            min_args=1,
+            max_args=1,
+            remainder=False,
+            metavar=mv,
             tag_options=tag_opts,
         )
 
     opts = _opt_strings(item, short_counts)
     return CliTagged(
-        field=item.field, path=item.path,
-        option_strings=opts, positional=False,
-        min_args=1, max_args=1, remainder=False, metavar=mv,
+        field=item.field,
+        path=item.path,
+        option_strings=opts,
+        positional=False,
+        min_args=1,
+        max_args=1,
+        remainder=False,
+        metavar=mv,
         tag_options=tag_opts,
     )
 
@@ -247,9 +278,14 @@ def _to_cli(item: LinearChoice, short_counts: dict) -> CliBase:
     compiled = [compile_cli(branch, cross_counts) for branch in item.options]
 
     return CliChoice(
-        field=item.field, path=item.path,
-        option_strings=[], positional=False,
-        min_args=0, max_args=0, remainder=False, metavar="",
+        field=item.field,
+        path=item.path,
+        option_strings=[],
+        positional=False,
+        min_args=0,
+        max_args=0,
+        remainder=False,
+        metavar="",
         choice_options=compiled,
         option_to_branches={k: frozenset(v) for k, v in option_to_branches.items()},
     )
@@ -278,9 +314,9 @@ def compile_cli(items: list[LinearBase], short_counts: dict = None) -> list[CliB
 
 # ── Colorized help ───────────────────────────────────────────────────────────
 
-_R  = "\033[0m"
-_B  = "\033[1m"
-_D  = "\033[2m"
+_R = "\033[0m"
+_B = "\033[1m"
+_D = "\033[2m"
 _CY = "\033[36m"
 _YL = "\033[33m"
 _GR = "\033[32m"
@@ -294,7 +330,7 @@ def _c(code: str, text: str, color: bool) -> str:
 def _cli_sig(cli: CliBase, color: bool) -> str:
     """Render the option signature (name + metavar) for one cli item."""
     if cli.positional:
-        return _c(_MG, cli.field.name.upper(), color)
+        return _c(_YL, cli.field.name.upper(), color)
 
     if not cli.option_strings:
         return ""
@@ -304,7 +340,11 @@ def _cli_sig(cli: CliBase, color: bool) -> str:
 
     if isinstance(cli, CliField):
         if cli.max_args == 0:  # bool flag — show first negation after a slash
-            neg = _c(_D, " / " + _dash(cli.negation_strings[0]), color) if cli.negation_strings else ""
+            neg = (
+                _c(_D, " / " + _dash(cli.negation_strings[0]), color)
+                if cli.negation_strings
+                else ""
+            )
             return names + neg
         if cli.metavar:
             names += " " + _c(_GR, cli.metavar, color)
@@ -316,7 +356,9 @@ def _cli_sig(cli: CliBase, color: bool) -> str:
     return names
 
 
-def _help_lines(items: list[CliBase], color: bool, indent: int = 0, col_width: int = 28) -> list[str]:
+def _help_lines(
+    items: list[CliBase], color: bool, indent: int = 0, col_width: int = 28
+) -> list[str]:
     pad = "  " * indent
     lines = []
     for cli in items:
@@ -336,7 +378,7 @@ def _help_lines(items: list[CliBase], color: bool, indent: int = 0, col_width: i
         if isinstance(cli, CliTagged):
             for tag, group in cli.tag_options.items():
                 tag_desc = (group.description or "").strip()
-                tag_label = _c(_YL, tag + ":", color)
+                tag_label = _c(_B, tag + ":", color)
                 desc_part = f"  {tag_desc}" if tag_desc else ""
                 lines.append(f"{pad}  {tag_label}{desc_part}")
                 lines += _help_lines(group.items, color, indent + 2, col_width)
@@ -355,19 +397,19 @@ def _render_help(
 
     if prog:
         usage_opts = " [OPTIONS]" if opts else ""
-        usage_pos = "".join(f" {_c(_MG, c.field.name.upper(), color)}" for c in positionals)
+        usage_pos = "".join(f" {_c(_YL, c.field.name.upper(), color)}" for c in positionals)
         parts.append(_c(_B, f"Usage: {prog}", color) + usage_opts + usage_pos)
 
     if description:
         parts += ["", description.strip()]
 
     if positionals:
-        parts += ["", _c(_YL + _B, "Positional arguments:", color)]
+        parts += ["", _c(_B, "Positional arguments:", color)]
         parts += _help_lines(positionals, color)
 
     if opts:
         col_width = 28
-        parts += ["", _c(_YL + _B, "Options:", color)]
+        parts += ["", _c(_B, "Options:", color)]
         help_sig = ", ".join(_c(_CY, s, color) for s in ["-h", "--help"])
         help_desc = "  Show this message and exit."
         parts.append(f"{help_sig}{' ' * max(1, col_width - len('-h, --help'))}{help_desc}")
@@ -432,6 +474,7 @@ def _set_field(cli: CliField, value_str: str, result: dict, observe) -> None:
 @dataclass
 class ChoiceState:
     """Tracks which branches of a CliChoice remain consistent as options are parsed."""
+
     cli: CliChoice
     possible: set = field(default_factory=set)
 
@@ -454,7 +497,7 @@ def _parse(root_type: type, argv: list[str], description: str = None) -> dict:
     neg_options: dict[str, CliField] = {}
     pos_queue: list[CliBase] = []
     states: list[ChoiceState] = []
-    active: list[CliBase] = []     # ordered list for contextual help display
+    active: list[CliBase] = []  # ordered list for contextual help display
 
     def register(cli: CliBase, priority: bool = True) -> None:
         for s in cli.option_strings:
@@ -503,7 +546,7 @@ def _parse(root_type: type, argv: list[str], description: str = None) -> dict:
             else:
                 register(cli, priority=True)
 
-    seen: list[str] = []   # positional tokens consumed so far, for the usage line
+    seen: list[str] = []  # positional tokens consumed so far, for the usage line
 
     i = 0
     while i < len(argv):
@@ -519,11 +562,22 @@ def _parse(root_type: type, argv: list[str], description: str = None) -> dict:
             opts_display = [c for c in active if not c.positional]
             seen_str = " ".join(seen)
             prog = sys.argv[0] + (f" {seen_str}" if seen_str else "")
-            print(_render_help(opts_display, list(pos_queue), description=description, color=sys.stdout.isatty(), prog=prog))
+            print(
+                _render_help(
+                    opts_display,
+                    list(pos_queue),
+                    description=description,
+                    color=sys.stdout.isatty(),
+                    prog=prog,
+                )
+            )
             sys.exit(0)
 
         elif token.startswith("--") or (token.startswith("-") and len(token) == 2):
             key = token[1:] if len(token) == 2 else token[2:]
+            inline_value = None
+            if "=" in key:
+                key, inline_value = key.split("=", 1)
 
             if key in neg_options:
                 cli = neg_options[key]
@@ -538,12 +592,15 @@ def _parse(root_type: type, argv: list[str], description: str = None) -> dict:
             cli = options[key]
 
             if isinstance(cli, CliTagged):
-                if i + 1 >= len(argv):
-                    raise ParseError(f"Expected tag value after {token!r}")
-                activate_tagged(cli, argv[i + 1])
-                seen.append(argv[i + 1])
+                if inline_value is None:
+                    if i + 1 >= len(argv):
+                        raise ParseError(f"Expected tag value after {token!r}")
+                    inline_value = argv[i + 1]
+                    i += 1
+                activate_tagged(cli, inline_value)
+                seen.append(inline_value)
                 observe(cli.path)
-                i += 2
+                i += 1
 
             elif cli.max_args == 0:  # bool flag
                 result[cli.path] = True
@@ -551,10 +608,13 @@ def _parse(root_type: type, argv: list[str], description: str = None) -> dict:
                 i += 1
 
             else:
-                if i + 1 >= len(argv):
-                    raise ParseError(f"Expected value after {token!r}")
-                _set_field(cli, argv[i + 1], result, observe)
-                i += 2
+                if inline_value is None:
+                    if i + 1 >= len(argv):
+                        raise ParseError(f"Expected value after {token!r}")
+                    inline_value = argv[i + 1]
+                    i += 1
+                _set_field(cli, inline_value, result, observe)
+                i += 1
 
         elif token.startswith("-") and len(token) > 2 and not token.startswith("--"):
             # Compact single-dash flags: -xyz
@@ -577,6 +637,8 @@ def _parse(root_type: type, argv: list[str], description: str = None) -> dict:
                             if i >= len(argv):
                                 raise ParseError(f"Expected value after -{ch!r}")
                             rest = argv[i]
+                        if rest.startswith("="):
+                            rest = rest[1:]
                         _set_field(cli, rest, result, observe)
                         rest = ""
                 else:
