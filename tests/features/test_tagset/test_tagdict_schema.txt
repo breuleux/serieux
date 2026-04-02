@@ -2,6 +2,7 @@
     "oneOf": [
         {
             "type": "object",
+            "title": "Cat",
             "properties": {
                 "name": {
                     "type": "string"
@@ -23,6 +24,7 @@
         },
         {
             "type": "object",
+            "title": "Wolf",
             "properties": {
                 "name": {
                     "type": "string"

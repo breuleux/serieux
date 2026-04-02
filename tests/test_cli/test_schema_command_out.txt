@@ -1,10 +1,12 @@
 {
     "type": "object",
+    "title": "World",
     "properties": {
         "countries": {
             "type": "object",
             "additionalProperties": {
                 "type": "object",
+                "title": "Country",
                 "properties": {
                     "languages": {
                         "type": "array",
@@ -22,6 +24,7 @@
                         "type": "array",
                         "items": {
                             "type": "object",
+                            "title": "Citizen",
                             "properties": {
                                 "name": {
                                     "type": "string"

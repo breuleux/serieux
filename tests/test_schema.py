@@ -98,6 +98,7 @@ def test_schema_nested():
 def test_schema_dataclass():
     assert schema(Point) == {
         "type": "object",
+        "title": "Point",
         "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
         "required": ["x", "y"],
         "additionalProperties": False,
@@ -107,6 +108,7 @@ def test_schema_dataclass():
 def test_schema_allow_extras_dataclass():
     assert schema(AllowExtras[Point]) == {
         "type": "object",
+        "title": "Point",
         "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
         "required": ["x", "y"],
         "additionalProperties": True,
@@ -116,6 +118,7 @@ def test_schema_allow_extras_dataclass():
 def test_schema_allow_extras_in_config():
     assert schema(Character) == {
         "type": "object",
+        "title": "Character",
         "properties": {
             "name": {"type": "string"},
             "age": {"type": "integer"},
@@ -130,10 +133,11 @@ def test_schema_allow_extras_in_config():
 def test_schema_dataclass_2():
     assert schema(Defaults) == {
         "type": "object",
+        "title": "Defaults",
         "properties": {
             "name": {"type": "string"},
             "aliases": {"type": "array", "items": {"type": "string"}},
-            "cool": {"type": "boolean"},
+            "cool": {"type": "boolean", "default": False},
         },
         "required": ["name"],
         "additionalProperties": False,
@@ -146,6 +150,7 @@ def test_schema_recursive():
 
     assert schema(Tree[int]) == {
         "type": "object",
+        "title": "Tree[int]",
         "properties": {
             "left": {
                 "oneOf": [
@@ -175,6 +180,7 @@ def test_schema_recursive_policy_always():
         "$defs": {
             "Tree": {
                 "type": "object",
+                "title": "Tree[int]",
                 "properties": {
                     "left": {
                         "oneOf": [
@@ -211,6 +217,7 @@ def test_schema_recursive_policy_two_trees():
         "$defs": {
             "DoubleTree": {
                 "type": "object",
+                "title": "DoubleTree",
                 "properties": {
                     "it": {"$ref": "#/$defs/Tree"},
                     "st": {"$ref": "#/$defs/Tree2"},
@@ -220,6 +227,7 @@ def test_schema_recursive_policy_two_trees():
             },
             "Tree": {
                 "type": "object",
+                "title": "Tree[int]",
                 "properties": {
                     "left": {
                         "oneOf": [
@@ -239,6 +247,7 @@ def test_schema_recursive_policy_two_trees():
             },
             "Tree2": {
                 "type": "object",
+                "title": "Tree[str]",
                 "properties": {
                     "left": {
                         "oneOf": [
@@ -284,9 +293,11 @@ def test_schema_policy_never_minimal():
         == minimal
         == {
             "type": "object",
+            "title": "TwoPoints",
             "properties": {
                 "a": {
                     "type": "object",
+                    "title": "Point",
                     "description": "First point",
                     "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
                     "required": ["x", "y"],
@@ -294,6 +305,7 @@ def test_schema_policy_never_minimal():
                 },
                 "b": {
                     "type": "object",
+                    "title": "Point",
                     "description": "Second point",
                     "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
                     "required": ["x", "y"],
@@ -309,9 +321,11 @@ def test_schema_policy_never_minimal():
 def test_schema_policy_norepeat():
     assert schema(TwoPoints, ref_policy="norepeat") == {
         "type": "object",
+        "title": "TwoPoints",
         "properties": {
             "a": {
                 "type": "object",
+                "title": "Point",
                 "description": "First point",
                 "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
                 "required": ["x", "y"],
@@ -333,12 +347,14 @@ def test_schema_policy_always():
         "$defs": {
             "Point": {
                 "type": "object",
+                "title": "Point",
                 "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
                 "required": ["x", "y"],
                 "additionalProperties": False,
             },
             "TwoPoints": {
                 "type": "object",
+                "title": "TwoPoints",
                 "properties": {
                     "a": {"$ref": "#/$defs/Point", "description": "First point"},
                     "b": {"$ref": "#/$defs/Point", "description": "Second point"},
@@ -353,6 +369,7 @@ def test_schema_policy_always():
 def test_schema_descriptions():
     assert schema(Pig) == {
         "type": "object",
+        "title": "Pig",
         "properties": {
             "pinkness": {"type": "number", "description": "How pink the pig is"},
             "weight": {"type": "number", "description": "Weight of the pig, in kilograms"},
@@ -370,6 +387,7 @@ def test_schema_descriptions():
 def test_schema_recursive_ltholder():
     assert schema(LTHolder) == {
         "type": "object",
+        "title": "LTHolder",
         "properties": {
             "lt": {
                 "type": "array",
@@ -377,6 +395,7 @@ def test_schema_recursive_ltholder():
                     "oneOf": [
                         {
                             "type": "object",
+                            "title": "Point",
                             "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}},
                             "required": ["x", "y"],
                             "additionalProperties": False,
@@ -406,6 +425,7 @@ class AdditivePoint(Point):
 def test_schema_additive_point():
     assert schema(AdditivePoint) == {
         "type": "object",
+        "title": "Point",
         "properties": {
             "x": {"type": "integer"},
             "y": {"type": "integer"},
@@ -424,6 +444,7 @@ class Blooper:
 def test_schema_blooper():
     assert schema(Blooper) == {
         "type": "object",
+        "title": "Blooper",
         "properties": {
             "x": {"type": "integer"},
             "y": {"type": "integer"},
