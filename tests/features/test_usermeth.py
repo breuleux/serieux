@@ -67,6 +67,7 @@ def test_custom_schema():
             {"type": "string", "pattern": r"^#[0-9a-fA-F]{6}$"},
             {
                 "type": "object",
+                "title": "RGB",
                 "properties": {
                     "red": {"type": "integer"},
                     "green": {"type": "integer"},
@@ -154,6 +155,7 @@ def test_custom_m_schema(file_regression):
         "oneOf": [
             {
                 "type": "object",
+                "title": "RGBM",
                 "properties": {
                     "R": {"type": "integer"},
                     "G": {"type": "integer"},
@@ -219,6 +221,7 @@ def test_serieux_from_string_and_to_string_dataclass():
         "oneOf": [
             {
                 "type": "object",
+                "title": "RGBS",
                 "properties": {
                     "red": {"type": "integer"},
                     "green": {"type": "integer"},

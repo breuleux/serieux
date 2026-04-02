@@ -617,13 +617,14 @@ class BaseImplementation(Medley):
                     extra["description"] = f.description
                 if f.default is not MISSING:
                     extra["default"] = f.default
-                fsch = fsch if not f.description else AnnotatedSchema(fsch, **extra)
+                fsch = fsch if not extra else AnnotatedSchema(fsch, **extra)
                 properties[f.serialized_name] = fsch
                 if f.required:
                     required.append(f.serialized_name)
 
             f_schema = {
                 "type": "object",
+                "title": clsstring(m.original_type),
                 "properties": properties,
                 "required": required,
                 "additionalProperties": m.allow_extras,

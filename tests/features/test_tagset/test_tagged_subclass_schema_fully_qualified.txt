@@ -2,6 +2,7 @@
     "oneOf": [
         {
             "type": "object",
+            "title": "Animal",
             "properties": {
                 "name": {
                     "type": "string"
@@ -19,6 +20,7 @@
         },
         {
             "type": "object",
+            "title": "Cat",
             "properties": {
                 "name": {
                     "type": "string"
@@ -40,6 +42,7 @@
         },
         {
             "type": "object",
+            "title": "Wolf",
             "properties": {
                 "name": {
                     "type": "string"
@@ -61,6 +64,7 @@
         },
         {
             "type": "object",
+            "title": "HouseCat",
             "properties": {
                 "name": {
                     "type": "string"
@@ -69,7 +73,8 @@
                     "type": "integer"
                 },
                 "cute": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "default": true
                 },
                 "$class": {
                     "description": "Reference to the class to instantiate",
