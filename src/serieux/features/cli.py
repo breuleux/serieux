@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import re as _re
 import sys
+from collections import deque
 from dataclasses import MISSING, dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from ovld import Medley, ovld, recurse
+from ovld.dependent import Regexp
 
 from ..ctx import Context
 from ..exc import find_information
@@ -581,56 +583,84 @@ class ChoiceState:
 # ── Core parser ──────────────────────────────────────────────────────────────
 
 
-def _parse(
-    root_type: type, argv: list[str], description: str = None, prog: str = None
-) -> ParsedDict:
-    description = description or getattr(root_type, "__doc__", None)
-    prog = prog or sys.argv[0]
-    cli_items = compile_cli(linearize(root_type))
+@dataclass
+class _Token:
+    """One unit in the parse queue, with a link back to its source in argv."""
 
-    options: dict[str, CliBase] = {}
-    neg_options: dict[str, CliField] = {}
-    pos_queue: list[CliBase] = []
-    states: list[ChoiceState] = []
-    active: list[CliBase] = []  # ordered list for contextual help display
+    text: str
+    arg_index: int  # index into argv
+    src_offset: int  # offset of text[0] within argv[arg_index]
 
-    def register(cli: CliBase, priority: bool = True, add_to_active: bool = True) -> None:
+
+class ParserState:
+    """Mutable state for a single _parse run."""
+
+    def __init__(
+        self,
+        root_type: type,
+        argv: list[str],
+        description: str = None,
+        prog: str = None,
+    ) -> None:
+        self.argv = argv
+        self.prog = prog or sys.argv[0]
+        self.description = description or getattr(root_type, "__doc__", None)
+        self.options: dict[str, CliBase] = {}
+        self.neg_options: dict[str, CliField] = {}
+        self.pos_queue: list[CliBase] = []
+        self.states: list[ChoiceState] = []
+        self.active: list[CliBase] = []
+        self.choice_branch_paths: set[str] = set()
+        self.result: dict[str, Any] = {}
+        self.spans: dict[str, CLILocation] = {}
+        self.seen: list[str] = []
+        self.queue: deque[_Token] = deque(_Token(t, i, 0) for i, t in enumerate(argv))
+
+        for cli in compile_cli(linearize(root_type)):
+            if cli.positional:
+                self.pos_queue.append(cli)
+            elif isinstance(cli, CliChoice):
+                for branch in cli.choice_options:
+                    for b_item in branch:
+                        self.register(b_item, priority=False, add_to_active=False)
+                        self.choice_branch_paths.add(b_item.path)
+                self.states.append(ChoiceState(cli))
+                self.active.append(cli)
+            else:
+                self.register(cli)
+
+    def show_help(self) -> None:
+        seen_str = " ".join(self.seen)
+        display_prog = sys.argv[0] + (f" {seen_str}" if seen_str else "")
+        print(
+            _render_help(
+                [c for c in self.active if not c.positional],
+                list(self.pos_queue),
+                description=self.description,
+                color=sys.stdout.isatty(),
+                prog=display_prog,
+            )
+        )
+        sys.exit(0)
+
+    # ── Registration ──────────────────────────────────────────────────────────
+
+    def register(self, cli: CliBase, priority: bool = True, add_to_active: bool = True) -> None:
         for s in cli.option_strings:
-            if priority or s not in options:
-                options[s] = cli
+            if priority or s not in self.options:
+                self.options[s] = cli
         if isinstance(cli, CliField):
             for s in cli.negation_strings:
-                if priority or s not in neg_options:
-                    neg_options[s] = cli
-        if add_to_active and id(cli) not in {id(x) for x in active}:
-            active.append(cli)
+                if priority or s not in self.neg_options:
+                    self.neg_options[s] = cli
+        if add_to_active and id(cli) not in {id(x) for x in self.active}:
+            self.active.append(cli)
 
-    choice_branch_paths: set[str] = set()
-    for cli in cli_items:
-        if cli.positional:
-            pos_queue.append(cli)
-        elif isinstance(cli, CliChoice):
-            for branch in cli.choice_options:
-                for b_item in branch:
-                    register(b_item, priority=False, add_to_active=False)
-                    choice_branch_paths.add(b_item.path)
-            states.append(ChoiceState(cli))
-            active.append(cli)
-        else:
-            register(cli, priority=True)
-
-    result: dict[str, Any] = {}
-    spans: dict[str, CLILocation] = {}
-
-    def _loc(arg_index: int, start: int, end: int) -> CLILocation:
-        return CLILocation(argv=argv, arg_index=arg_index, start=start, end=end, prog=prog)
-
-    def observe(path: str) -> None:
-        for state in states:
+    def observe(self, path: str) -> None:
+        for state in self.states:
             state.observe(path)
 
-    def activate_tagged(tagged: CliTagged, tag: str, tag_loc: CLILocation = None) -> None:
-        nonlocal description
+    def activate_tagged(self, tagged: CliTagged, tag: str, tag_loc: CLILocation = None) -> None:
         if tag not in tagged.tag_options:
             raise ParseError(
                 f"Unknown tag {tag!r} for '{tagged.path}'. Valid tags: {list(tagged.tag_options)}",
@@ -638,186 +668,180 @@ def _parse(
             )
         group = tagged.tag_options[tag]
         if group.description:
-            description = group.description.strip()
+            self.description = group.description.strip()
         path = f"{tagged.path}.{tag_field}"
-        result[path] = tag
+        self.result[path] = tag
         if tag_loc is not None:
-            spans[path] = tag_loc
-        # Remove the resolved selector from the registry and active list.
-        for s in [s for s, v in options.items() if v is tagged]:
-            del options[s]
-        if tagged in active:
-            active.remove(tagged)
-        # Register branch items with priority (they override any existing short names).
-        for cli in tagged.tag_options[tag].items:
+            self.spans[path] = tag_loc
+        for s in [s for s, v in self.options.items() if v is tagged]:
+            del self.options[s]
+        if tagged in self.active:
+            self.active.remove(tagged)
+        for cli in group.items:
             if cli.positional:
-                pos_queue.insert(0, cli)
+                self.pos_queue.insert(0, cli)
             else:
-                register(cli, priority=True)
+                self.register(cli)
 
-    seen: list[str] = []  # positional tokens consumed so far, for the usage line
+    # ── Location ──────────────────────────────────────────────────────────────
 
-    i = 0
-    while i < len(argv):
-        token = argv[i]
+    def _loc(self, tok: _Token, start: int, end: int) -> CLILocation:
+        return CLILocation(
+            argv=self.argv,
+            arg_index=tok.arg_index,
+            start=tok.src_offset + start,
+            end=tok.src_offset + end,
+            prog=self.prog,
+        )
 
-        # Remainder mode: current positional gobbles everything, including --flags.
-        if pos_queue and pos_queue[0].remainder:
-            _set_field(
-                pos_queue[0], token, result, observe, spans=spans, loc=_loc(i, 0, len(token))
-            )
-            i += 1
-            continue
+    # ── Token processing ──────────────────────────────────────────────────────
 
-        if token in ("-h", "--help"):
-            opts_display = [c for c in active if not c.positional]
-            seen_str = " ".join(seen)
-            prog = sys.argv[0] + (f" {seen_str}" if seen_str else "")
-            print(
-                _render_help(
-                    opts_display,
-                    list(pos_queue),
-                    description=description,
-                    color=sys.stdout.isatty(),
-                    prog=prog,
-                )
-            )
-            sys.exit(0)
+    def _get_value(
+        self, tok: _Token, inline: str | None, val_loc: CLILocation | None, key_loc: CLILocation
+    ) -> tuple[str, CLILocation]:
+        """Return (value, loc), consuming the next queued token if no inline value."""
+        if inline is not None:
+            return inline, val_loc
+        if not self.queue:
+            raise ParseError(f"Expected value after {tok.text!r}", key_loc)
+        nxt = self.queue.popleft()
+        return nxt.text, self._loc(nxt, 0, len(nxt.text))
 
-        elif token.startswith("--") or (token.startswith("-") and len(token) == 2):
-            pfx = 1 if len(token) == 2 else 2  # length of the dash prefix
-            key = token[pfx:]
-            inline_value = None
-            val_loc = None
-            if "=" in key:
-                key, inline_value = key.split("=", 1)
-                val_start = pfx + len(key) + 1  # skip dashes + key + "="
-                val_loc = _loc(i, val_start, len(token))
-
-            key_loc = _loc(i, 0, pfx + len(key))
-
-            if key in neg_options:
-                cli = neg_options[key]
-                result[cli.path] = False
-                spans[cli.path] = key_loc
-                observe(cli.path)
-                i += 1
-                continue
-
-            if key not in options:
-                raise ParseError(f"Unknown option: {token!r}", _loc(i, 0, len(token)))
-
-            cli = options[key]
-
-            if isinstance(cli, CliTagged):
-                if inline_value is None:
-                    if i + 1 >= len(argv):
-                        raise ParseError(f"Expected tag value after {token!r}", key_loc)
-                    inline_value = argv[i + 1]
-                    val_loc = _loc(i + 1, 0, len(inline_value))
-                    i += 1
-                activate_tagged(cli, inline_value, val_loc)
-                seen.append(inline_value)
-                observe(cli.path)
-                i += 1
-
-            elif cli.max_args == 0:  # bool flag
-                result[cli.path] = True
-                spans[cli.path] = key_loc
-                observe(cli.path)
-                i += 1
-
-            else:
-                if inline_value is None:
-                    if i + 1 >= len(argv):
-                        raise ParseError(f"Expected value after {token!r}", key_loc)
-                    inline_value = argv[i + 1]
-                    val_loc = _loc(i + 1, 0, len(inline_value))
-                    i += 1
-                _set_field(cli, inline_value, result, observe, spans=spans, loc=val_loc)
-                i += 1
-
-        elif token.startswith("-") and len(token) > 2 and not token.startswith("--"):
-            # Compact single-dash flags: -xyz  or  -o=val  or  -oval
-            compact_i = i
-            rest = token[1:]
-            token_offset = 1  # current byte position within the original token
-            while rest:
-                ch = rest[0]
-                rest = rest[1:]
-                ch_offset = token_offset
-                token_offset += 1
-
-                if ch in neg_options:
-                    cli = neg_options[ch]
-                    result[cli.path] = False
-                    spans[cli.path] = _loc(compact_i, ch_offset, ch_offset + 1)
-                    observe(cli.path)
-                elif ch in options:
-                    cli = options[ch]
-                    if cli.max_args == 0:  # bool
-                        result[cli.path] = True
-                        spans[cli.path] = _loc(compact_i, ch_offset, ch_offset + 1)
-                        observe(cli.path)
-                    else:
-                        if not rest:
-                            i += 1
-                            if i >= len(argv):
-                                raise ParseError(
-                                    f"Expected value after -{ch!r}",
-                                    _loc(compact_i, ch_offset, ch_offset + 1),
-                                )
-                            rest = argv[i]
-                            val_loc = _loc(i, 0, len(rest))
-                        else:
-                            if rest.startswith("="):
-                                rest = rest[1:]
-                                token_offset += 1
-                            val_loc = _loc(compact_i, token_offset, token_offset + len(rest))
-                        _set_field(cli, rest, result, observe, spans=spans, loc=val_loc)
-                        rest = ""
-                else:
-                    raise ParseError(
-                        f"Unknown option: -{ch!r}",
-                        _loc(compact_i, ch_offset, ch_offset + 1),
-                    )
-            i += 1
-
+    def _dispatch(
+        self,
+        tok: _Token,
+        cli: CliBase,
+        key_loc: CLILocation,
+        inline: str | None,
+        val_loc: CLILocation | None,
+    ) -> None:
+        """Apply a resolved option: tagged selector, bool flag, or value field."""
+        if isinstance(cli, CliTagged):
+            value, val_loc = self._get_value(tok, inline, val_loc, key_loc)
+            self.activate_tagged(cli, value, val_loc)
+            self.seen.append(value)
+            self.observe(cli.path)
+        elif cli.max_args == 0:  # bool flag — no value consumed
+            self.result[cli.path] = True
+            self.spans[cli.path] = key_loc
+            self.observe(cli.path)
         else:
-            if not pos_queue:
-                raise ParseError(
-                    f"Unexpected positional argument: {token!r}",
-                    _loc(i, 0, len(token)),
-                )
-            cli = pos_queue[0]
+            value, val_loc = self._get_value(tok, inline, val_loc, key_loc)
+            _set_field(cli, value, self.result, self.observe, spans=self.spans, loc=val_loc)
 
-            if isinstance(cli, CliTagged):
-                pos_queue.pop(0)
-                activate_tagged(cli, token, _loc(i, 0, len(token)))
-                seen.append(token)
-                observe(cli.path)
-            else:
-                _set_field(cli, token, result, observe, spans=spans, loc=_loc(i, 0, len(token)))
-                if not cli.remainder:
-                    pos_queue.pop(0)
-            i += 1
+    @ovld(priority=1)
+    def _process(self, tok: _Token, text: Literal["-h", "--help"]):
+        self.show_help()
 
-    # Check for missing required arguments
-    seen_cli_paths: set[str] = set()
-    missing: list[CliBase] = []
-    for cli in options.values():
-        if cli.path in seen_cli_paths or cli.path in choice_branch_paths:
-            continue
-        seen_cli_paths.add(cli.path)
-        if not cli.field.required:
-            continue
-        key = f"{cli.path}.{tag_field}" if isinstance(cli, CliTagged) else cli.path
-        if key not in result:
-            missing.append(cli)
-    for cli in pos_queue:
-        if not cli.remainder and cli.field.required:
-            missing.append(cli)
-    if missing:
+    @ovld
+    def _process(self, tok: _Token, text: Regexp["^--"]):
+        """Handle --key and --key=val."""
+        key = tok.text[2:]
+        inline, val_loc = None, None
+        if "=" in key:
+            key, inline = key.split("=", 1)
+            val_loc = self._loc(tok, 2 + len(key) + 1, len(tok.text))
+        key_loc = self._loc(tok, 0, 2 + len(key))
+
+        if key in self.neg_options:
+            cli = self.neg_options[key]
+            self.result[cli.path] = False
+            self.spans[cli.path] = key_loc
+            self.observe(cli.path)
+            return
+
+        if key not in self.options:
+            raise ParseError(f"Unknown option: {tok.text!r}", self._loc(tok, 0, len(tok.text)))
+
+        self._dispatch(tok, self.options[key], key_loc, inline, val_loc)
+
+    @ovld
+    def _process(self, tok: _Token, text: Regexp["^-[^-]"]):
+        """Handle -x, -xyz, -x=val, -xval.
+
+        Processes the first flag char and pushes the remainder back as a new
+        token so the main loop handles it naturally on the next iteration.
+        """
+        ch, rest = tok.text[1], tok.text[2:]
+        ch_loc = self._loc(tok, 1, 2)
+
+        if ch in self.neg_options:
+            cli = self.neg_options[ch]
+            self.result[cli.path] = False
+            self.spans[cli.path] = ch_loc
+            self.observe(cli.path)
+        elif ch in self.options:
+            cli = self.options[ch]
+            if cli.max_args == 0:  # bool flag
+                self.result[cli.path] = True
+                self.spans[cli.path] = ch_loc
+                self.observe(cli.path)
+            else:  # value option: rest (minus optional leading =) is the inline value
+                eq = rest.startswith("=")
+                inline = rest[eq:] or None
+                val_loc = self._loc(tok, 2 + eq, 2 + eq + len(inline)) if inline else None
+                self._dispatch(tok, cli, ch_loc, inline, val_loc)
+                return  # rest was consumed as value; nothing to push back
+        else:
+            raise ParseError(f"Unknown option: -{ch!r}", ch_loc)
+
+        if rest:  # push remaining chars back for the next iteration
+            self.queue.appendleft(_Token(f"-{rest}", tok.arg_index, tok.src_offset + 1))
+
+    @ovld
+    def _process(self, tok: _Token, text: str):
+        if not self.pos_queue:
+            raise ParseError(
+                f"Unexpected positional argument: {tok.text!r}",
+                self._loc(tok, 0, len(tok.text)),
+            )
+        cli = self.pos_queue[0]
+        loc = self._loc(tok, 0, len(tok.text))
+        if isinstance(cli, CliTagged):
+            self.pos_queue.pop(0)
+            self.activate_tagged(cli, tok.text, loc)
+            self.seen.append(tok.text)
+            self.observe(cli.path)
+        else:
+            _set_field(cli, tok.text, self.result, self.observe, spans=self.spans, loc=loc)
+            if not cli.remainder:
+                self.pos_queue.pop(0)
+
+    def step(self) -> None:
+        tok = self.queue.popleft()
+
+        if self.pos_queue and self.pos_queue[0].remainder:
+            _set_field(
+                self.pos_queue[0],
+                tok.text,
+                self.result,
+                self.observe,
+                spans=self.spans,
+                loc=self._loc(tok, 0, len(tok.text)),
+            )
+            return
+
+        self._process(tok, tok.text)
+
+    # ── Post-parse validation ─────────────────────────────────────────────────
+
+    def check_missing(self) -> None:
+        seen_paths: set[str] = set()
+        missing: list[CliBase] = []
+        for cli in self.options.values():
+            if cli.path in seen_paths or cli.path in self.choice_branch_paths:
+                continue
+            seen_paths.add(cli.path)
+            if not cli.field.required:
+                continue
+            key = f"{cli.path}.{tag_field}" if isinstance(cli, CliTagged) else cli.path
+            if key not in self.result:
+                missing.append(cli)
+        for cli in self.pos_queue:
+            if not cli.remainder and cli.field.required:
+                missing.append(cli)
+        if not missing:
+            return
         names = []
         for cli in missing:
             if cli.positional:
@@ -828,7 +852,15 @@ def _parse(
         noun = "arguments" if len(names) > 1 else "argument"
         raise ParseError(f"Missing required {noun}: {', '.join(names)}")
 
-    return ParsedDict(unflatten(result), spans, argv)
+
+def _parse(
+    root_type: type, argv: list[str], description: str = None, prog: str = None
+) -> ParsedDict:
+    state = ParserState(root_type, argv, description, prog)
+    while state.queue:
+        state.step()
+    state.check_missing()
+    return ParsedDict(unflatten(state.result), state.spans, argv)
 
 
 # ── Public interface ─────────────────────────────────────────────────────────
