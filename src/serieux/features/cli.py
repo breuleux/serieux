@@ -580,6 +580,61 @@ class ChoiceState:
             self.possible &= self.cli.option_to_branches[path]
 
 
+# ── Actions ──────────────────────────────────────────────────────────────────
+
+
+@dataclass
+class Action:
+    """Base for option actions; one instance per option string in ParserState.options."""
+
+    cli: CliBase
+
+    def activate(
+        self,
+        state: "ParserState",
+        key_loc: CLILocation,
+        inline: str | None,
+        val_loc: CLILocation | None,
+    ) -> bool:
+        """Activate the action. Returns True if inline was consumed, False if not."""
+        raise NotImplementedError  # pragma: no cover
+
+
+@dataclass
+class SetFlag(Action):
+    """Set a bool field to a fixed value without consuming any argument."""
+
+    value: bool
+
+    def activate(self, state, key_loc, inline, val_loc) -> bool:
+        state.result[self.cli.path] = self.value
+        state.spans[self.cli.path] = key_loc
+        state.observe(self.cli.path)
+        return False
+
+
+@dataclass
+class SetValue(Action):
+    """Consume the next argument and set a scalar/list field."""
+
+    def activate(self, state, key_loc, inline, val_loc) -> bool:
+        value, loc = state.consume(inline, val_loc, key_loc)
+        _set_field(self.cli, value, state.result, state.observe, spans=state.spans, loc=loc)
+        return True
+
+
+@dataclass
+class ActivateTag(Action):
+    """Consume the next argument as a tag name and activate the matching union branch."""
+
+    def activate(self, state, key_loc, inline, val_loc) -> bool:
+        value, loc = state.consume(inline, val_loc, key_loc)
+        state.activate_tagged(self.cli, value, loc)
+        state.seen.append(value)
+        state.observe(self.cli.path)
+        return True
+
+
 # ── Core parser ──────────────────────────────────────────────────────────────
 
 
@@ -605,8 +660,7 @@ class ParserState:
         self.argv = argv
         self.prog = prog or sys.argv[0]
         self.description = description or getattr(root_type, "__doc__", None)
-        self.options: dict[str, CliBase] = {}
-        self.neg_options: dict[str, CliField] = {}
+        self.options: dict[str, Action] = {}
         self.pos_queue: list[CliBase] = []
         self.states: list[ChoiceState] = []
         self.active: list[CliBase] = []
@@ -646,13 +700,18 @@ class ParserState:
     # ── Registration ──────────────────────────────────────────────────────────
 
     def register(self, cli: CliBase, priority: bool = True, add_to_active: bool = True) -> None:
+        if isinstance(cli, CliTagged):
+            action: Action = ActivateTag(cli=cli)
+        elif isinstance(cli, CliField) and cli.max_args == 0:
+            for s in cli.negation_strings:
+                if priority or s not in self.options:
+                    self.options[s] = SetFlag(cli=cli, value=False)
+            action = SetFlag(cli=cli, value=True)
+        else:
+            action = SetValue(cli=cli)
         for s in cli.option_strings:
             if priority or s not in self.options:
-                self.options[s] = cli
-        if isinstance(cli, CliField):
-            for s in cli.negation_strings:
-                if priority or s not in self.neg_options:
-                    self.neg_options[s] = cli
+                self.options[s] = action
         if add_to_active and id(cli) not in {id(x) for x in self.active}:
             self.active.append(cli)
 
@@ -673,7 +732,7 @@ class ParserState:
         self.result[path] = tag
         if tag_loc is not None:
             self.spans[path] = tag_loc
-        for s in [s for s, v in self.options.items() if v is tagged]:
+        for s in [s for s, a in self.options.items() if a.cli is tagged]:
             del self.options[s]
         if tagged in self.active:
             self.active.remove(tagged)
@@ -696,38 +755,24 @@ class ParserState:
 
     # ── Token processing ──────────────────────────────────────────────────────
 
-    def _get_value(
-        self, tok: _Token, inline: str | None, val_loc: CLILocation | None, key_loc: CLILocation
+    def consume(
+        self,
+        inline: str | None,
+        val_loc: CLILocation | None,
+        key_loc: CLILocation,
+        *,
+        consume_options: bool = True,
     ) -> tuple[str, CLILocation]:
         """Return (value, loc), consuming the next queued token if no inline value."""
         if inline is not None:
             return inline, val_loc
         if not self.queue:
-            raise ParseError(f"Expected value after {tok.text!r}", key_loc)
-        nxt = self.queue.popleft()
+            raise ParseError("Expected a value", key_loc)
+        nxt = self.queue[0]
+        if not consume_options and nxt.text.startswith("-"):
+            raise ParseError("Expected a value", key_loc)
+        self.queue.popleft()
         return nxt.text, self._loc(nxt, 0, len(nxt.text))
-
-    def _dispatch(
-        self,
-        tok: _Token,
-        cli: CliBase,
-        key_loc: CLILocation,
-        inline: str | None,
-        val_loc: CLILocation | None,
-    ) -> None:
-        """Apply a resolved option: tagged selector, bool flag, or value field."""
-        if isinstance(cli, CliTagged):
-            value, val_loc = self._get_value(tok, inline, val_loc, key_loc)
-            self.activate_tagged(cli, value, val_loc)
-            self.seen.append(value)
-            self.observe(cli.path)
-        elif cli.max_args == 0:  # bool flag — no value consumed
-            self.result[cli.path] = True
-            self.spans[cli.path] = key_loc
-            self.observe(cli.path)
-        else:
-            value, val_loc = self._get_value(tok, inline, val_loc, key_loc)
-            _set_field(cli, value, self.result, self.observe, spans=self.spans, loc=val_loc)
 
     @ovld(priority=1)
     def _process(self, tok: _Token, text: Literal["-h", "--help"]):
@@ -742,18 +787,9 @@ class ParserState:
             key, inline = key.split("=", 1)
             val_loc = self._loc(tok, 2 + len(key) + 1, len(tok.text))
         key_loc = self._loc(tok, 0, 2 + len(key))
-
-        if key in self.neg_options:
-            cli = self.neg_options[key]
-            self.result[cli.path] = False
-            self.spans[cli.path] = key_loc
-            self.observe(cli.path)
-            return
-
         if key not in self.options:
             raise ParseError(f"Unknown option: {tok.text!r}", self._loc(tok, 0, len(tok.text)))
-
-        self._dispatch(tok, self.options[key], key_loc, inline, val_loc)
+        self.options[key].activate(self, key_loc, inline, val_loc)
 
     @ovld
     def _process(self, tok: _Token, text: Regexp["^-[^-]"]):
@@ -764,28 +800,13 @@ class ParserState:
         """
         ch, rest = tok.text[1], tok.text[2:]
         ch_loc = self._loc(tok, 1, 2)
-
-        if ch in self.neg_options:
-            cli = self.neg_options[ch]
-            self.result[cli.path] = False
-            self.spans[cli.path] = ch_loc
-            self.observe(cli.path)
-        elif ch in self.options:
-            cli = self.options[ch]
-            if cli.max_args == 0:  # bool flag
-                self.result[cli.path] = True
-                self.spans[cli.path] = ch_loc
-                self.observe(cli.path)
-            else:  # value option: rest (minus optional leading =) is the inline value
-                eq = rest.startswith("=")
-                inline = rest[eq:] or None
-                val_loc = self._loc(tok, 2 + eq, 2 + eq + len(inline)) if inline else None
-                self._dispatch(tok, cli, ch_loc, inline, val_loc)
-                return  # rest was consumed as value; nothing to push back
-        else:
+        if ch not in self.options:
             raise ParseError(f"Unknown option: -{ch!r}", ch_loc)
-
-        if rest:  # push remaining chars back for the next iteration
+        action = self.options[ch]
+        eq = rest.startswith("=")
+        inline = rest[eq:] or None
+        val_loc = self._loc(tok, 2 + eq, 2 + eq + len(inline)) if inline else None
+        if not action.activate(self, ch_loc, inline, val_loc) and rest:
             self.queue.appendleft(_Token(f"-{rest}", tok.arg_index, tok.src_offset + 1))
 
     @ovld
@@ -828,7 +849,8 @@ class ParserState:
     def check_missing(self) -> None:
         seen_paths: set[str] = set()
         missing: list[CliBase] = []
-        for cli in self.options.values():
+        for action in self.options.values():
+            cli = action.cli
             if cli.path in seen_paths or cli.path in self.choice_branch_paths:
                 continue
             seen_paths.add(cli.path)
