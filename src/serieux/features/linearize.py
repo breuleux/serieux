@@ -68,7 +68,9 @@ def linearize(t: type[FieldModelizable], prefix: str = ""):
 def linearize(ft: type[Any @ TagSet], owner: type, fld: Field, path: str):
     """Field type is directly annotated with a TagSet."""
     base, ts = decompose(ft)
-    options = {tag: LinearGroup(type=cls, items=recurse(cls, path)) for tag, cls in ts.iterate(base)}
+    options = {
+        tag: LinearGroup(type=cls, items=recurse(cls, path)) for tag, cls in ts.iterate(base)
+    }
     return [LinearTagged(owner=owner, field=fld, path=path, options=options)]
 
 
@@ -114,6 +116,6 @@ def linearize(ft: type[FieldModelizable], owner: type, fld: Field, path: str):
 
 
 @ovld
-def linearize(ft: type[object], owner: type, fld: Field, path: str):
+def linearize(ft: type[Any], owner: type, fld: Field, path: str):
     """Primitive / leaf field."""
     return [LinearField(type=ft, owner=owner, field=fld, path=path)]

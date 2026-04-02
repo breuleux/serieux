@@ -7,20 +7,64 @@ from __future__ import annotations
 
 import re as _re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import MISSING, dataclass, field
 from typing import Any
 
 from ovld import Medley, ovld, recurse
 
 from ..ctx import Context
+from ..exc import find_information
 from ..model import ListModelizable, model
 from .dotted import unflatten
 from .linearize import LinearBase, LinearChoice, LinearField, LinearTagged, linearize
 from .tagset import tag_field
 
 
+@dataclass
+class CLILocation:
+    """Source location of a parsed token within an argv list."""
+
+    argv: list[str]
+    arg_index: int  # 0-based index into argv
+    start: int  # inclusive char offset within argv[arg_index]
+    end: int  # exclusive char offset
+    prog: str = None  # program name prepended to the error display line
+
+    def render(self, message: str, color: bool = None) -> str:
+        if color is None:
+            color = sys.stderr.isatty()
+        offsets = []
+        pos = 0
+        for arg in self.argv:
+            offsets.append(pos)
+            pos += len(arg) + 1
+        arg_line = " ".join(self.argv)
+        abs_start = offsets[self.arg_index] + self.start
+        abs_end = offsets[self.arg_index] + self.end
+        width = max(1, abs_end - abs_start)
+        err_col = "\033[1;31m" if color else ""
+        reset = "\033[0m" if color else ""
+        if self.prog:
+            dim = "\033[2m" if color else ""
+            prefix_len = len(self.prog) + 1
+            line = f"{dim}{self.prog}{reset} {arg_line}"
+            underline = " " * (prefix_len + abs_start) + err_col + "^" * width + reset
+        else:
+            line = arg_line
+            underline = " " * abs_start + err_col + "^" * width + reset
+        return f"{message}\n\n  {line}\n  {underline}"
+
+
 class ParseError(Exception):
-    pass
+    def __init__(self, message: str, location: CLILocation = None):
+        super().__init__(message)
+        self.location = location
+
+    def __str__(self) -> str:
+        msg = self.args[0]
+        if self.location is not None:
+            return self.location.render(msg)
+        return msg
 
 
 # ── Linear item helpers ──────────────────────────────────────────────────────
@@ -339,13 +383,17 @@ def _cli_sig(cli: CliBase, color: bool) -> str:
     names = ", ".join(_c(_CY, _dash(s), color) for s in visible)
 
     if isinstance(cli, CliField):
-        if cli.max_args == 0:  # bool flag — show first negation after a slash
-            neg = (
-                _c(_D, " / " + _dash(cli.negation_strings[0]), color)
-                if cli.negation_strings
-                else ""
-            )
-            return names + neg
+        if cli.max_args == 0:  # bool flag
+            if cli.negation_strings:
+                neg_name = _dash(cli.negation_strings[0])
+                if cli.field.default is True:
+                    # Default on: show --no-opt first so the "change" action is prominent
+                    return _c(_CY, neg_name, color) + _c(
+                        _D, " / " + ", ".join(_dash(s) for s in visible), color
+                    )
+                else:
+                    return names + _c(_D, " / " + neg_name, color)
+            return names
         if cli.metavar:
             names += " " + _c(_GR, cli.metavar, color)
         return names
@@ -354,6 +402,28 @@ def _cli_sig(cli: CliBase, color: bool) -> str:
         return names + " " + _c(_GR, cli.metavar, color)
 
     return names
+
+
+def _default_hint(cli: "CliField") -> str:
+    """Short annotation about a field's default for help text; empty string if required."""
+    f = cli.field
+    if f.required:
+        return ""
+    d = f.default
+    if d is MISSING:
+        return "(optional)"
+    if isinstance(d, bool):
+        visible = [s for s in cli.option_strings if "." not in s] or cli.option_strings
+        if d:
+            flag = _dash(visible[0]) if visible else None
+        else:
+            flag = _dash(cli.negation_strings[0]) if cli.negation_strings else None
+        return f"(default: {flag})" if flag else "(optional)"
+    if isinstance(d, (int, float)):
+        return f"(default: {d})"
+    if isinstance(d, str) and len(d) <= 20:
+        return f'(default: "{d}")'
+    return "(optional)"
 
 
 def _help_lines(
@@ -372,7 +442,10 @@ def _help_lines(
             continue
         raw_len = len(_re.sub(r"\033\[[0-9;]*m", "", sig))
         desc = cli.field.description or ""
-        desc_str = ("  " + desc) if desc else ""
+        hint = _default_hint(cli) if isinstance(cli, CliField) else ""
+        hint_str = _c(_D, hint, color) if hint else ""
+        parts = [s for s in (desc, hint_str) if s]
+        desc_str = ("  " + "  ".join(parts)) if parts else ""
         lines.append(f"{pad}{sig}{' ' * max(1, col_width - raw_len)}{desc_str}")
 
         if isinstance(cli, CliTagged):
@@ -455,7 +528,15 @@ def _convert(ft: type, raw: str) -> Any:
     return raw
 
 
-def _set_field(cli: CliField, value_str: str, result: dict, observe) -> None:
+def _set_field(
+    cli: CliField,
+    value_str: str,
+    result: dict,
+    observe,
+    *,
+    spans: dict = None,
+    loc: CLILocation = None,
+) -> None:
     ft = cli.type
     if issubclass(ft, ListModelizable) or cli.field.metadata.get("action") == "append":
         m = model(ft)
@@ -465,7 +546,18 @@ def _set_field(cli: CliField, value_str: str, result: dict, observe) -> None:
         result[cli.path] = (existing if isinstance(existing, list) else [existing]) + [converted]
     else:
         result[cli.path] = _convert(ft, value_str)
+    if spans is not None and loc is not None:
+        spans[cli.path] = loc
     observe(cli.path)
+
+
+class ParsedDict(dict):
+    """Result of _parse: a dict of field values with attached per-field source locations."""
+
+    def __init__(self, data: dict, spans: "dict[str, CLILocation]", argv: list[str]) -> None:
+        super().__init__(data)
+        self.spans = spans  # flat dotted-path → CLILocation
+        self.argv = argv
 
 
 # ── Choice state tracker ─────────────────────────────────────────────────────
@@ -489,8 +581,11 @@ class ChoiceState:
 # ── Core parser ──────────────────────────────────────────────────────────────
 
 
-def _parse(root_type: type, argv: list[str], description: str = None) -> dict:
+def _parse(
+    root_type: type, argv: list[str], description: str = None, prog: str = None
+) -> ParsedDict:
     description = description or getattr(root_type, "__doc__", None)
+    prog = prog or sys.argv[0]
     cli_items = compile_cli(linearize(root_type))
 
     options: dict[str, CliBase] = {}
@@ -499,7 +594,7 @@ def _parse(root_type: type, argv: list[str], description: str = None) -> dict:
     states: list[ChoiceState] = []
     active: list[CliBase] = []  # ordered list for contextual help display
 
-    def register(cli: CliBase, priority: bool = True) -> None:
+    def register(cli: CliBase, priority: bool = True, add_to_active: bool = True) -> None:
         for s in cli.option_strings:
             if priority or s not in options:
                 options[s] = cli
@@ -507,33 +602,47 @@ def _parse(root_type: type, argv: list[str], description: str = None) -> dict:
             for s in cli.negation_strings:
                 if priority or s not in neg_options:
                     neg_options[s] = cli
-        if id(cli) not in {id(x) for x in active}:
+        if add_to_active and id(cli) not in {id(x) for x in active}:
             active.append(cli)
 
+    choice_branch_paths: set[str] = set()
     for cli in cli_items:
         if cli.positional:
             pos_queue.append(cli)
         elif isinstance(cli, CliChoice):
             for branch in cli.choice_options:
                 for b_item in branch:
-                    register(b_item, priority=False)
+                    register(b_item, priority=False, add_to_active=False)
+                    choice_branch_paths.add(b_item.path)
             states.append(ChoiceState(cli))
             active.append(cli)
         else:
             register(cli, priority=True)
 
     result: dict[str, Any] = {}
+    spans: dict[str, CLILocation] = {}
+
+    def _loc(arg_index: int, start: int, end: int) -> CLILocation:
+        return CLILocation(argv=argv, arg_index=arg_index, start=start, end=end, prog=prog)
 
     def observe(path: str) -> None:
         for state in states:
             state.observe(path)
 
-    def activate_tagged(tagged: CliTagged, tag: str) -> None:
+    def activate_tagged(tagged: CliTagged, tag: str, tag_loc: CLILocation = None) -> None:
+        nonlocal description
         if tag not in tagged.tag_options:
             raise ParseError(
-                f"Unknown tag {tag!r} for '{tagged.path}'. Valid tags: {list(tagged.tag_options)}"
+                f"Unknown tag {tag!r} for '{tagged.path}'. Valid tags: {list(tagged.tag_options)}",
+                tag_loc,
             )
-        result[f"{tagged.path}.{tag_field}"] = tag
+        group = tagged.tag_options[tag]
+        if group.description:
+            description = group.description.strip()
+        path = f"{tagged.path}.{tag_field}"
+        result[path] = tag
+        if tag_loc is not None:
+            spans[path] = tag_loc
         # Remove the resolved selector from the registry and active list.
         for s in [s for s, v in options.items() if v is tagged]:
             del options[s]
@@ -554,7 +663,9 @@ def _parse(root_type: type, argv: list[str], description: str = None) -> dict:
 
         # Remainder mode: current positional gobbles everything, including --flags.
         if pos_queue and pos_queue[0].remainder:
-            _set_field(pos_queue[0], token, result, observe)
+            _set_field(
+                pos_queue[0], token, result, observe, spans=spans, loc=_loc(i, 0, len(token))
+            )
             i += 1
             continue
 
@@ -574,94 +685,150 @@ def _parse(root_type: type, argv: list[str], description: str = None) -> dict:
             sys.exit(0)
 
         elif token.startswith("--") or (token.startswith("-") and len(token) == 2):
-            key = token[1:] if len(token) == 2 else token[2:]
+            pfx = 1 if len(token) == 2 else 2  # length of the dash prefix
+            key = token[pfx:]
             inline_value = None
+            val_loc = None
             if "=" in key:
                 key, inline_value = key.split("=", 1)
+                val_start = pfx + len(key) + 1  # skip dashes + key + "="
+                val_loc = _loc(i, val_start, len(token))
+
+            key_loc = _loc(i, 0, pfx + len(key))
 
             if key in neg_options:
                 cli = neg_options[key]
                 result[cli.path] = False
+                spans[cli.path] = key_loc
                 observe(cli.path)
                 i += 1
                 continue
 
             if key not in options:
-                raise ParseError(f"Unknown option: {token!r}")
+                raise ParseError(f"Unknown option: {token!r}", _loc(i, 0, len(token)))
 
             cli = options[key]
 
             if isinstance(cli, CliTagged):
                 if inline_value is None:
                     if i + 1 >= len(argv):
-                        raise ParseError(f"Expected tag value after {token!r}")
+                        raise ParseError(f"Expected tag value after {token!r}", key_loc)
                     inline_value = argv[i + 1]
+                    val_loc = _loc(i + 1, 0, len(inline_value))
                     i += 1
-                activate_tagged(cli, inline_value)
+                activate_tagged(cli, inline_value, val_loc)
                 seen.append(inline_value)
                 observe(cli.path)
                 i += 1
 
             elif cli.max_args == 0:  # bool flag
                 result[cli.path] = True
+                spans[cli.path] = key_loc
                 observe(cli.path)
                 i += 1
 
             else:
                 if inline_value is None:
                     if i + 1 >= len(argv):
-                        raise ParseError(f"Expected value after {token!r}")
+                        raise ParseError(f"Expected value after {token!r}", key_loc)
                     inline_value = argv[i + 1]
+                    val_loc = _loc(i + 1, 0, len(inline_value))
                     i += 1
-                _set_field(cli, inline_value, result, observe)
+                _set_field(cli, inline_value, result, observe, spans=spans, loc=val_loc)
                 i += 1
 
         elif token.startswith("-") and len(token) > 2 and not token.startswith("--"):
-            # Compact single-dash flags: -xyz
+            # Compact single-dash flags: -xyz  or  -o=val  or  -oval
+            compact_i = i
             rest = token[1:]
+            token_offset = 1  # current byte position within the original token
             while rest:
                 ch = rest[0]
                 rest = rest[1:]
+                ch_offset = token_offset
+                token_offset += 1
+
                 if ch in neg_options:
                     cli = neg_options[ch]
                     result[cli.path] = False
+                    spans[cli.path] = _loc(compact_i, ch_offset, ch_offset + 1)
                     observe(cli.path)
                 elif ch in options:
                     cli = options[ch]
                     if cli.max_args == 0:  # bool
                         result[cli.path] = True
+                        spans[cli.path] = _loc(compact_i, ch_offset, ch_offset + 1)
                         observe(cli.path)
                     else:
                         if not rest:
                             i += 1
                             if i >= len(argv):
-                                raise ParseError(f"Expected value after -{ch!r}")
+                                raise ParseError(
+                                    f"Expected value after -{ch!r}",
+                                    _loc(compact_i, ch_offset, ch_offset + 1),
+                                )
                             rest = argv[i]
-                        if rest.startswith("="):
-                            rest = rest[1:]
-                        _set_field(cli, rest, result, observe)
+                            val_loc = _loc(i, 0, len(rest))
+                        else:
+                            if rest.startswith("="):
+                                rest = rest[1:]
+                                token_offset += 1
+                            val_loc = _loc(compact_i, token_offset, token_offset + len(rest))
+                        _set_field(cli, rest, result, observe, spans=spans, loc=val_loc)
                         rest = ""
                 else:
-                    raise ParseError(f"Unknown option: -{ch!r}")
+                    raise ParseError(
+                        f"Unknown option: -{ch!r}",
+                        _loc(compact_i, ch_offset, ch_offset + 1),
+                    )
             i += 1
 
         else:
             if not pos_queue:
-                raise ParseError(f"Unexpected positional argument: {token!r}")
+                raise ParseError(
+                    f"Unexpected positional argument: {token!r}",
+                    _loc(i, 0, len(token)),
+                )
             cli = pos_queue[0]
 
             if isinstance(cli, CliTagged):
                 pos_queue.pop(0)
-                activate_tagged(cli, token)
+                activate_tagged(cli, token, _loc(i, 0, len(token)))
                 seen.append(token)
                 observe(cli.path)
             else:
-                _set_field(cli, token, result, observe)
+                _set_field(cli, token, result, observe, spans=spans, loc=_loc(i, 0, len(token)))
                 if not cli.remainder:
                     pos_queue.pop(0)
             i += 1
 
-    return unflatten(result)
+    # Check for missing required arguments
+    seen_cli_paths: set[str] = set()
+    missing: list[CliBase] = []
+    for cli in options.values():
+        if cli.path in seen_cli_paths or cli.path in choice_branch_paths:
+            continue
+        seen_cli_paths.add(cli.path)
+        if not cli.field.required:
+            continue
+        key = f"{cli.path}.{tag_field}" if isinstance(cli, CliTagged) else cli.path
+        if key not in result:
+            missing.append(cli)
+    for cli in pos_queue:
+        if not cli.remainder and cli.field.required:
+            missing.append(cli)
+    if missing:
+        names = []
+        for cli in missing:
+            if cli.positional:
+                names.append(cli.metavar or cli.field.name.upper())
+            else:
+                visible = [_dash(s) for s in cli.option_strings if "." not in s]
+                names.append(visible[0] if visible else _dash(_full(cli)))
+        noun = "arguments" if len(names) > 1 else "argument"
+        raise ParseError(f"Missing required {noun}: {', '.join(names)}")
+
+    return ParsedDict(unflatten(result), spans, argv)
 
 
 # ── Public interface ─────────────────────────────────────────────────────────
@@ -681,19 +848,36 @@ class CLIDefinition:
     root_type: type = None
     mapping: dict[str, str | dict[str, Any]] = field(default_factory=lambda: {"": {"auto": True}})
     description: str = None
+    prog: str = None
 
     def __call__(self, argv: list[str]):
-        return _parse(self.root_type, argv, description=self.description)
+        return _parse(self.root_type, argv, description=self.description, prog=self.prog)
 
 
-def parse_cli(root_type: type, argv: list[str] = None, mapping=None, description: str = None):
+def parse_cli(
+    root_type: type,
+    argv: list[str] = None,
+    mapping=None,
+    description: str = None,
+    prog: str = None,
+):
     mapping = {"": {"auto": True}} if mapping is None else mapping
     argv = sys.argv[1:] if argv is None else argv
-    return CLIDefinition(root_type=root_type, mapping=mapping, description=description)(argv)
+    return CLIDefinition(root_type=root_type, mapping=mapping, description=description, prog=prog)(
+        argv
+    )
 
 
 class FromArguments(Medley):
     @ovld(priority=1)
     def deserialize(self, t: Any, obj: CommandLineArguments, ctx: Context):
         vals = obj.parse(t, obj.arguments)
-        return recurse(t, vals, ctx)
+        try:
+            return recurse(t, vals, ctx)
+        except Exception as exc:
+            if isinstance(vals, ParsedDict):
+                info = find_information(exc=exc, ctx=ctx)
+                path = ".".join(str(p) for p in info.path)
+                if loc := vals.spans.get(path):
+                    raise ParseError(str(exc), loc) from None
+            raise
