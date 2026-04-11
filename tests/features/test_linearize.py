@@ -82,7 +82,6 @@ def test_flat():
     assert all(isinstance(i, LinearField) for i in items)
     assert [i.path for i in items] == ["name", "age"]
     assert [i.type for i in items] == [str, int]
-    assert all(i.owner is Person for i in items)
 
 
 # ── nested struct is flattened ───────────────────────────────────────────────
@@ -95,14 +94,6 @@ def test_nested_flattened():
     assert paths == ["person.name", "person.age", "address.street", "address.city", "salary"]
 
 
-def test_nested_owner():
-    items = linearize(Employee)
-    owners = {i.path: i.owner for i in items}
-    assert owners["person.name"] is Person
-    assert owners["address.city"] is Address
-    assert owners["salary"] is Employee
-
-
 # ── tagged union → LinearTagged ──────────────────────────────────────────────
 
 
@@ -112,7 +103,6 @@ def test_tagged_union():
     assert len(tagged) == 1
     t = tagged[0]
     assert t.path == "animal"
-    assert t.owner is Pet
     assert set(t.options.keys()) == {"cat", "dog"}
 
 
@@ -158,7 +148,6 @@ def test_plain_union():
     c = items[0]
     assert isinstance(c, LinearChoice)
     assert c.path == "value"
-    assert c.owner is WithUnion
     assert len(c.options) == 2  # int branch, str branch
 
 

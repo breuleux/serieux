@@ -13,7 +13,6 @@ from .tagset import TagSet, decompose
 
 @dataclass(kw_only=True)
 class LinearBase:
-    owner: type
     field: Field
     path: str
 
@@ -57,25 +56,25 @@ def linearize(t: type[FieldModelizable], prefix: str = ""):
         if fld.name.startswith("_"):  # pragma: no cover
             continue
         path = f"{prefix}.{fld.name}" if prefix else fld.name
-        result.extend(recurse(fld.type, t, fld, path))
+        result.extend(recurse(fld.type, fld, path))
     return result
 
 
-# Four-argument form: decide what a single field contributes
+# Three-argument form: decide what a single field contributes
 
 
 @ovld(priority=1)
-def linearize(ft: type[Any @ TagSet], owner: type, fld: Field, path: str):
+def linearize(ft: type[Any @ TagSet], fld: Field, path: str):
     """Field type is directly annotated with a TagSet."""
     base, ts = decompose(ft)
     options = {
         tag: LinearGroup(type=cls, items=recurse(cls, path)) for tag, cls in ts.iterate(base)
     }
-    return [LinearTagged(owner=owner, field=fld, path=path, options=options)]
+    return [LinearTagged(field=fld, path=path, options=options)]
 
 
 @ovld
-def linearize(ft: type[UnionAlias], owner: type, fld: Field, path: str):
+def linearize(ft: type[UnionAlias], fld: Field, path: str):
     """Field type is a Union — tagged, optional, or plain."""
     non_none = [a for a in get_args(ft) if a is not NoneType]
     tagged = [a for a in non_none if TagSet.extract(a)]
@@ -87,7 +86,7 @@ def linearize(ft: type[UnionAlias], owner: type, fld: Field, path: str):
             base, ts = decompose(arg)
             for tag, cls in ts.iterate(base):
                 options[tag] = LinearGroup(type=cls, items=recurse(cls, path))
-        return [LinearTagged(owner=owner, field=fld, path=path, options=options)]
+        return [LinearTagged(field=fld, path=path, options=options)]
 
     # Optional[T] with a single non-None member
     if len(non_none) == 1:
@@ -96,26 +95,26 @@ def linearize(ft: type[UnionAlias], owner: type, fld: Field, path: str):
         if issubclass(inner, FieldModelizable) and not issubclass(inner, StringModelizable):
             return recurse(inner, path)
         # Leaf (StringModelizable, primitive, etc.) → dispatch through 4-arg form
-        return recurse(inner, owner, fld, path)
+        return recurse(inner, fld, path)
 
     # Plain union → LinearChoice, one list per member
-    options = [recurse(a, owner, fld, path) for a in non_none]
-    return [LinearChoice(owner=owner, field=fld, path=path, options=options)]
+    options = [recurse(a, fld, path) for a in non_none]
+    return [LinearChoice(field=fld, path=path, options=options)]
 
 
 @ovld(priority=1)
-def linearize(ft: type[StringModelizable], owner: type, fld: Field, path: str):
+def linearize(ft: type[StringModelizable], fld: Field, path: str):
     """StringModelizable is treated as a leaf even if it also has fields."""
-    return [LinearField(type=ft, owner=owner, field=fld, path=path)]
+    return [LinearField(type=ft, field=fld, path=path)]
 
 
 @ovld
-def linearize(ft: type[FieldModelizable], owner: type, fld: Field, path: str):
+def linearize(ft: type[FieldModelizable], fld: Field, path: str):
     """Nested struct field → flatten recursively."""
     return recurse(ft, path)
 
 
 @ovld
-def linearize(ft: type[Any], owner: type, fld: Field, path: str):
+def linearize(ft: type[Any], fld: Field, path: str):
     """Primitive / leaf field."""
-    return [LinearField(type=ft, owner=owner, field=fld, path=path)]
+    return [LinearField(type=ft, field=fld, path=path)]
