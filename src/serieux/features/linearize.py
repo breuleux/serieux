@@ -46,35 +46,23 @@ class LinearChoice(LinearBase):
     options: list[list[LinearBase]]
 
 
-# Two-argument form: linearize all fields of a struct type
 @ovld
-def linearize(t: type[FieldModelizable], prefix: str = ""):
-    """Flatten a struct type into a list of LinearField / LinearChoice."""
-    m = model(t)
-    result = []
-    for fld in m.fields:
-        if fld.name.startswith("_"):  # pragma: no cover
-            continue
-        path = f"{prefix}.{fld.name}" if prefix else fld.name
-        result.extend(recurse(fld.type, fld, path))
-    return result
-
-
-# Three-argument form: decide what a single field contributes
+def linearize(t: type[Any], prefix: str = ""):
+    return recurse(t, None, prefix)
 
 
 @ovld(priority=1)
-def linearize(ft: type[Any @ TagSet], fld: Field, path: str):
+def linearize(ft: type[Any @ TagSet], fld: Field | None, path: str):
     """Field type is directly annotated with a TagSet."""
     base, ts = decompose(ft)
     options = {
-        tag: LinearGroup(type=cls, items=recurse(cls, path)) for tag, cls in ts.iterate(base)
+        tag: LinearGroup(type=cls, items=recurse(cls, None, path)) for tag, cls in ts.iterate(base)
     }
     return [LinearTagged(field=fld, path=path, options=options)]
 
 
 @ovld
-def linearize(ft: type[UnionAlias], fld: Field, path: str):
+def linearize(ft: type[UnionAlias], fld: Field | None, path: str):
     """Field type is a Union — tagged, optional, or plain."""
     non_none = [a for a in get_args(ft) if a is not NoneType]
     tagged = [a for a in non_none if TagSet.extract(a)]
@@ -85,7 +73,7 @@ def linearize(ft: type[UnionAlias], fld: Field, path: str):
         for arg in tagged:
             base, ts = decompose(arg)
             for tag, cls in ts.iterate(base):
-                options[tag] = LinearGroup(type=cls, items=recurse(cls, path))
+                options[tag] = LinearGroup(type=cls, items=recurse(cls, None, path))
         return [LinearTagged(field=fld, path=path, options=options)]
 
     # Optional[T] with a single non-None member
@@ -93,7 +81,7 @@ def linearize(ft: type[UnionAlias], fld: Field, path: str):
         inner = non_none[0]
         # Pure struct (not string-serializable) → flatten transparently
         if issubclass(inner, FieldModelizable) and not issubclass(inner, StringModelizable):
-            return recurse(inner, path)
+            return recurse(inner, None, path)
         # Leaf (StringModelizable, primitive, etc.) → dispatch through 4-arg form
         return recurse(inner, fld, path)
 
@@ -103,18 +91,23 @@ def linearize(ft: type[UnionAlias], fld: Field, path: str):
 
 
 @ovld(priority=1)
-def linearize(ft: type[StringModelizable], fld: Field, path: str):
+def linearize(ft: type[StringModelizable], fld: Field | None, path: str):
     """StringModelizable is treated as a leaf even if it also has fields."""
     return [LinearField(type=ft, field=fld, path=path)]
 
 
 @ovld
-def linearize(ft: type[FieldModelizable], fld: Field, path: str):
+def linearize(ft: type[FieldModelizable], fld: Field | None, path: str):
     """Nested struct field → flatten recursively."""
-    return recurse(ft, path)
+    m = model(ft)
+    result = []
+    for subfld in m.fields:
+        subpath = f"{path}.{subfld.name}" if path else subfld.name
+        result.extend(recurse(subfld.type, subfld, subpath))
+    return result
 
 
 @ovld
-def linearize(ft: type[Any], fld: Field, path: str):
+def linearize(ft: type[Any], fld: Field | None, path: str):
     """Primitive / leaf field."""
     return [LinearField(type=ft, field=fld, path=path)]
