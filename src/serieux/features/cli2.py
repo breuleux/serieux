@@ -423,6 +423,31 @@ def _option_strings(lfield: LinearField) -> tuple[list[str], list[str]]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Control structure
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@dataclass(kw_only=True)
+class Control:
+    # [alias: -h]
+    help: bool = False
+
+    def build(self, flat, spans, parse_error):
+        if parse_error is not None:
+            raise parse_error
+        return ParsedArgs(unflatten(flat), spans)
+
+
+# Internal namespace used to segregate Control fields from root-type fields.
+# Using a dotted prefix with a non-identifier first segment ensures it can
+# never clash with user-defined field names (identifiers cannot start with a
+# digit).  The leading digit also prevents _cli_name from producing a leading
+# dash, while the fields still surface under their short names (e.g. ``help``)
+# and any aliases (e.g. ``-h``).
+_CTRL_NS = "0ctrl"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Handlers
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -959,15 +984,46 @@ def parse(
     """Parse *argv* (defaults to ``sys.argv[1:]``) against *root_type*'s schema.
 
     *prog* is the program name shown in error messages; defaults to ``sys.argv[0]``.
+
+    :class:`Control` flags (e.g. ``-h`` / ``--help``) are injected into the
+    parser via an internal namespace so they coexist with *root_type*'s own
+    fields without any path collision.  After parsing, :meth:`Control.build`
+    is called; it may intercept the result (e.g. print help and exit) or
+    return ``None`` to continue with normal deserialization.
     """
     if argv is None:
         argv = sys.argv[1:]
     if prog is None:
         prog = sys.argv[0]
     tokens = tokenize(argv)
-    group = linearize(root_type)
-    state = ParserState(group, prog=prog)
-    return state.run(tokens)
+
+    # Merge root-type fields with Control fields (in a private namespace).
+    root_group = linearize(root_type)
+    ctrl_group = linearize(Control, _CTRL_NS)
+    merged_group = root_group | ctrl_group
+
+    state = ParserState(merged_group, prog=prog)
+
+    parse_error: ParseError | None = None
+    try:
+        result = state.run(tokens)
+        flat = state.result
+        spans = result.spans
+    except ParseError as e:
+        parse_error = e
+        flat = state.result
+        spans = state.spans
+
+    # Extract Control values from the internal namespace and build the instance.
+    ctrl_prefix = _CTRL_NS + "."
+    ctrl_flat = {k[len(ctrl_prefix):]: v for k, v in flat.items() if k.startswith(ctrl_prefix)}
+    control = Control(**ctrl_flat)
+
+    # Strip Control fields from the result.
+    clean_flat = {k: v for k, v in flat.items() if not k.startswith(ctrl_prefix)}
+    clean_spans = {k: v for k, v in spans.items() if not k.startswith(ctrl_prefix)}
+
+    return control.build(clean_flat, clean_spans, parse_error)
 
 
 def parse_cli(root_type: type, argv: list[str] = None, prog: str | None = None) -> ParsedArgs:
