@@ -11,12 +11,11 @@ from typing import Any
 
 from ovld import Medley, ovld, recurse
 
+from ..ctx import Context
+from ..model import ListModelizable
 from .dotted import unflatten
 from .linearize import LinearField, LinearGroup, LinearUnlock, linearize
 from .tagset import tag_field
-from ..ctx import Context
-from ..model import ListModelizable
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Source location
@@ -25,34 +24,204 @@ from ..model import ListModelizable
 
 @dataclass
 class Loc:
-    """Character-level source location within an argv list."""
+    """Character-level source location within an argv list.
+
+    When ``phantom=True`` the location does not point to real characters but
+    to ``end`` imaginary characters inserted right *after* ``argv[arg_index]``
+    in the rendered output, to indicate where something is *missing*.
+    """
 
     argv: list[str]
     arg_index: int  # 0-based index into argv
-    start: int      # inclusive char offset within argv[arg_index]
-    end: int        # exclusive char offset within argv[arg_index]
+    start: int  # char offset within argv[arg_index]  (0 if phantom)
+    end: int  # exclusive end  (phantom width if phantom)
+    prog: str | None = None  # program name shown dimmed before the arg line
+    phantom: bool = False  # if True, insert phantom chars after argv[arg_index]
+    phantom_char: str = " "  # character used for the phantom display area
 
     def render(self, message: str, color: bool = None) -> str:
-        if color is None:
-            color = sys.stderr.isatty()
-        offsets = []
-        pos = 0
-        for arg in self.argv:
-            offsets.append(pos)
-            pos += len(arg) + 1
-        abs_start = offsets[self.arg_index] + self.start
-        abs_end = offsets[self.arg_index] + self.end
-        width = max(1, abs_end - abs_start)
-        arg_line = " ".join(self.argv)
-        err_col = "\033[1;31m" if color else ""
-        reset = "\033[0m" if color else ""
-        underline = " " * abs_start + err_col + "^" * width + reset
-        return f"{message}\n\n  {arg_line}\n  {underline}"
+        return _render_all_errors([(message, self)], color)
 
     def __add__(self, other: "Loc") -> "Loc":
         """Merge two locations within the same argv element."""
         assert self.argv is other.argv and self.arg_index == other.arg_index
-        return Loc(self.argv, self.arg_index, min(self.start, other.start), max(self.end, other.end))
+        return Loc(
+            self.argv,
+            self.arg_index,
+            min(self.start, other.start),
+            max(self.end, other.end),
+            self.prog,
+        )
+
+
+def _colorize_labeled(chars: list[str], err_col: str, reset: str) -> str:
+    """Join underline chars, wrapping every non-space run in ANSI error color."""
+    if not err_col:
+        return "".join(chars)
+    result: list[str] = []
+    in_err = False
+    for ch in chars:
+        if ch != " " and not in_err:
+            result.append(err_col)
+            in_err = True
+        elif ch == " " and in_err:
+            result.append(reset)
+            in_err = False
+        result.append(ch)
+    if in_err:
+        result.append(reset)
+    return "".join(result)
+
+
+def _render_all_errors(
+    items: list[tuple[str, "Loc | None"]],
+    color: bool = None,
+) -> str:
+    """Render a list of ``(message, loc)`` pairs.
+
+    Each item is listed as ``a. message``, ``b. message``, … and its span in
+    the arg line is underlined with ``^…^X`` where X is the assigned letter.
+    Items without a loc still receive a letter in the listing but have no
+    underline.  Phantom spans insert extra chars right after their token.
+    """
+    if color is None:
+        color = sys.stderr.isatty()
+    if not items:
+        return ""
+
+    # Assign a letter to each item (all items get a letter for consistency)
+    letters = [chr(ord("a") + i) for i in range(len(items))]
+
+    # Build message listing
+    message_lines = [f"{letter}. {msg}" for letter, (msg, _) in zip(letters, items)]
+
+    # Find the first item that has a loc (for argv / prog context)
+    first_loc = next((loc for _, loc in items if loc is not None), None)
+    if first_loc is None:
+        return "\n".join(message_lines)
+
+    argv = first_loc.argv
+    prog = first_loc.prog
+
+    # Lettered spans: only items that have a loc
+    lettered: list[tuple[str, "Loc"]] = [
+        (letter, loc) for letter, (_, loc) in zip(letters, items) if loc is not None
+    ]
+
+    err_col = "\033[1;31m" if color else ""
+    dim = "\033[2m" if color else ""
+    reset = "\033[0m" if color else ""
+
+    # Determine phantom width, display char, and active ranges per arg index.
+    # Active ranges are positions [start, end) within the phantom area that are
+    # covered by a label; gaps between them become plain spaces in the display.
+    phantom_width: dict[int, int] = {}
+    phantom_char_for: dict[int, str] = {}
+    phantom_active: dict[int, list[tuple[int, int]]] = {}
+    for _, loc in lettered:
+        if loc.phantom:
+            phantom_width[loc.arg_index] = max(phantom_width.get(loc.arg_index, 0), loc.end)
+            phantom_char_for[loc.arg_index] = loc.phantom_char
+            phantom_active.setdefault(loc.arg_index, []).append((loc.start, loc.end))
+
+    # Build plain display (for offset math) and colored display (for rendering).
+    # Non-space phantom chars get an extra leading space and are rendered grey;
+    # positions not covered by any active range become plain spaces.
+    # phant_offsets is a dict so it can also hold "trailing" phantoms whose
+    # arg_index >= len(argv) (e.g. when argv is empty).
+    real_offsets: list[int] = []
+    phant_offsets: dict[int, int | None] = {}
+    plain_parts: list[str] = []
+    color_parts: list[str] = []
+    pos = 0
+    for i, arg in enumerate(argv):
+        real_offsets.append(pos)
+        plain_parts.append(arg)
+        color_parts.append(arg)
+        pos += len(arg)
+        pw = phantom_width.get(i, 0)
+        pc = phantom_char_for.get(i, " ")
+        if pw:
+            if pc != " ":
+                active = set()
+                for s, e in phantom_active.get(i, []):
+                    active.update(range(s, e))
+                chars = "".join(pc if j in active else " " for j in range(pw))
+                plain_parts.append(" " + chars)
+                color_parts.append(" " + dim + chars + reset)
+                phant_offsets[i] = pos + 1
+                pos += 1 + pw
+            else:
+                plain_parts.append(" " * pw)
+                color_parts.append(" " * pw)
+                phant_offsets[i] = pos
+                pos += pw
+        else:
+            phant_offsets[i] = None
+        if i < len(argv) - 1:
+            plain_parts.append(" ")
+            color_parts.append(" ")
+            pos += 1
+
+    # Trailing phantoms: arg_index >= len(argv).  These are appended after all
+    # real args (or are the entire display when argv is empty).
+    for idx in sorted(
+        {loc.arg_index for _, loc in lettered if loc.phantom and loc.arg_index >= len(argv)}
+    ):
+        pw = phantom_width.get(idx, 0)
+        pc = phantom_char_for.get(idx, " ")
+        if not pw:
+            phant_offsets[idx] = None
+            continue
+        active = set()
+        for s, e in phantom_active.get(idx, []):
+            active.update(range(s, e))
+        chars = "".join(pc if j in active else " " for j in range(pw))
+        if pos > 0:  # separate from preceding real args
+            plain_parts.append(" ")
+            color_parts.append(" ")
+            pos += 1
+        if pc != " ":
+            plain_parts.append(chars)
+            color_parts.append(dim + chars + reset)
+        else:
+            plain_parts.append(chars)
+            color_parts.append(chars)
+        phant_offsets[idx] = pos
+        pos += pw
+
+    display = "".join(plain_parts)
+    display_color = "".join(color_parts)
+    uc = [" "] * len(display)
+
+    for letter, loc in lettered:
+        if loc.phantom:
+            po = phant_offsets[loc.arg_index]
+            if po is None:
+                continue
+            a, b = po + loc.start, po + loc.end
+        else:
+            a = real_offsets[loc.arg_index] + loc.start
+            b = real_offsets[loc.arg_index] + loc.end
+        a, b = max(0, a), min(b, len(uc))
+        if b <= a:
+            continue
+        for j in range(a, b - 1):
+            uc[j] = "^"
+        uc[b - 1] = letter  # last char of span is the letter label
+
+    underline = _colorize_labeled(uc, err_col, reset)
+
+    if prog:
+        prefix = len(prog) + 1
+        line = f"{dim}{prog}{reset} {display_color}"
+        under = " " * prefix + underline
+    else:
+        line = display_color
+        under = underline
+
+    header = "\n".join(message_lines)
+    return f"{header}\n\n  {line}\n  {under}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -107,6 +276,15 @@ class Separator:
 Token = LongOpt | ShortOpt | Value | Separator
 
 
+def _token_argv(tok: Token) -> list[str]:
+    """Return the shared argv list carried by any token type."""
+    if isinstance(tok, LongOpt):
+        return tok.name_loc.argv
+    if isinstance(tok, ShortOpt):
+        return tok.chars_loc.argv
+    return tok.loc.argv
+
+
 def tokenize(argv: list[str]) -> list[Token]:
     """Convert an argv list into a sequence of typed tokens with source locations.
 
@@ -122,6 +300,7 @@ def tokenize(argv: list[str]) -> list[Token]:
     past_separator = False
 
     for idx, arg in enumerate(argv):
+
         def _loc(start: int, end: int, _i: int = idx) -> Loc:
             return Loc(argv, _i, start, end)
 
@@ -138,13 +317,15 @@ def tokenize(argv: list[str]) -> list[Token]:
             body = arg[2:]
             if "=" in body:
                 eq = body.index("=")
-                name, val = body[:eq], body[eq + 1:]
-                tokens.append(LongOpt(
-                    name=name,
-                    name_loc=_loc(0, 2 + eq),
-                    value=val,
-                    value_loc=_loc(2 + eq + 1, len(arg)),
-                ))
+                name, val = body[:eq], body[eq + 1 :]
+                tokens.append(
+                    LongOpt(
+                        name=name,
+                        name_loc=_loc(0, 2 + eq),
+                        value=val,
+                        value_loc=_loc(2 + eq + 1, len(arg)),
+                    )
+                )
             else:
                 tokens.append(LongOpt(name=body, name_loc=_loc(0, len(arg))))
             continue
@@ -153,13 +334,15 @@ def tokenize(argv: list[str]) -> list[Token]:
             chars_raw = arg[1:]
             if "=" in chars_raw:
                 eq = chars_raw.index("=")
-                chars, val = chars_raw[:eq], chars_raw[eq + 1:]
-                tokens.append(ShortOpt(
-                    chars=chars,
-                    chars_loc=_loc(1, 1 + eq),
-                    value=val,
-                    value_loc=_loc(1 + eq + 1, len(arg)),
-                ))
+                chars, val = chars_raw[:eq], chars_raw[eq + 1 :]
+                tokens.append(
+                    ShortOpt(
+                        chars=chars,
+                        chars_loc=_loc(1, 1 + eq),
+                        value=val,
+                        value_loc=_loc(1 + eq + 1, len(arg)),
+                    )
+                )
             else:
                 tokens.append(ShortOpt(chars=chars_raw, chars_loc=_loc(1, len(arg))))
             continue
@@ -175,13 +358,25 @@ def tokenize(argv: list[str]) -> list[Token]:
 
 
 class ParseError(Exception):
+    """Holds one or more located error messages, rendered together."""
+
     def __init__(self, message: str, loc: Loc = None):
         super().__init__(message)
         self.loc = loc
+        self._items: list[tuple[str, Loc | None]] = [(message, loc)]
+
+    @classmethod
+    def _from_items(cls, items: list[tuple[str, Loc | None]]) -> "ParseError":
+        obj = cls.__new__(cls)
+        first_msg = items[0][0] if items else ""
+        first_loc = items[0][1] if items else None
+        Exception.__init__(obj, first_msg)
+        obj.loc = first_loc
+        obj._items = list(items)
+        return obj
 
     def __str__(self) -> str:
-        msg = self.args[0]
-        return self.loc.render(msg) if self.loc is not None else msg
+        return _render_all_errors(self._items)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -298,14 +493,26 @@ class ParsedArgs(dict):
 
 
 class ParserState:
-    def __init__(self, root_group: LinearGroup) -> None:
+    def __init__(self, root_group: LinearGroup, prog: str | None = None) -> None:
         self.option_map: dict[str, Handler] = {}
         self.pos_queue: list[LinearField | ChoiceSet] = []
-        self.latent: dict[str, list[LinearGroup]] = {}   # group_id → branches
-        self.activated: dict[str, int] = {}              # group_id → choice_id
+        self.latent: dict[str, list[LinearGroup]] = {}  # group_id → branches
+        self.activated: dict[str, int] = {}  # group_id → choice_id
         self.result: dict[str, Any] = {}
         self.spans: dict[str, Loc] = {}
+        self.prog: str | None = prog
+        self._accumulated: list[tuple[str, Loc | None]] = []
+        self._errored_paths: set[str] = set()
+        self._argv: list[str] = []  # populated by run(); used for phantom locs
         self._add_group(root_group)
+
+    def _ploc(self, loc: Loc) -> Loc:
+        """Return *loc* with ``prog`` stamped on, for use in raised errors."""
+        if self.prog is None or loc.prog == self.prog:
+            return loc
+        from dataclasses import replace
+
+        return replace(loc, prog=self.prog)
 
     # ── Setup ──────────────────────────────────────────────────────────────────
 
@@ -441,11 +648,14 @@ class ParserState:
             is_list = False
         if is_list:
             from ..model import model as _model
+
             m = _model(lfield.type)
             elem_tp = m.element_field.type if (m and m.element_field) else str
             coerced = self._coerce(elem_tp, value)
             existing = self.result.get(path, [])
-            self.result[path] = (existing if isinstance(existing, list) else [existing]) + [coerced]
+            self.result[path] = (existing if isinstance(existing, list) else [existing]) + [
+                coerced
+            ]
         else:
             self.result[path] = self._coerce(lfield.type, value)
         self.spans[path] = loc
@@ -498,12 +708,31 @@ class ParserState:
 
     # ── Token handlers ─────────────────────────────────────────────────────────
 
+    def _mark_handler_errored(self, handler: Handler) -> None:
+        """Record the path of *handler* so _check_required won't double-report it."""
+        if isinstance(handler, Ambiguous):
+            return
+        src = handler.unlocks[0] if isinstance(handler, ChoiceSet) else handler
+        self._errored_paths.add(src.path)
+
+    def _missing_loc(self, key_loc: Loc) -> Loc:
+        """Return a phantom loc that shows grey dots right after the key option token."""
+        return Loc(
+            argv=key_loc.argv,
+            arg_index=key_loc.arg_index,
+            start=0,
+            end=2,
+            prog=key_loc.prog,
+            phantom=True,
+            phantom_char="·",
+        )
+
     def _consume_value(self, key_loc: Loc, queue: deque[Token]) -> tuple[str, Loc]:
         """Pop the next :class:`Value` token or raise :class:`ParseError`."""
         if not queue or not isinstance(queue[0], Value):
-            raise ParseError("Expected a value", key_loc)
+            raise ParseError("Expected a value", self._missing_loc(key_loc))
         tok = queue.popleft()
-        return tok.text, tok.loc
+        return tok.text, self._ploc(tok.loc)
 
     def _handle_long(self, tok: LongOpt, queue: deque[Token]) -> None:
         opt = tok.name
@@ -512,30 +741,46 @@ class ParserState:
             if opt.startswith("no-"):
                 base = opt[3:]
                 h = self.option_map.get(base)
-                if isinstance(h, LinearField) and not isinstance(h, LinearUnlock) and h.type is bool:
+                if (
+                    isinstance(h, LinearField)
+                    and not isinstance(h, LinearUnlock)
+                    and h.type is bool
+                ):
                     if tok.value is not None:
                         raise ParseError(
-                            f"--{opt} is a flag and does not take a value", tok.value_loc
+                            f"--{opt} is a flag and does not take a value",
+                            self._ploc(tok.value_loc),
                         )
                     self.result[h.path] = False
                     self.spans[h.path] = tok.name_loc
                     return
-            raise ParseError(f"Unknown option: --{opt}", tok.name_loc)
+            self._accumulated.append((f"Unknown option: --{opt}", self._ploc(tok.name_loc)))
+            # Speculatively skip the next Value — likely this option's argument.
+            if tok.value is None and queue and isinstance(queue[0], Value):
+                queue.popleft()
+            return
 
         handler = self.option_map[opt]
 
         if not self._needs_value(handler):
             if tok.value is not None:
-                raise ParseError(f"--{opt} is a flag and does not take a value", tok.value_loc)
+                raise ParseError(
+                    f"--{opt} is a flag and does not take a value",
+                    self._ploc(tok.value_loc),
+                )
             self._apply_bool_handler(handler, tok.name_loc)
             return
 
-        value, value_loc = (
-            (tok.value, tok.value_loc)
-            if tok.value is not None
-            else self._consume_value(tok.name_loc, queue)
-        )
-        self._apply_handler(handler, value, value_loc, tok.name_loc)
+        if tok.value is not None:
+            value, value_loc = tok.value, self._ploc(tok.value_loc)
+        else:
+            try:
+                value, value_loc = self._consume_value(self._ploc(tok.name_loc), queue)
+            except ParseError as e:
+                self._accumulated.extend(e._items)
+                self._mark_handler_errored(handler)
+                return
+        self._apply_handler(handler, value, value_loc, self._ploc(tok.name_loc))
 
     def _handle_short(self, tok: ShortOpt, queue: deque[Token]) -> None:
         chars = tok.chars
@@ -546,10 +791,14 @@ class ParserState:
         i = 0
         while i < len(chars):
             ch = chars[i]
-            char_loc = Loc(argv, idx, base + i, base + i + 1)
+            char_loc = self._ploc(Loc(argv, idx, base + i, base + i + 1))
 
             if ch not in self.option_map:
-                raise ParseError(f"Unknown option: -{ch}", char_loc)
+                # Extend loc to include the leading '-' for the first char
+                full_loc = self._ploc(Loc(argv, idx, 0 if i == 0 else base + i, base + i + 1))
+                self._accumulated.append((f"Unknown option: -{ch}", full_loc))
+                i += 1
+                continue
 
             handler = self.option_map[ch]
 
@@ -560,21 +809,25 @@ class ParserState:
                 continue
 
             # Needs a value: rest of chars cluster, then inline =val, then next token
-            rest = chars[i + 1:]
+            rest = chars[i + 1 :]
             if rest:
-                rest_loc = Loc(argv, idx, base + i + 1, tok.chars_loc.end)
+                rest_loc = self._ploc(Loc(argv, idx, base + i + 1, tok.chars_loc.end))
                 value, value_loc = rest, rest_loc
             elif tok.value is not None:
-                value, value_loc = tok.value, tok.value_loc
+                value, value_loc = tok.value, self._ploc(tok.value_loc)
             else:
-                value, value_loc = self._consume_value(char_loc, queue)
-
+                try:
+                    value, value_loc = self._consume_value(char_loc, queue)
+                except ParseError as e:
+                    self._accumulated.extend(e._items)
+                    self._mark_handler_errored(handler)
+                    break
             self._apply_handler(handler, value, value_loc, char_loc)
             break  # value consumed — remaining chars were the value
 
     def _handle_positional(self, tok: Value) -> None:
         if not self.pos_queue:
-            raise ParseError(f"Unexpected positional argument: {tok.text!r}", tok.loc)
+            raise ParseError(f"Unexpected positional argument: {tok.text!r}", self._ploc(tok.loc))
         handler = self.pos_queue[0]
         # Retrieve positional metadata from the underlying field
         if isinstance(handler, ChoiceSet):
@@ -583,7 +836,14 @@ class ParserState:
             src_field = handler.field
         pos_meta = src_field.metadata.get("positional", False) if src_field else True
         remainder = pos_meta not in (False, True)
-        self._apply_handler(handler, tok.text, tok.loc, tok.loc)
+        try:
+            self._apply_handler(handler, tok.text, tok.loc, tok.loc)
+        except ParseError as e:
+            self._accumulated.extend(e._items)
+            self._mark_handler_errored(handler)
+            if not remainder:
+                self.pos_queue.pop(0)
+            return
         if not remainder:
             self.pos_queue.pop(0)
 
@@ -600,36 +860,83 @@ class ParserState:
             if src.path in seen_paths:
                 continue
             seen_paths.add(src.path)
-            if src.field is not None and src.field.required and src.path not in self.result:
+            if (
+                src.field is not None
+                and src.field.required
+                and src.path not in self.result
+                and src.path not in self._errored_paths
+            ):
                 prim, _ = _option_strings(src)
-                missing.append(f"--{prim[0]}")
+                missing.append(f"Missing required option: --{prim[0]}")
 
         for h in self.pos_queue:
             src = h.unlocks[0] if isinstance(h, ChoiceSet) else h
             pos_meta = src.field.metadata.get("positional", False) if src.field else True
             remainder = pos_meta not in (False, True)
-            if not remainder and src.field is not None and src.field.required and src.path not in self.result:
-                missing.append((src.field.name or src.path.split(".")[-1]).upper())
+            if (
+                not remainder
+                and src.field is not None
+                and src.field.required
+                and src.path not in self.result
+                and src.path not in self._errored_paths
+            ):
+                name = (src.field.name or src.path.split(".")[-1]).upper()
+                missing.append(f"Missing required argument: {name}")
 
-        if missing:
-            noun = "arguments" if len(missing) > 1 else "argument"
-            raise ParseError(f"Missing required {noun}: {', '.join(missing)}")
+        # Assign staggered phantom locs at the end of the arg line (2 dots each,
+        # separated by spaces).  Start after any phantom already accumulated at
+        # that position (e.g. an "Expected a value" dot group).
+        argv = self._argv
+        # For empty argv use arg_index=0; _render_all_errors treats any
+        # arg_index >= len(argv) as a trailing phantom shown standalone.
+        last_idx = len(argv) - 1 if argv else 0
+        existing_end = max(
+            (
+                loc.end
+                for _, loc in self._accumulated
+                if loc is not None and loc.phantom and loc.arg_index == last_idx
+            ),
+            default=0,
+        )
+        base = existing_end + 1 if existing_end else 0
+        for i, msg in enumerate(missing):
+            start = base + 3 * i
+            self._accumulated.append(
+                (
+                    msg,
+                    Loc(
+                        argv=argv,
+                        arg_index=last_idx,
+                        start=start,
+                        end=start + 2,
+                        prog=self.prog,
+                        phantom=True,
+                        phantom_char="·",
+                    ),
+                )
+            )
 
     # ── Main loop ──────────────────────────────────────────────────────────────
 
     def run(self, tokens: list[Token]) -> ParsedArgs:
+        self._argv = _token_argv(tokens[0]) if tokens else []
         queue: deque[Token] = deque(tokens)
         while queue:
             tok = queue.popleft()
-            if isinstance(tok, Separator):
-                continue  # tokenizer already converts post-separator args to Value
-            elif isinstance(tok, LongOpt):
-                self._handle_long(tok, queue)
-            elif isinstance(tok, ShortOpt):
-                self._handle_short(tok, queue)
-            else:
-                self._handle_positional(tok)
+            try:
+                if isinstance(tok, Separator):
+                    continue  # tokenizer already converts post-separator args to Value
+                elif isinstance(tok, LongOpt):
+                    self._handle_long(tok, queue)
+                elif isinstance(tok, ShortOpt):
+                    self._handle_short(tok, queue)
+                else:
+                    self._handle_positional(tok)
+            except ParseError as e:
+                self._accumulated.extend(e._items)
         self._check_required()
+        if self._accumulated:
+            raise ParseError._from_items(self._accumulated)
         return ParsedArgs(unflatten(self.result), self.spans)
 
 
@@ -638,18 +945,27 @@ class ParserState:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def parse(root_type: type, argv: list[str] = None) -> ParsedArgs:
-    """Parse *argv* (defaults to ``sys.argv[1:]``) against *root_type*'s schema."""
+def parse(
+    root_type: type,
+    argv: list[str] = None,
+    prog: str | None = None,
+) -> ParsedArgs:
+    """Parse *argv* (defaults to ``sys.argv[1:]``) against *root_type*'s schema.
+
+    *prog* is the program name shown in error messages; defaults to ``sys.argv[0]``.
+    """
     if argv is None:
         argv = sys.argv[1:]
+    if prog is None:
+        prog = sys.argv[0]
     tokens = tokenize(argv)
     group = linearize(root_type)
-    state = ParserState(group)
+    state = ParserState(group, prog=prog)
     return state.run(tokens)
 
 
-# Alias for compatibility
-parse_cli = parse
+def parse_cli(root_type: type, argv: list[str] = None, prog: str | None = None) -> ParsedArgs:
+    return parse(root_type, argv, prog)
 
 
 @dataclass
@@ -673,6 +989,7 @@ class FromArguments(Medley):
             # Try to attach a source location from spans
             try:
                 from ..exc import find_information
+
                 info = find_information(exc=exc, ctx=ctx)
                 path = ".".join(str(p) for p in info.path)
                 if loc := vals.spans.get(path):

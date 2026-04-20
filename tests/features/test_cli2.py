@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 
 import pytest
@@ -235,6 +235,22 @@ def test_positional_missing():
 def test_unknown_option():
     with pytest.raises(ParseError, match="Unknown option"):
         parse_cli(Person, ["--unknown", "value"])
+
+
+def test_unknown_options_all_reported():
+    # All unknown options are collected and reported together, not just the first.
+    with pytest.raises(ParseError, match="--foo.*--bar") as exc_info:
+        parse_cli(Person, ["--foo", "--bar", "--name", "Alice", "--age", "30"])
+    assert "--foo" in str(exc_info.value)
+    assert "--bar" in str(exc_info.value)
+
+
+def test_prog_name_in_error():
+    # The program name appears before the argv line in the rendered error.
+    try:
+        parse_cli(Person, ["--unknown"], prog="myprog")
+    except ParseError as e:
+        assert "myprog" in str(e)
 
 
 # ── bool fields ───────────────────────────────────────────────────────────────
