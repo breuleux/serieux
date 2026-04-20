@@ -503,7 +503,9 @@ class ParserState:
         self.prog: str | None = prog
         self._accumulated: list[tuple[str, Loc | None]] = []
         self._errored_paths: set[str] = set()
-        self._argv: list[str] = []  # populated by run(); used for phantom locs
+        self._argv: list[str] = []        # populated by run()
+        self._current_arg_idx: int = -1   # updated as tokens are consumed
+        self._field_added_at: dict[str, int] = {}  # path → arg_index when added
         self._add_group(root_group)
 
     def _ploc(self, loc: Loc) -> Loc:
@@ -530,6 +532,8 @@ class ParserState:
         Handlers from previous batches are overwritten by the new batch's entry
         for the same key (no cross-batch collision check).
         """
+        for f in fields:
+            self._field_added_at.setdefault(f.path, self._current_arg_idx)
         positionals_raw: list[LinearField] = []
         options: list[LinearField] = []
         for f in fields:
@@ -620,6 +624,7 @@ class ParserState:
             # Same branch already active — just update the stored value
         else:
             self.activated[gid] = unlock.choice_id
+            self._current_arg_idx = value_loc.arg_index
             self._add_group(self.latent[gid][unlock.choice_id])
         self.result[unlock.path] = value
         self.spans[unlock.path] = value_loc
@@ -837,7 +842,7 @@ class ParserState:
         pos_meta = src_field.metadata.get("positional", False) if src_field else True
         remainder = pos_meta not in (False, True)
         try:
-            self._apply_handler(handler, tok.text, tok.loc, tok.loc)
+            self._apply_handler(handler, tok.text, self._ploc(tok.loc), self._ploc(tok.loc))
         except ParseError as e:
             self._accumulated.extend(e._items)
             self._mark_handler_errored(handler)
@@ -850,7 +855,9 @@ class ParserState:
     # ── Validation ─────────────────────────────────────────────────────────────
 
     def _check_required(self) -> None:
-        missing: list[str] = []
+        # Collect (message, added_at) where added_at is the arg_index when the
+        # field became available (-1 = initial, falls back to end of argv).
+        missing: list[tuple[str, int]] = []
         seen_paths: set[str] = set()
 
         for handler in self.option_map.values():
@@ -867,7 +874,8 @@ class ParserState:
                 and src.path not in self._errored_paths
             ):
                 prim, _ = _option_strings(src)
-                missing.append(f"Missing required option: --{prim[0]}")
+                missing.append((f"Missing required option: --{prim[0]}",
+                                 self._field_added_at.get(src.path, -1)))
 
         for h in self.pos_queue:
             src = h.unlocks[0] if isinstance(h, ChoiceSet) else h
@@ -881,40 +889,38 @@ class ParserState:
                 and src.path not in self._errored_paths
             ):
                 name = (src.field.name or src.path.split(".")[-1]).upper()
-                missing.append(f"Missing required argument: {name}")
+                missing.append((f"Missing required argument: {name}",
+                                 self._field_added_at.get(src.path, -1)))
 
-        # Assign staggered phantom locs at the end of the arg line (2 dots each,
-        # separated by spaces).  Start after any phantom already accumulated at
-        # that position (e.g. an "Expected a value" dot group).
+        if not missing:
+            return
+
         argv = self._argv
-        # For empty argv use arg_index=0; _render_all_errors treats any
-        # arg_index >= len(argv) as a trailing phantom shown standalone.
-        last_idx = len(argv) - 1 if argv else 0
-        existing_end = max(
-            (
-                loc.end
-                for _, loc in self._accumulated
-                if loc is not None and loc.phantom and loc.arg_index == last_idx
-            ),
-            default=0,
-        )
-        base = existing_end + 1 if existing_end else 0
-        for i, msg in enumerate(missing):
-            start = base + 3 * i
-            self._accumulated.append(
-                (
-                    msg,
-                    Loc(
-                        argv=argv,
-                        arg_index=last_idx,
-                        start=start,
-                        end=start + 2,
-                        prog=self.prog,
-                        phantom=True,
-                        phantom_char="·",
-                    ),
-                )
+        last_idx = len(argv) - 1 if argv else 0  # trailing phantom index for empty argv
+
+        # Group messages by the arg_index where the phantom should appear.
+        # -1 (initial fields) falls back to last_idx.
+        from collections import defaultdict
+        groups: dict[int, list[str]] = defaultdict(list)
+        for msg, added_at in missing:
+            groups[added_at if added_at >= 0 else last_idx].append(msg)
+
+        # For each group, stagger phantoms (2 dots + 1 space gap) starting after
+        # any phantom already placed at that arg_index.
+        for arg_idx, msgs in sorted(groups.items()):
+            existing_end = max(
+                (loc.end for _, loc in self._accumulated
+                 if loc is not None and loc.phantom and loc.arg_index == arg_idx),
+                default=0,
             )
+            base = existing_end + 1 if existing_end else 0
+            for i, msg in enumerate(msgs):
+                start = base + 3 * i
+                self._accumulated.append((msg, Loc(
+                    argv=argv, arg_index=arg_idx,
+                    start=start, end=start + 2,
+                    prog=self.prog, phantom=True, phantom_char="·",
+                )))
 
     # ── Main loop ──────────────────────────────────────────────────────────────
 
