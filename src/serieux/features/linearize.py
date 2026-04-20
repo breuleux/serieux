@@ -1,14 +1,21 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
+from itertools import pairwise
 from types import NoneType
-from typing import Any, get_args
+from typing import Any, Union, get_args
+from uuid import uuid4
 
-from ovld import ovld, recurse
+from ovld import call_next, ovld, recurse
 
 from ..model import Field, FieldModelizable, StringModelizable, model
+from ..tell import Tell, tells as get_tells
 from ..utils import UnionAlias
-from .tagset import TagSet, decompose
+from .tagset import Tagged, TagSet
+
+
+def _subpath(p, field):
+    return f"{p}.{field}" if p else field
 
 
 @dataclass(kw_only=True)
@@ -24,26 +31,27 @@ class LinearField(LinearBase):
     type: type
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LinearGroup:
-    """A group of LinearBase items for one branch of a tagged union, with its associated type."""
+    """A group of LinearBase items for one branch of a union, with its associated type."""
 
-    type: type
-    items: list[LinearBase]
+    fields: list[LinearField] = field(default_factory=list)
+    option_groups: dict[str, list[LinearGroup]] = field(default_factory=dict)
+
+    def __or__(self, other):
+        return LinearGroup(
+            fields=[*self.fields, *other.fields],
+            option_groups={**self.option_groups, **other.option_groups},
+        )
 
 
 @dataclass(kw_only=True)
-class LinearTagged(LinearBase):
-    """A tagged-union branch point in the linearized representation."""
+class LinearUnlock(LinearField):
+    """A branch point in the linearized representation."""
 
-    options: dict[str, LinearGroup]
-
-
-@dataclass(kw_only=True)
-class LinearChoice(LinearBase):
-    """A plain (untagged) Union branch point in the linearized representation."""
-
-    options: list[list[LinearBase]]
+    group_id: str
+    choice_id: int
+    expected_value: str = None
 
 
 @ovld
@@ -51,63 +59,138 @@ def linearize(t: type[Any], prefix: str = ""):
     return recurse(t, None, prefix)
 
 
+@ovld
+def _flatten_options(ft: type[Any @ TagSet]):
+    _, ts = TagSet.decompose(ft)
+    for tag, cls in ts.iterate(object):
+        yield Tagged[cls, tag]
+
+
+@ovld
+def _flatten_options(ft: type[UnionAlias]):
+    for opt in get_args(ft):
+        yield from recurse(opt)
+
+
+@ovld
+def _flatten_options(ft: type[Any]):
+    yield ft
+
+
 @ovld(priority=1)
 def linearize(ft: type[Any @ TagSet], fld: Field | None, path: str):
     """Field type is directly annotated with a TagSet."""
-    base, ts = decompose(ft)
-    options = {
-        tag: LinearGroup(type=cls, items=recurse(cls, None, path)) for tag, cls in ts.iterate(base)
-    }
-    return [LinearTagged(field=fld, path=path, options=options)]
+    results = call_next(ft, fld, path)
+    _, ts = TagSet.decompose(ft)
+    opts = list(ts.iterate(object))
+    if len(opts) == 1:
+        results.fields.insert(
+            0,
+            LinearField(
+                type=str,
+                field=Field(type=str, serialized_name="$class"),
+                path=_subpath(path, "$class"),
+            ),
+        )
+        return results
+    else:
+        return recurse(Union[tuple(Tagged[cls, tag] for tag, cls in opts)], fld, path)
+
+
+@dataclass(frozen=True)
+class LeafTell(Tell):
+    pass
+
+
+@dataclass(frozen=True)
+class AbsentTell(Tell):
+    pass
 
 
 @ovld
 def linearize(ft: type[UnionAlias], fld: Field | None, path: str):
     """Field type is a Union — tagged, optional, or plain."""
-    non_none = [a for a in get_args(ft) if a is not NoneType]
-    tagged = [a for a in non_none if TagSet.extract(a)]
+    options = list(_flatten_options(ft))
 
-    # All non-None arms are tagged → LinearTagged
-    if tagged and len(tagged) == len(non_none):
-        options = {}
-        for arg in tagged:
-            base, ts = decompose(arg)
-            for tag, cls in ts.iterate(base):
-                options[tag] = LinearGroup(type=cls, items=recurse(cls, None, path))
-        return [LinearTagged(field=fld, path=path, options=options)]
+    tells = []
+    for o in options:
+        if (tls := get_tells(o, dict)) is not None:
+            tells.append((o, tls))
+        elif o is NoneType:
+            tells.append((o, {AbsentTell()}))
+        else:
+            tells.append((o, {LeafTell()}))
 
-    # Optional[T] with a single non-None member
-    if len(non_none) == 1:
-        inner = non_none[0]
-        # Pure struct (not string-serializable) → flatten transparently
-        if issubclass(inner, FieldModelizable) and not issubclass(inner, StringModelizable):
-            return recurse(inner, None, path)
-        # Leaf (StringModelizable, primitive, etc.) → dispatch through 4-arg form
-        return recurse(inner, fld, path)
+    elim = set()
+    for (_, tl1), (_, tl2) in pairwise(tells):
+        elim |= tl1 & tl2
+    for _, tls in tells:
+        tls -= elim
 
-    # Plain union → LinearChoice, one list per member
-    options = [recurse(a, fld, path) for a in non_none]
-    return [LinearChoice(field=fld, path=path, options=options)]
+    if any(not tls for _, tls in tells):
+        raise Exception("Cannot differentiate options")
+
+    group_id = uuid4().hex
+    rval = LinearGroup(option_groups={group_id: []})
+
+    groups = [recurse(t, fld, path) for t in options]
+
+    for i, (group, (_, tls)) in enumerate(zip(groups, tells)):
+        filter_out = []
+
+        match list(tls):
+            case [LeafTell() | AbsentTell()]:
+                (lfld,) = group.fields
+                filter_out.append(lfld)
+                rval.fields.append(
+                    LinearUnlock(
+                        choice_id=i,
+                        group_id=group_id,
+                        **vars(lfld),
+                    )
+                )
+            case _:
+                for lfld in group.fields:
+                    for tl in tls:
+                        if tl.key == lfld.field.serialized_name:
+                            filter_out.append(lfld)
+                            rval.fields.append(
+                                LinearUnlock(
+                                    choice_id=i,
+                                    expected_value=getattr(tl, "value", None),
+                                    group_id=group_id,
+                                    **vars(lfld),
+                                )
+                            )
+                            break
+
+        reduced_fields = [fld for fld in group.fields if fld not in filter_out]
+        rval.option_groups[group_id].append(replace(group, fields=reduced_fields))
+
+    return rval
 
 
 @ovld(priority=1)
 def linearize(ft: type[StringModelizable], fld: Field | None, path: str):
     """StringModelizable is treated as a leaf even if it also has fields."""
-    return [LinearField(type=ft, field=fld, path=path)]
+    return LinearGroup(
+        fields=[LinearField(type=ft, field=fld, path=path)],
+    )
 
 
 @ovld
 def linearize(ft: type[FieldModelizable], fld: Field | None, path: str):
     """Nested struct field → flatten recursively."""
     m = model(ft)
-    result = []
+    result = LinearGroup()
     for subfld in m.fields:
-        subpath = f"{path}.{subfld.name}" if path else subfld.name
-        result.extend(recurse(subfld.type, subfld, subpath))
+        result |= recurse(subfld.type, subfld, _subpath(path, subfld.name))
     return result
 
 
 @ovld
 def linearize(ft: type[Any], fld: Field | None, path: str):
     """Primitive / leaf field."""
-    return [LinearField(type=ft, field=fld, path=path)]
+    return LinearGroup(
+        fields=[LinearField(type=ft, field=fld, path=path)],
+    )

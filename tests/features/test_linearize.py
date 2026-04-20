@@ -1,18 +1,76 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
+from pprint import pprint
+from types import NoneType
 from typing import Annotated, Optional, Union
 
-from serieux.features.linearize import LinearChoice, LinearField, LinearTagged, linearize
+import pytest
+from ovld import ovld, recurse
+
+from serieux.features.linearize import (
+    LinearField,
+    LinearGroup,
+    LinearUnlock,
+    linearize,
+)
 from serieux.features.tagset import TagDict, TaggedUnion
+
+
+@dataclass
+class Sexp:
+    curr: int = 0
+    gmap: dict = field(default_factory=dict)
+
+    def get(self, group_id):
+        if group_id not in self.gmap:
+            self.curr += 1
+            self.gmap[group_id] = f"G{self.curr}"
+        return self.gmap[group_id]
+
+    @ovld
+    def __call__(self, lin: LinearField):
+        return lin.path
+
+    @ovld
+    def __call__(self, lin: LinearUnlock):
+        rval = f"<{self.get(lin.group_id)}.{lin.choice_id}>{lin.path}"
+        if lin.expected_value:
+            rval = f"{rval}={lin.expected_value}"
+        if lin.type is NoneType:
+            rval += "-"
+        return rval
+
+    @ovld
+    def __call__(self, lin: LinearGroup):
+        og = {
+            f"{self.get(k)}.{i}": recurse(e)
+            for k, v in lin.option_groups.items()
+            for i, e in enumerate(v)
+        }
+        return [recurse(x) for x in lin.fields] + ([og] if og else [])
+
+    @ovld
+    def __call__(self, lin: list):
+        return [recurse(x) for x in lin]
+
+
+def sexp(lin):
+    return Sexp()(lin)
 
 
 @dataclass
 class Person:
     name: str
     age: int
+
+
+@dataclass
+class Job:
+    name: str
+    salary: int
 
 
 @dataclass
@@ -51,11 +109,6 @@ class WithOptional:
 
 
 @dataclass
-class WithUnion:
-    value: Union[int, str]
-
-
-@dataclass
 class WithDate:
     # date is StringModelizable
     born: date
@@ -73,103 +126,76 @@ class WithEnum:
     count: int
 
 
-# ── flat struct ──────────────────────────────────────────────────────────────
-
-
 def test_flat():
     items = linearize(Person)
-    assert len(items) == 2
-    assert all(isinstance(i, LinearField) for i in items)
-    assert [i.path for i in items] == ["name", "age"]
-    assert [i.type for i in items] == [str, int]
-
-
-# ── nested struct is flattened ───────────────────────────────────────────────
+    assert sexp(items) == ["name", "age"]
+    assert [i.type for i in items.fields] == [str, int]
 
 
 def test_nested_flattened():
     items = linearize(Employee)
-    assert all(isinstance(i, LinearField) for i in items)
-    paths = [i.path for i in items]
-    assert paths == ["person.name", "person.age", "address.street", "address.city", "salary"]
-
-
-# ── tagged union → LinearTagged ──────────────────────────────────────────────
+    assert sexp(items) == ["person.name", "person.age", "address.street", "address.city", "salary"]
 
 
 def test_tagged_union():
     items = linearize(Pet)
-    tagged = [i for i in items if isinstance(i, LinearTagged)]
-    assert len(tagged) == 1
-    t = tagged[0]
-    assert t.path == "animal"
-    assert set(t.options.keys()) == {"cat", "dog"}
-
-
-def test_tagged_union_options():
-    items = linearize(Pet)
-    t = next(i for i in items if isinstance(i, LinearTagged))
-
-    cat_items = t.options["cat"].items
-    assert len(cat_items) == 1
-    assert isinstance(cat_items[0], LinearField)
-    assert cat_items[0].path == "animal.indoor"
-    assert cat_items[0].type is bool
-
-    dog_items = t.options["dog"].items
-    assert len(dog_items) == 1
-    assert dog_items[0].path == "animal.breed"
-    assert dog_items[0].type is str
-
-
-def test_tagged_union_sibling_field():
-    items = linearize(Pet)
-    plain = [i for i in items if isinstance(i, LinearField)]
-    assert any(i.path == "name" for i in plain)
-
-
-# ── Optional[FieldModelizable] is flattened ──────────────────────────────────
+    assert sexp(items) == [
+        "<G1.0>animal.$class=cat",
+        "<G1.1>animal.$class=dog",
+        "name",
+        {
+            "G1.0": ["animal.indoor"],
+            "G1.1": ["animal.breed"],
+        },
+    ]
 
 
 def test_optional_struct_flattened():
     items = linearize(WithOptional)
-    paths = [i.path for i in items]
-    assert "label" in paths
-    assert "person.name" in paths
-    assert "person.age" in paths
+    assert sexp(items) == [
+        "label",
+        "<G1.0>person.name",
+        "<G1.0>person.age",
+        "<G1.1>person-",
+        {"G1.0": [], "G1.1": []},
+    ]
 
 
-# ── plain Union → LinearChoice ───────────────────────────────────────────────
+def test_indistinguishable_union():
+    with pytest.raises(Exception, match="Cannot differentiate"):
+        linearize(Union[int, str])
 
 
-def test_plain_union():
-    items = linearize(WithUnion)
-    assert len(items) == 1
-    c = items[0]
-    assert isinstance(c, LinearChoice)
-    assert c.path == "value"
-    assert len(c.options) == 2  # int branch, str branch
+def test_union_struct():
+    items = linearize(Union[Person, Address])
+    assert sexp(items) == [
+        "<G1.0>name",
+        "<G1.0>age",
+        "<G1.1>street",
+        "<G1.1>city",
+        {"G1.0": [], "G1.1": []},
+    ]
 
 
-def test_plain_union_branches():
-    c = linearize(WithUnion)[0]
-    types = {items[0].type for items in c.options}
-    assert types == {int, str}
+def test_union_struct_overlap():
+    items = linearize(Union[Person, Job])
+    assert sexp(items) == [
+        "<G1.0>age",
+        "<G1.1>salary",
+        {"G1.0": ["name"], "G1.1": ["name"]},
+    ]
 
 
-# ── StringModelizable is treated as a leaf ───────────────────────────────────
+def test_union_struct_leaf():
+    items = linearize(Union[Person, str])
+    pprint(sexp(items))
 
 
 def test_string_modelizable_leaf():
     items = linearize(WithDate)
-    paths = [i.path for i in items]
-    assert paths == ["born", "name"]
-    assert all(isinstance(i, LinearField) for i in items)
-    born = next(i for i in items if i.path == "born")
-    assert born.type is date
+    assert sexp(items) == ["born", "name"]
+    assert items.fields[0].type is date
 
-
-# ── direct TagSet annotation → LinearTagged ──────────────────────────────────
 
 vehicles = TagDict()
 
@@ -194,20 +220,15 @@ class Garage:
 
 def test_direct_tagset():
     items = linearize(Garage)
-    tagged = [i for i in items if isinstance(i, LinearTagged)]
-    assert len(tagged) == 1
-    t = tagged[0]
-    assert t.path == "vehicle"
-    assert set(t.options.keys()) == {"car", "bike"}
-    assert t.options["car"].items[0].path == "vehicle.horsepower"
-    assert t.options["bike"].items[0].path == "vehicle.gears"
-
-
-# ── Enum is a leaf ───────────────────────────────────────────────────────────
+    assert sexp(items) == [
+        "<G1.0>vehicle.$class=car",
+        "<G1.1>vehicle.$class=bike",
+        "owner",
+        {"G1.0": ["vehicle.horsepower"], "G1.1": ["vehicle.gears"]},
+    ]
 
 
 def test_enum_leaf():
     items = linearize(WithEnum)
-    assert all(isinstance(i, LinearField) for i in items)
-    color = next(i for i in items if i.path == "color")
-    assert color.type is Color
+    assert sexp(items) == ["color", "count"]
+    assert items.fields[0].type is Color
