@@ -4,10 +4,11 @@ Command-line argument parser built on linearize (second attempt).
 
 from __future__ import annotations
 
+import inspect
 import sys
 from collections import deque
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import MISSING, dataclass
+from typing import Annotated, Any, get_args, get_origin
 
 from ovld import Medley, ovld, recurse
 
@@ -15,7 +16,7 @@ from ..ctx import Context
 from ..model import ListModelizable
 from .dotted import unflatten
 from .linearize import LinearField, LinearGroup, LinearUnlock, linearize
-from .tagset import tag_field
+from .tagset import Tag, tag_field
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Source location
@@ -427,12 +428,236 @@ def _option_strings(lfield: LinearField) -> tuple[list[str], list[str]]:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+def _type_metavar(tp: type) -> str:
+    """Short uppercase metavar for a type; empty string for bool flags."""
+    if tp is bool:
+        return ""
+    if tp is str:
+        return "TEXT"
+    if tp is int:
+        return "INT"
+    if tp is float:
+        return "FLOAT"
+    return tp.__name__.upper()
+
+
+def _opt_str(name: str) -> str:
+    return f"-{name}" if len(name) == 1 else f"--{name}"
+
+
+def _tag_classes(ft: type) -> list[tuple[str, type]]:
+    """Return ``(tag, cls)`` pairs from a TaggedUnion type, or ``[]`` otherwise."""
+    result = []
+    try:
+        for variant in get_args(ft):
+            if get_origin(variant) is Annotated:
+                for ann in get_args(variant)[1:]:
+                    if isinstance(ann, Tag):
+                        result.append((ann.tag, ann.cls))
+                        break
+    except Exception:
+        pass
+    return result
+
+
+def _find_field_at_path(root_type: type, path: str) -> "Field | None":
+    """Walk the model tree along *path* (dot-separated) and return the leaf Field."""
+    from ..model import model as _model
+
+    parts = path.split(".")
+    current = root_type
+    fld = None
+    for part in parts:
+        try:
+            m = _model(current)
+        except Exception:
+            return None
+        fld = next(
+            (f for f in m.fields if f.serialized_name == part or f.name == part),
+            None,
+        )
+        if fld is None:
+            return None
+        current = fld.type
+    return fld
+
+
+def _class_doc(cls: type) -> str:
+    """Class docstring, or '' for the auto-generated dataclass form."""
+    doc = inspect.getdoc(cls) or ""
+    # Python auto-generates "ClassName(field: type, ...)" for dataclasses.
+    return "" if doc.startswith(cls.__name__ + "(") else doc
+
+
+def _format_help(state: "ParserState", color: bool = None) -> str:
+    prog = state.prog or sys.argv[0]
+
+    if color is None:
+        color = sys.stdout.isatty()
+
+    # ── ANSI helpers ──────────────────────────────────────────────────────────
+    bold = "\033[1m" if color else ""
+    dim = "\033[2m" if color else ""
+    green = "\033[32m" if color else ""
+    yellow = "\033[33m" if color else ""
+    cyan = "\033[36m" if color else ""
+    reset = "\033[0m" if color else ""
+
+    def c_header(s):
+        return f"{bold}{s}{reset}"
+
+    def c_opt(s):
+        return f"{bold}{green}{s}{reset}"
+
+    def c_meta(s):
+        return f"{yellow}{s}{reset}"
+
+    def c_tag(s):
+        return f"{bold}{cyan}{s}{reset}"
+
+    def c_dim(s):
+        return f"{dim}{s}{reset}"
+
+    def c_prog(s):
+        return f"{bold}{s}{reset}"
+
+    # ── Reverse map: handler → names registered in option_map ────────────────
+    handler_to_names: dict[int, list[str]] = {}
+    for name, h in state.option_map.items():
+        if isinstance(h, Ambiguous) or name.startswith(_CTRL_NS):
+            continue
+        handler_to_names.setdefault(id(h), []).append(name)
+
+    def _display_names(handler: Handler) -> list[str]:
+        all_names = handler_to_names.get(id(handler), [])
+        short = [n for n in all_names if "." not in n]
+        chosen = short if short else all_names
+        chosen.sort(key=lambda n: (len(n) > 1, n))
+        return chosen
+
+    # ── Entry builder ─────────────────────────────────────────────────────────
+    def _make_entry(handler: Handler) -> dict:
+        src: LinearField = handler.unlocks[0] if isinstance(handler, ChoiceSet) else handler
+        names = _display_names(handler)
+        is_class = src.field is not None and src.field.serialized_name == tag_field
+
+        if is_class:
+            parent_path = _strip_tag_suffix(src.path)
+            parent_fld = (
+                _find_field_at_path(state.root_type, parent_path) if state.root_type else None
+            )
+            desc = (parent_fld.description or "") if parent_fld else ""
+            metavar = _cli_name(parent_path.split(".")[-1]).upper()
+            tag_info = _tag_classes(parent_fld.type) if parent_fld else []
+        else:
+            desc = (src.field.description or "") if src.field else ""
+            if isinstance(handler, ChoiceSet):
+                evs = [u.expected_value for u in handler.unlocks if u.expected_value is not None]
+                metavar = "{" + ",".join(evs) + "}" if evs else _type_metavar(src.type)
+            else:
+                metavar = _type_metavar(src.type)
+            tag_info = []
+            if src.field is not None and not src.field.required:
+                dflt = src.field.default
+                if dflt is not MISSING and dflt is not False:
+                    suffix = f"[default: {dflt}]"
+                    desc = f"{desc}  {c_dim(suffix)}".lstrip() if desc else c_dim(suffix)
+
+        return {"names": names, "metavar": metavar, "desc": desc, "tag_info": tag_info}
+
+    # ── Collect options ───────────────────────────────────────────────────────
+    seen: set[int] = set()
+    option_entries: list[dict] = []
+    for handler in state.option_map.values():
+        if id(handler) in seen:
+            continue
+        seen.add(id(handler))
+        if isinstance(handler, Ambiguous):
+            continue
+        option_entries.append(_make_entry(handler))
+
+    # ── Collect positionals ───────────────────────────────────────────────────
+    pos_entries: list[dict] = []
+    for h in state.pos_queue:
+        src = h.unlocks[0] if isinstance(h, ChoiceSet) else h
+        is_class = src.field is not None and src.field.serialized_name == tag_field
+        if is_class:
+            parent_path = _strip_tag_suffix(src.path)
+            parent_fld = (
+                _find_field_at_path(state.root_type, parent_path) if state.root_type else None
+            )
+            desc = (parent_fld.description or "") if parent_fld else ""
+            tag_info = _tag_classes(parent_fld.type) if parent_fld else []
+            unlocks = (
+                h.unlocks
+                if isinstance(h, ChoiceSet)
+                else ([h] if isinstance(h, LinearUnlock) else [])
+            )
+            evs = [u.expected_value for u in unlocks if u.expected_value]
+            display = "{" + ",".join(evs) + "}" if evs else parent_path.split(".")[-1].upper()
+        else:
+            display = (src.field.name or src.path.split(".")[-1]).upper()
+            desc = (src.field.description or "") if src.field else ""
+            tag_info = []
+        pos_entries.append({"display": display, "desc": desc, "tag_info": tag_info})
+
+    # ── Global tag width (aligned across all sections) ────────────────────────
+    all_tags = [tag for e in option_entries + pos_entries for tag, _ in e["tag_info"]]
+    tag_w = max((len(t) for t in all_tags), default=0)
+
+    def _tag_lines(tag_info: list) -> list[str]:
+        rows = []
+        for tag, cls in tag_info:
+            cdoc = _class_doc(cls)
+            padded = f"{tag:<{tag_w}}"
+            row = f"    {c_tag(padded)}  {cdoc}".rstrip()
+            rows.append(row)
+        return rows
+
+    # ── Usage ─────────────────────────────────────────────────────────────────
+    opts_placeholder = c_dim("[OPTIONS]")
+    pos_part = "".join(f" {c_meta(e['display'])}" for e in pos_entries)
+    lines = [f"{c_header('Usage:')} {c_prog(prog)} {opts_placeholder}{pos_part}", ""]
+
+    # ── Arguments section ─────────────────────────────────────────────────────
+    if pos_entries:
+        lines.append(c_header("Arguments:"))
+        w = max(len(e["display"]) for e in pos_entries)
+        for e in pos_entries:
+            padded = f"{e['display']:<{w}}"
+            lines.append(f"  {c_meta(padded)}  {e['desc']}".rstrip())
+            lines.extend(_tag_lines(e["tag_info"]))
+        lines.append("")
+
+    # ── Options section ───────────────────────────────────────────────────────
+    lines.append(c_header("Options:"))
+    if option_entries:
+        opt_w = max(len(", ".join(_opt_str(n) for n in e["names"])) for e in option_entries)
+        mv_w = max(len(e["metavar"]) for e in option_entries)
+        for e in option_entries:
+            raw_opt = ", ".join(_opt_str(n) for n in e["names"])
+            # Pad based on plain width, then colorize
+            padded_opt = f"{raw_opt:<{opt_w}}"
+            mv_raw = e["metavar"]
+            mv_padded = f"{mv_raw:<{mv_w}}" if mv_w else ""
+            opt_part = c_opt(padded_opt)
+            mv_part = f"  {c_meta(mv_padded)}" if mv_w else ""
+            lines.append(f"  {opt_part}{mv_part}  {e['desc']}".rstrip())
+            lines.extend(_tag_lines(e["tag_info"]))
+
+    return "\n".join(lines)
+
+
 @dataclass(kw_only=True)
 class Control:
     # [alias: -h]
+    # Show this help message and exit
     help: bool = False
 
-    def build(self, flat, spans, parse_error):
+    def build(self, flat, spans, parse_error, state: "ParserState"):
+        if self.help:
+            print(_format_help(state, color=sys.stdout.isatty()))
+            sys.exit(0)
         if parse_error is not None:
             raise parse_error
         return ParsedArgs(unflatten(flat), spans)
@@ -518,7 +743,12 @@ class ParsedArgs(dict):
 
 
 class ParserState:
-    def __init__(self, root_group: LinearGroup, prog: str | None = None) -> None:
+    def __init__(
+        self,
+        root_group: LinearGroup,
+        prog: str | None = None,
+        root_type: type | None = None,
+    ) -> None:
         self.option_map: dict[str, Handler] = {}
         self.pos_queue: list[LinearField | ChoiceSet] = []
         self.latent: dict[str, list[LinearGroup]] = {}  # group_id → branches
@@ -526,10 +756,11 @@ class ParserState:
         self.result: dict[str, Any] = {}
         self.spans: dict[str, Loc] = {}
         self.prog: str | None = prog
+        self.root_type: type | None = root_type
         self._accumulated: list[tuple[str, Loc | None]] = []
         self._errored_paths: set[str] = set()
-        self._argv: list[str] = []        # populated by run()
-        self._current_arg_idx: int = -1   # updated as tokens are consumed
+        self._argv: list[str] = []  # populated by run()
+        self._current_arg_idx: int = -1  # updated as tokens are consumed
         self._field_added_at: dict[str, int] = {}  # path → arg_index when added
         self._add_group(root_group)
 
@@ -883,39 +1114,143 @@ class ParserState:
         # Collect (message, added_at) where added_at is the arg_index when the
         # field became available (-1 = initial, falls back to end of argv).
         missing: list[tuple[str, int]] = []
-        seen_paths: set[str] = set()
+
+        # ── Options ────────────────────────────────────────────────────────────
+        # Gather all unique unlocks per group_id; plain fields are checked directly.
+        seen_hids: set[int] = set()
+        seen_plain_paths: set[str] = set()
+        group_unlocks: dict[str, list[LinearUnlock]] = {}  # group_id → unlocks
+        group_seen_paths: dict[str, set[str]] = {}  # group_id → paths seen
 
         for handler in self.option_map.values():
-            if isinstance(handler, Ambiguous):
+            if isinstance(handler, Ambiguous) or id(handler) in seen_hids:
                 continue
-            src: LinearField = handler.unlocks[0] if isinstance(handler, ChoiceSet) else handler
-            if src.path in seen_paths:
-                continue
-            seen_paths.add(src.path)
-            if (
-                src.field is not None
-                and src.field.required
-                and src.path not in self.result
-                and src.path not in self._errored_paths
-            ):
+            seen_hids.add(id(handler))
+
+            if isinstance(handler, (ChoiceSet, LinearUnlock)):
+                gid = (
+                    handler.unlocks[0].group_id
+                    if isinstance(handler, ChoiceSet)
+                    else handler.group_id
+                )
+                if gid in self.activated:
+                    continue
+                unlocks = handler.unlocks if isinstance(handler, ChoiceSet) else [handler]
+                if gid not in group_unlocks:
+                    group_unlocks[gid] = []
+                    group_seen_paths[gid] = set()
+                for u in unlocks:
+                    if u.path not in group_seen_paths[gid]:
+                        group_seen_paths[gid].add(u.path)
+                        group_unlocks[gid].append(u)
+            else:
+                src = handler
+                if src.path in seen_plain_paths:
+                    continue
+                seen_plain_paths.add(src.path)
+                if (
+                    src.field is None
+                    or not src.field.required
+                    or src.path in self.result
+                    or src.path in self._errored_paths
+                ):
+                    continue
                 prim, _ = _option_strings(src)
-                missing.append((f"Missing required option: --{prim[0]}",
-                                 self._field_added_at.get(src.path, -1)))
+                missing.append(
+                    (
+                        f"Missing required option: --{prim[0]}",
+                        self._field_added_at.get(src.path, -1),
+                    )
+                )
+
+        # One consolidated message per unactivated required group.
+        for gid, unlocks in group_unlocks.items():
+            if not any(u.field is not None and u.field.required for u in unlocks):
+                continue
+            seen_names: set[str] = set()
+            names: list[str] = []
+            for u in unlocks:
+                if u.path in self._errored_paths:
+                    continue
+                prim, _ = _option_strings(u)
+                nm = f"--{prim[-1]}"  # shortest primary name (last component)
+                if nm not in seen_names:
+                    seen_names.add(nm)
+                    names.append(nm)
+            if not names:
+                continue
+            added_at = min(
+                (
+                    self._field_added_at.get(u.path, -1)
+                    for u in unlocks
+                    if self._field_added_at.get(u.path, -1) >= 0
+                ),
+                default=-1,
+            )
+            missing.append(
+                (
+                    "Missing required option: " + " or ".join(names),
+                    added_at,
+                )
+            )
+
+        # ── Positional queue ───────────────────────────────────────────────────
+        pos_group_unlocks: dict[str, list[LinearUnlock]] = {}
+        pos_group_seen_paths: dict[str, set[str]] = {}
 
         for h in self.pos_queue:
             src = h.unlocks[0] if isinstance(h, ChoiceSet) else h
             pos_meta = src.field.metadata.get("positional", False) if src.field else True
             remainder = pos_meta not in (False, True)
-            if (
-                not remainder
-                and src.field is not None
-                and src.field.required
-                and src.path not in self.result
-                and src.path not in self._errored_paths
-            ):
+            if remainder:
+                continue
+
+            if isinstance(h, (ChoiceSet, LinearUnlock)):
+                gid = h.unlocks[0].group_id if isinstance(h, ChoiceSet) else h.group_id
+                if gid in self.activated:
+                    continue
+                unlocks = h.unlocks if isinstance(h, ChoiceSet) else [h]
+                if gid not in pos_group_unlocks:
+                    pos_group_unlocks[gid] = []
+                    pos_group_seen_paths[gid] = set()
+                for u in unlocks:
+                    if u.path not in pos_group_seen_paths[gid]:
+                        pos_group_seen_paths[gid].add(u.path)
+                        pos_group_unlocks[gid].append(u)
+            else:
+                if (
+                    src.field is None
+                    or not src.field.required
+                    or src.path in self.result
+                    or src.path in self._errored_paths
+                ):
+                    continue
                 name = (src.field.name or src.path.split(".")[-1]).upper()
-                missing.append((f"Missing required argument: {name}",
-                                 self._field_added_at.get(src.path, -1)))
+                missing.append(
+                    (
+                        f"Missing required argument: {name}",
+                        self._field_added_at.get(src.path, -1),
+                    )
+                )
+
+        for gid, unlocks in pos_group_unlocks.items():
+            if not any(u.field is not None and u.field.required for u in unlocks):
+                continue
+            u0 = unlocks[0]
+            name = (
+                (u0.field.name or u0.path.split(".")[-1]).upper()
+                if u0.field
+                else u0.path.split(".")[-1].upper()
+            )
+            added_at = min(
+                (
+                    self._field_added_at.get(u.path, -1)
+                    for u in unlocks
+                    if self._field_added_at.get(u.path, -1) >= 0
+                ),
+                default=-1,
+            )
+            missing.append((f"Missing required argument: {name}", added_at))
 
         if not missing:
             return
@@ -926,6 +1261,7 @@ class ParserState:
         # Group messages by the arg_index where the phantom should appear.
         # -1 (initial fields) falls back to last_idx.
         from collections import defaultdict
+
         groups: dict[int, list[str]] = defaultdict(list)
         for msg, added_at in missing:
             groups[added_at if added_at >= 0 else last_idx].append(msg)
@@ -934,18 +1270,30 @@ class ParserState:
         # any phantom already placed at that arg_index.
         for arg_idx, msgs in sorted(groups.items()):
             existing_end = max(
-                (loc.end for _, loc in self._accumulated
-                 if loc is not None and loc.phantom and loc.arg_index == arg_idx),
+                (
+                    loc.end
+                    for _, loc in self._accumulated
+                    if loc is not None and loc.phantom and loc.arg_index == arg_idx
+                ),
                 default=0,
             )
             base = existing_end + 1 if existing_end else 0
             for i, msg in enumerate(msgs):
                 start = base + 3 * i
-                self._accumulated.append((msg, Loc(
-                    argv=argv, arg_index=arg_idx,
-                    start=start, end=start + 2,
-                    prog=self.prog, phantom=True, phantom_char="·",
-                )))
+                self._accumulated.append(
+                    (
+                        msg,
+                        Loc(
+                            argv=argv,
+                            arg_index=arg_idx,
+                            start=start,
+                            end=start + 2,
+                            prog=self.prog,
+                            phantom=True,
+                            phantom_char="·",
+                        ),
+                    )
+                )
 
     # ── Main loop ──────────────────────────────────────────────────────────────
 
@@ -1002,7 +1350,7 @@ def parse(
     ctrl_group = linearize(Control, _CTRL_NS)
     merged_group = root_group | ctrl_group
 
-    state = ParserState(merged_group, prog=prog)
+    state = ParserState(merged_group, prog=prog, root_type=root_type)
 
     parse_error: ParseError | None = None
     try:
@@ -1016,14 +1364,14 @@ def parse(
 
     # Extract Control values from the internal namespace and build the instance.
     ctrl_prefix = _CTRL_NS + "."
-    ctrl_flat = {k[len(ctrl_prefix):]: v for k, v in flat.items() if k.startswith(ctrl_prefix)}
+    ctrl_flat = {k[len(ctrl_prefix) :]: v for k, v in flat.items() if k.startswith(ctrl_prefix)}
     control = Control(**ctrl_flat)
 
     # Strip Control fields from the result.
     clean_flat = {k: v for k, v in flat.items() if not k.startswith(ctrl_prefix)}
     clean_spans = {k: v for k, v in spans.items() if not k.startswith(ctrl_prefix)}
 
-    return control.build(clean_flat, clean_spans, parse_error)
+    return control.build(clean_flat, clean_spans, parse_error, state)
 
 
 def parse_cli(root_type: type, argv: list[str] = None, prog: str | None = None) -> ParsedArgs:
