@@ -88,7 +88,7 @@ def linearize(ft: type[Any @ TagSet], fld: Field | None, path: str):
             0,
             LinearField(
                 type=str,
-                field=Field(type=str, serialized_name="$class"),
+                field=Field(type=str, metadata=fld.metadata, serialized_name="$class"),
                 path=_subpath(path, "$class"),
             ),
         )
@@ -102,11 +102,6 @@ class LeafTell(Tell):
     pass
 
 
-@dataclass(frozen=True)
-class AbsentTell(Tell):
-    pass
-
-
 @ovld
 def linearize(ft: type[UnionAlias], fld: Field | None, path: str):
     """Field type is a Union — tagged, optional, or plain."""
@@ -117,7 +112,7 @@ def linearize(ft: type[UnionAlias], fld: Field | None, path: str):
         if (tls := get_tells(o, dict)) is not None:
             tells.append((o, tls))
         elif o is NoneType:
-            tells.append((o, {AbsentTell()}))
+            pass
         else:
             tells.append((o, {LeafTell()}))
 
@@ -139,7 +134,7 @@ def linearize(ft: type[UnionAlias], fld: Field | None, path: str):
         filter_out = []
 
         match list(tls):
-            case [LeafTell() | AbsentTell()]:
+            case [LeafTell()]:
                 (lfld,) = group.fields
                 filter_out.append(lfld)
                 rval.fields.append(

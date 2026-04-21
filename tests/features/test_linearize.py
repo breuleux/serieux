@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
-from pprint import pprint
 from types import NoneType
 from typing import Annotated, Optional, Union
 
@@ -156,8 +155,7 @@ def test_optional_struct_flattened():
         "label",
         "<G1.0>person.name",
         "<G1.0>person.age",
-        "<G1.1>person-",
-        {"G1.0": [], "G1.1": []},
+        {"G1.0": []},
     ]
 
 
@@ -188,7 +186,7 @@ def test_union_struct_overlap():
 
 def test_union_struct_leaf():
     items = linearize(Union[Person, str])
-    pprint(sexp(items))
+    assert sexp(items) == ["<G1.0>name", "<G1.0>age", "<G1.1>", {"G1.0": [], "G1.1": []}]
 
 
 def test_string_modelizable_leaf():
