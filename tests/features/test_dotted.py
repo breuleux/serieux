@@ -1,3 +1,5 @@
+import pytest
+
 from serieux import Serieux
 from serieux.ctx import Context
 from serieux.features.dotted import DottedNotation, unflatten
@@ -36,6 +38,24 @@ def test_unflatten_ordering():
     d1 = {"b": 1, "a": {"y": 7}, "a.x": 2, "r": 3, "n": 4}
     d2 = unflatten(d1)
     assert list(d2) == list("barn")
+
+
+@one_test_per_assert
+def test_unflatten_allow_lists():
+    assert unflatten({"x.0.y": 9, "x.1.y": 10}, allow_lists=True) == {"x": [{"y": 9}, {"y": 10}]}
+    assert unflatten({"0.y": 9, "1.y": 10}, allow_lists=True) == [{"y": 9}, {"y": 10}]
+    assert unflatten({"0": "a", "1": "b", "2": "c"}, allow_lists=True) == ["a", "b", "c"]
+    assert unflatten({"x.0": 1, "x.1": 2, "y": 3}, allow_lists=True) == {"x": [1, 2], "y": 3}
+
+
+def test_unflatten_allow_lists_numeric_sort():
+    d = {f"{i}": i for i in range(11)}
+    assert unflatten(d, allow_lists=True) == list(range(11))
+
+
+def test_unflatten_allow_lists_gap():
+    with pytest.raises(ValueError, match="gaps"):
+        unflatten({"x.0": 1, "x.2": 3}, allow_lists=True)
 
 
 def test_deserialize():
