@@ -20,7 +20,7 @@ from serieux.features.tagset import TagDict, TaggedUnion
 
 @ovld
 def sexp(lin: LinearField):
-    return lin.path
+    return str(lin.path)
 
 
 @ovld

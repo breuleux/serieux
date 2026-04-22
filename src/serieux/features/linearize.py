@@ -7,14 +7,44 @@ from typing import Any, Union, get_args
 
 from ovld import call_next, ovld, recurse
 
-from ..model import Field, FieldModelizable, ListModelizable, StringModelizable, model
+from ..model import Field, FieldModelizable, ListModelizable, Model, StringModelizable, model
 from ..tell import Tell, tells as get_tells
 from ..utils import UnionAlias
 from .tagset import Tagged, TagSet
 
 
-def _subpath(p, field):
-    return f"{p}.{field}" if p else field
+@dataclass(kw_only=True, frozen=True)
+class Step:
+    model: Model
+    field: Field
+    repeat: bool = False
+
+    @property
+    def type(self):
+        return self.field.type
+
+    @property
+    def parent_type(self):
+        return self.model.original_type
+
+    def name(self):
+        return "#" if self.repeat else self.field.serialized_name
+
+
+@dataclass(kw_only=True, frozen=True)
+class Path:
+    steps: list[Step] = field(default_factory=list)
+
+    def follow(self, model, field, repeat=False):
+        assert field
+        return type(self)(steps=[*self.steps, Step(model=model, field=field, repeat=repeat)])
+
+    @property
+    def last(self):
+        return self.steps[-1]
+
+    def __str__(self):
+        return ".".join(p.name() for p in self.steps)
 
 
 @dataclass(kw_only=True)
@@ -22,7 +52,7 @@ class LinearField:
     """A leaf field in the linearized representation."""
 
     field: Field
-    path: str
+    path: Path
     type: type
 
 
@@ -51,7 +81,13 @@ class LinearUnlock(LinearField):
 
 @ovld
 def linearize(t: type[Any], prefix: str = ""):
-    return recurse(t, None, prefix)
+    return recurse(
+        t,
+        None,
+        Path(steps=[Step(model=None, field=Field(type=NoneType, serialized_name=prefix))])
+        if prefix
+        else Path(),
+    )
 
 
 @ovld
@@ -73,19 +109,16 @@ def _flatten_options(ft: type[Any]):
 
 
 @ovld(priority=1)
-def linearize(ft: type[Any @ TagSet], fld: Field | None, path: str):
+def linearize(ft: type[Any @ TagSet], fld: Field | None, path: Path):
     """Field type is directly annotated with a TagSet."""
     results = call_next(ft, fld, path)
     _, ts = TagSet.decompose(ft)
     opts = list(ts.iterate(object))
     if len(opts) == 1:
+        tag_fld = Field(type=str, metadata=fld.metadata, serialized_name="$class")
         results.fields.insert(
             0,
-            LinearField(
-                type=str,
-                field=Field(type=str, metadata=fld.metadata, serialized_name="$class"),
-                path=_subpath(path, "$class"),
-            ),
+            LinearField(type=str, field=tag_fld, path=path.follow(Model(ft), tag_fld)),
         )
         return results
     else:
@@ -98,7 +131,7 @@ class LeafTell(Tell):
 
 
 @ovld
-def linearize(ft: type[UnionAlias], fld: Field | None, path: str):
+def linearize(ft: type[UnionAlias], fld: Field | None, path: Path):
     """Field type is a Union — tagged, optional, or plain."""
     options = list(_flatten_options(ft))
 
@@ -120,7 +153,7 @@ def linearize(ft: type[UnionAlias], fld: Field | None, path: str):
     if any(not tls for _, tls in tells):
         raise Exception("Cannot differentiate options")
 
-    group_id = path
+    group_id = str(path)
     rval = LinearGroup(option_groups={group_id: []})
 
     groups = [recurse(t, fld, path) for t in options]
@@ -161,7 +194,7 @@ def linearize(ft: type[UnionAlias], fld: Field | None, path: str):
 
 
 @ovld(priority=1)
-def linearize(ft: type[StringModelizable], fld: Field | None, path: str):
+def linearize(ft: type[StringModelizable], fld: Field | None, path: Path):
     """StringModelizable is treated as a leaf even if it also has fields."""
     return LinearGroup(
         fields=[LinearField(type=ft, field=fld, path=path)],
@@ -169,25 +202,25 @@ def linearize(ft: type[StringModelizable], fld: Field | None, path: str):
 
 
 @ovld
-def linearize(ft: type[FieldModelizable], fld: Field | None, path: str):
+def linearize(ft: type[FieldModelizable], fld: Field | None, path: Path):
     """Nested struct field → flatten recursively."""
     m = model(ft)
     result = LinearGroup()
     for subfld in m.fields:
-        result |= recurse(subfld.type, subfld, _subpath(path, subfld.name))
+        result |= recurse(subfld.type, subfld, path.follow(m, subfld))
     return result
 
 
 @ovld
-def linearize(ft: type[ListModelizable], fld: Field | None, path: str):
+def linearize(ft: type[ListModelizable], fld: Field | None, path: Path):
     """List field."""
     m = model(ft)
     ef = m.element_field
-    return recurse(ef.type, ef, _subpath(path, "#"))
+    return recurse(ef.type, ef, path.follow(m, ef, True))
 
 
 @ovld
-def linearize(ft: type[Any], fld: Field | None, path: str):
+def linearize(ft: type[Any], fld: Field | None, path: Path):
     """Primitive / leaf field."""
     return LinearGroup(
         fields=[LinearField(type=ft, field=fld, path=path)],
