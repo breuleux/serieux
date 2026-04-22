@@ -15,7 +15,7 @@ from ovld import Medley, ovld, recurse
 from ..ctx import Context
 from ..model import ListModelizable
 from .dotted import unflatten
-from .linearize import LinearField, LinearGroup, LinearUnlock, linearize
+from .linearize import LinearField, LinearGroup, LinearUnlock, Path, linearize
 from .tagset import Tag, tag_field
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -385,11 +385,16 @@ class ParseError(Exception):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-_TAG_SUFFIX = f".{tag_field}"
+def _is_tag_path(path: Path) -> bool:
+    return bool(path.steps) and path.steps[-1].field.serialized_name == tag_field
 
 
-def _strip_tag_suffix(path: str) -> str:
-    return path[: -len(_TAG_SUFFIX)] if path.endswith(_TAG_SUFFIX) else path
+def _strip_tag_path(path: Path) -> Path:
+    return Path(steps=path.steps[:-1]) if _is_tag_path(path) else path
+
+
+def _path_last(path: Path) -> str:
+    return path.steps[-1].field.serialized_name if path.steps else ""
 
 
 def _cli_name(s: str) -> str:
@@ -403,13 +408,14 @@ def _option_strings(lfield: LinearField) -> tuple[list[str], list[str]]:
     ``[long]`` when both are identical.  Aliases come from field metadata.
     """
     f = lfield.field
-    eff = _strip_tag_suffix(lfield.path)
+    eff_path = _strip_tag_path(lfield.path)
+    eff = str(eff_path)
 
     if f is not None and (opt := f.metadata.get("option")):
         primary = [opt.lstrip("-")]
     else:
         long = _cli_name(eff)
-        short = _cli_name(eff.split(".")[-1])
+        short = _cli_name(_path_last(eff_path) if eff_path.steps else eff)
         primary = [long] if long == short else [long, short]
 
     if f is not None:
@@ -498,9 +504,8 @@ def _cls_for_unlock(root_type: type, unlock: "LinearUnlock") -> "type | None":
     path = unlock.path
 
     # Tagged union: path ends with .<tag_field> and expected_value is the tag name.
-    if path.endswith(_TAG_SUFFIX):
-        parent_path = _strip_tag_suffix(path)
-        parent_fld = _find_field_at_path(root_type, parent_path)
+    if _is_tag_path(path):
+        parent_fld = _find_field_at_path(root_type, str(_strip_tag_path(path)))
         if parent_fld is None:
             return None
         for tag, cls in _tag_classes(parent_fld.type):
@@ -508,15 +513,13 @@ def _cls_for_unlock(root_type: type, unlock: "LinearUnlock") -> "type | None":
                 return cls
         return None
 
-    # Plain union: path like "animal.indoor"; find which branch owns the discriminator.
-    parts = path.split(".")
-    if len(parts) < 2:
+    # Plain union: find which branch owns the discriminator field.
+    if len(path.steps) < 2:
         return None
-    parent_path = ".".join(parts[:-1])
-    disc_name = parts[-1]
-    parent_fld = _find_field_at_path(root_type, parent_path)
+    parent_fld = _find_field_at_path(root_type, str(Path(steps=path.steps[:-1])))
     if parent_fld is None:
         return None
+    disc_name = _path_last(path)
     parent_type = parent_fld.type
     if get_origin(parent_type) is not Union:
         return None
@@ -585,12 +588,12 @@ def _format_help(state: "ParserState", color: bool = None) -> str:
         is_class = src.field is not None and src.field.serialized_name == tag_field
 
         if is_class:
-            parent_path = _strip_tag_suffix(src.path)
+            parent_path = _strip_tag_path(src.path)
             parent_fld = (
-                _find_field_at_path(state.root_type, parent_path) if state.root_type else None
+                _find_field_at_path(state.root_type, str(parent_path)) if state.root_type else None
             )
             desc = (parent_fld.description or "") if parent_fld else ""
-            metavar = _cli_name(parent_path.split(".")[-1]).upper()
+            metavar = _cli_name(_path_last(parent_path)).upper()
             tag_info = _tag_classes(parent_fld.type) if parent_fld else []
         else:
             desc = (src.field.description or "") if src.field else ""
@@ -625,9 +628,9 @@ def _format_help(state: "ParserState", color: bool = None) -> str:
         src = h.unlocks[0] if isinstance(h, ChoiceSet) else h
         is_class = src.field is not None and src.field.serialized_name == tag_field
         if is_class:
-            parent_path = _strip_tag_suffix(src.path)
+            parent_path = _strip_tag_path(src.path)
             parent_fld = (
-                _find_field_at_path(state.root_type, parent_path) if state.root_type else None
+                _find_field_at_path(state.root_type, str(parent_path)) if state.root_type else None
             )
             desc = (parent_fld.description or "") if parent_fld else ""
             tag_info = _tag_classes(parent_fld.type) if parent_fld else []
@@ -637,9 +640,9 @@ def _format_help(state: "ParserState", color: bool = None) -> str:
                 else ([h] if isinstance(h, LinearUnlock) else [])
             )
             evs = [u.expected_value for u in unlocks if u.expected_value]
-            display = "{" + ",".join(evs) + "}" if evs else parent_path.split(".")[-1].upper()
+            display = "{" + ",".join(evs) + "}" if evs else _path_last(parent_path).upper()
         else:
-            display = (src.field.name or src.path.split(".")[-1]).upper()
+            display = (src.field.name or _path_last(src.path)).upper()
             desc = (src.field.description or "") if src.field else ""
             tag_info = []
         pos_entries.append({"display": display, "desc": desc, "tag_info": tag_info})
@@ -779,7 +782,7 @@ def _group_handlers(fields: list[LinearField]) -> list[LinearField | ChoiceSet]:
 
     for f in fields:
         if isinstance(f, LinearUnlock):
-            key = (f.path, f.group_id)
+            key = (str(f.path), f.group_id)
             if key not in unlock_map:
                 unlock_map[key] = []
                 unlock_order.append(key)
@@ -865,7 +868,7 @@ class ParserState:
         for the same key (no cross-batch collision check).
         """
         for f in fields:
-            self._field_added_at.setdefault(f.path, self._current_arg_idx)
+            self._field_added_at.setdefault(str(f.path), self._current_arg_idx)
         positionals_raw: list[LinearField] = []
         options: list[LinearField] = []
         for f in fields:
@@ -907,7 +910,7 @@ class ParserState:
         pos_handlers: list[LinearField | ChoiceSet] = []
         for f in positionals_raw:
             if isinstance(f, LinearUnlock):
-                key = (f.path, f.group_id)
+                key = (str(f.path), f.group_id)
                 if key not in unlock_groups:
                     unlock_groups[key] = []
                     unlock_order.append(key)
@@ -963,8 +966,8 @@ class ParserState:
             self._fired_unlocks.append((unlock, value))
             self._current_arg_idx = value_loc.arg_index
             self._add_group(self.latent[gid][unlock.choice_id])
-        self.result[unlock.path] = value
-        self.spans[unlock.path] = value_loc
+        self.result[str(unlock.path)] = value
+        self.spans[str(unlock.path)] = value_loc
 
     # ── Field assignment ───────────────────────────────────────────────────────
 
@@ -983,7 +986,7 @@ class ParserState:
         return value
 
     def _set_field(self, lfield: LinearField, value: Any, loc: Loc) -> None:
-        path = lfield.path
+        path = str(lfield.path)
         try:
             is_list = issubclass(lfield.type, ListModelizable)
         except TypeError:
@@ -1045,8 +1048,8 @@ class ParserState:
             self._fire_unlock(handler, True, loc, loc)
         else:
             assert isinstance(handler, LinearField)
-            self.result[handler.path] = True
-            self.spans[handler.path] = loc
+            self.result[str(handler.path)] = True
+            self.spans[str(handler.path)] = loc
 
     # ── Token handlers ─────────────────────────────────────────────────────────
 
@@ -1055,7 +1058,7 @@ class ParserState:
         if isinstance(handler, Ambiguous):
             return
         src = handler.unlocks[0] if isinstance(handler, ChoiceSet) else handler
-        self._errored_paths.add(src.path)
+        self._errored_paths.add(str(src.path))
 
     def _missing_loc(self, key_loc: Loc) -> Loc:
         """Return a phantom loc that shows grey dots right after the key option token."""
@@ -1093,8 +1096,8 @@ class ParserState:
                             f"--{opt} is a flag and does not take a value",
                             self._ploc(tok.value_loc),
                         )
-                    self.result[h.path] = False
-                    self.spans[h.path] = tok.name_loc
+                    self.result[str(h.path)] = False
+                    self.spans[str(h.path)] = tok.name_loc
                     return
             self._accumulated.append((f"Unknown option: --{opt}", self._ploc(tok.name_loc)))
             # Speculatively skip the next Value — likely this option's argument.
@@ -1221,26 +1224,26 @@ class ParserState:
                     group_unlocks[gid] = []
                     group_seen_paths[gid] = set()
                 for u in unlocks:
-                    if u.path not in group_seen_paths[gid]:
-                        group_seen_paths[gid].add(u.path)
+                    if str(u.path) not in group_seen_paths[gid]:
+                        group_seen_paths[gid].add(str(u.path))
                         group_unlocks[gid].append(u)
             else:
                 src = handler
-                if src.path in seen_plain_paths:
+                if str(src.path) in seen_plain_paths:
                     continue
-                seen_plain_paths.add(src.path)
+                seen_plain_paths.add(str(src.path))
                 if (
                     src.field is None
                     or not src.field.required
-                    or src.path in self.result
-                    or src.path in self._errored_paths
+                    or str(src.path) in self.result
+                    or str(src.path) in self._errored_paths
                 ):
                     continue
                 prim, _ = _option_strings(src)
                 missing.append(
                     (
                         f"Missing required option: --{prim[0]}",
-                        self._field_added_at.get(src.path, -1),
+                        self._field_added_at.get(str(src.path), -1),
                     )
                 )
 
@@ -1251,7 +1254,7 @@ class ParserState:
             seen_names: set[str] = set()
             names: list[str] = []
             for u in unlocks:
-                if u.path in self._errored_paths:
+                if str(u.path) in self._errored_paths:
                     continue
                 prim, _ = _option_strings(u)
                 nm = f"--{prim[-1]}"  # shortest primary name (last component)
@@ -1262,9 +1265,9 @@ class ParserState:
                 continue
             added_at = min(
                 (
-                    self._field_added_at.get(u.path, -1)
+                    self._field_added_at.get(str(u.path), -1)
                     for u in unlocks
-                    if self._field_added_at.get(u.path, -1) >= 0
+                    if self._field_added_at.get(str(u.path), -1) >= 0
                 ),
                 default=-1,
             )
@@ -1295,22 +1298,22 @@ class ParserState:
                     pos_group_unlocks[gid] = []
                     pos_group_seen_paths[gid] = set()
                 for u in unlocks:
-                    if u.path not in pos_group_seen_paths[gid]:
-                        pos_group_seen_paths[gid].add(u.path)
+                    if str(u.path) not in pos_group_seen_paths[gid]:
+                        pos_group_seen_paths[gid].add(str(u.path))
                         pos_group_unlocks[gid].append(u)
             else:
                 if (
                     src.field is None
                     or not src.field.required
-                    or src.path in self.result
-                    or src.path in self._errored_paths
+                    or str(src.path) in self.result
+                    or str(src.path) in self._errored_paths
                 ):
                     continue
-                name = (src.field.name or src.path.split(".")[-1]).upper()
+                name = (src.field.name or _path_last(src.path)).upper()
                 missing.append(
                     (
                         f"Missing required argument: {name}",
-                        self._field_added_at.get(src.path, -1),
+                        self._field_added_at.get(str(src.path), -1),
                     )
                 )
 
@@ -1319,15 +1322,15 @@ class ParserState:
                 continue
             u0 = unlocks[0]
             name = (
-                (u0.field.name or u0.path.split(".")[-1]).upper()
+                (u0.field.name or _path_last(u0.path)).upper()
                 if u0.field
-                else u0.path.split(".")[-1].upper()
+                else _path_last(u0.path).upper()
             )
             added_at = min(
                 (
-                    self._field_added_at.get(u.path, -1)
+                    self._field_added_at.get(str(u.path), -1)
                     for u in unlocks
-                    if self._field_added_at.get(u.path, -1) >= 0
+                    if self._field_added_at.get(str(u.path), -1) >= 0
                 ),
                 default=-1,
             )
