@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from enum import Enum
 from types import NoneType
@@ -18,46 +18,30 @@ from serieux.features.linearize import (
 from serieux.features.tagset import TagDict, TaggedUnion
 
 
-@dataclass
-class Sexp:
-    curr: int = 0
-    gmap: dict = field(default_factory=dict)
-
-    def get(self, group_id):
-        if group_id not in self.gmap:
-            self.curr += 1
-            self.gmap[group_id] = f"G{self.curr}"
-        return self.gmap[group_id]
-
-    @ovld
-    def __call__(self, lin: LinearField):
-        return lin.path
-
-    @ovld
-    def __call__(self, lin: LinearUnlock):
-        rval = f"<{self.get(lin.group_id)}.{lin.choice_id}>{lin.path}"
-        if lin.expected_value:
-            rval = f"{rval}={lin.expected_value}"
-        if lin.type is NoneType:
-            rval += "-"
-        return rval
-
-    @ovld
-    def __call__(self, lin: LinearGroup):
-        og = {
-            f"{self.get(k)}.{i}": recurse(e)
-            for k, v in lin.option_groups.items()
-            for i, e in enumerate(v)
-        }
-        return [recurse(x) for x in lin.fields] + ([og] if og else [])
-
-    @ovld
-    def __call__(self, lin: list):
-        return [recurse(x) for x in lin]
+@ovld
+def sexp(lin: LinearField):
+    return lin.path
 
 
-def sexp(lin):
-    return Sexp()(lin)
+@ovld
+def sexp(lin: LinearUnlock):
+    rval = f"<{lin.group_id}/{lin.choice_id}>{lin.path}"
+    if lin.expected_value:
+        rval = f"{rval}={lin.expected_value}"
+    if lin.type is NoneType:
+        rval += "-"
+    return rval
+
+
+@ovld
+def sexp(lin: LinearGroup):
+    og = {f"{k}/{i}": recurse(e) for k, v in lin.option_groups.items() for i, e in enumerate(v)}
+    return [recurse(x) for x in lin.fields] + ([og] if og else [])
+
+
+@ovld
+def sexp(lin: list):
+    return [recurse(x) for x in lin]
 
 
 @dataclass
@@ -130,6 +114,12 @@ class Capharnaum:
     elements: list[TaggedUnion[Cat, Dog]]
 
 
+@dataclass
+class MultiU:
+    u1: Person | Job
+    u2: Cat | Dog
+
+
 class Color(str, Enum):
     RED = "red"
     GREEN = "green"
@@ -155,12 +145,12 @@ def test_nested_flattened():
 def test_tagged_union():
     items = linearize(Pet)
     assert sexp(items) == [
-        "<G1.0>animal.$class=cat",
-        "<G1.1>animal.$class=dog",
+        "<animal/0>animal.$class=cat",
+        "<animal/1>animal.$class=dog",
         "name",
         {
-            "G1.0": ["animal.indoor"],
-            "G1.1": ["animal.breed"],
+            "animal/0": ["animal.indoor"],
+            "animal/1": ["animal.breed"],
         },
     ]
 
@@ -169,9 +159,9 @@ def test_optional_struct_flattened():
     items = linearize(WithOptional)
     assert sexp(items) == [
         "label",
-        "<G1.0>person.name",
-        "<G1.0>person.age",
-        {"G1.0": []},
+        "<person/0>person.name",
+        "<person/0>person.age",
+        {"person/0": []},
     ]
 
 
@@ -183,26 +173,37 @@ def test_indistinguishable_union():
 def test_union_struct():
     items = linearize(Union[Person, Address])
     assert sexp(items) == [
-        "<G1.0>name",
-        "<G1.0>age",
-        "<G1.1>street",
-        "<G1.1>city",
-        {"G1.0": [], "G1.1": []},
+        "</0>name",
+        "</0>age",
+        "</1>street",
+        "</1>city",
+        {"/0": [], "/1": []},
     ]
 
 
 def test_union_struct_overlap():
     items = linearize(Union[Person, Job])
     assert sexp(items) == [
-        "<G1.0>age",
-        "<G1.1>salary",
-        {"G1.0": ["name"], "G1.1": ["name"]},
+        "</0>age",
+        "</1>salary",
+        {"/0": ["name"], "/1": ["name"]},
+    ]
+
+
+def test_multiple_union():
+    items = linearize(MultiU)
+    assert sexp(items) == [
+        "<u1/0>u1.age",
+        "<u1/1>u1.salary",
+        "<u2/0>u2.indoor",
+        "<u2/1>u2.breed",
+        {"u1/0": ["u1.name"], "u1/1": ["u1.name"], "u2/0": [], "u2/1": []},
     ]
 
 
 def test_union_struct_leaf():
     items = linearize(Union[Person, str])
-    assert sexp(items) == ["<G1.0>name", "<G1.0>age", "<G1.1>", {"G1.0": [], "G1.1": []}]
+    assert sexp(items) == ["</0>name", "</0>age", "</1>", {"/0": [], "/1": []}]
 
 
 def test_string_modelizable_leaf():
@@ -235,10 +236,10 @@ class Garage:
 def test_direct_tagset():
     items = linearize(Garage)
     assert sexp(items) == [
-        "<G1.0>vehicle.$class=car",
-        "<G1.1>vehicle.$class=bike",
+        "<vehicle/0>vehicle.$class=car",
+        "<vehicle/1>vehicle.$class=bike",
         "owner",
-        {"G1.0": ["vehicle.horsepower"], "G1.1": ["vehicle.gears"]},
+        {"vehicle/0": ["vehicle.horsepower"], "vehicle/1": ["vehicle.gears"]},
     ]
 
 
@@ -250,9 +251,9 @@ def test_list():
 def test_list_of_tagged():
     items = linearize(Capharnaum)
     assert sexp(items) == [
-        "<G1.0>elements.#.$class=cat",
-        "<G1.1>elements.#.$class=dog",
-        {"G1.0": ["elements.#.indoor"], "G1.1": ["elements.#.breed"]},
+        "<elements.#/0>elements.#.$class=cat",
+        "<elements.#/1>elements.#.$class=dog",
+        {"elements.#/0": ["elements.#.indoor"], "elements.#/1": ["elements.#.breed"]},
     ]
 
 

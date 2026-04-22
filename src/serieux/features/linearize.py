@@ -4,7 +4,6 @@ from dataclasses import dataclass, field, replace
 from itertools import pairwise
 from types import NoneType
 from typing import Any, Union, get_args
-from uuid import uuid4
 
 from ovld import call_next, ovld, recurse
 
@@ -125,7 +124,7 @@ def linearize(ft: type[UnionAlias], fld: Field | None, path: str):
     if any(not tls for _, tls in tells):
         raise Exception("Cannot differentiate options")
 
-    group_id = uuid4().hex
+    group_id = path
     rval = LinearGroup(option_groups={group_id: []})
 
     groups = [recurse(t, fld, path) for t in options]
