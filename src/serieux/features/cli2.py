@@ -489,6 +489,49 @@ def _class_doc(cls: type) -> str:
     return "" if doc.startswith(cls.__name__ + "(") else doc
 
 
+def _cls_for_unlock(root_type: type, unlock: "LinearUnlock") -> "type | None":
+    """Return the Python class selected by a fired LinearUnlock, if determinable."""
+    from typing import Union, get_args, get_origin
+
+    from ..model import model as _model
+
+    path = unlock.path
+
+    # Tagged union: path ends with .<tag_field> and expected_value is the tag name.
+    if path.endswith(_TAG_SUFFIX):
+        parent_path = _strip_tag_suffix(path)
+        parent_fld = _find_field_at_path(root_type, parent_path)
+        if parent_fld is None:
+            return None
+        for tag, cls in _tag_classes(parent_fld.type):
+            if tag == unlock.expected_value:
+                return cls
+        return None
+
+    # Plain union: path like "animal.indoor"; find which branch owns the discriminator.
+    parts = path.split(".")
+    if len(parts) < 2:
+        return None
+    parent_path = ".".join(parts[:-1])
+    disc_name = parts[-1]
+    parent_fld = _find_field_at_path(root_type, parent_path)
+    if parent_fld is None:
+        return None
+    parent_type = parent_fld.type
+    if get_origin(parent_type) is not Union:
+        return None
+    for opt in get_args(parent_type):
+        try:
+            m = _model(opt)
+            if m and m.fields:
+                for f in m.fields:
+                    if f.serialized_name == disc_name or f.name == disc_name:
+                        return opt
+        except Exception:
+            pass
+    return None
+
+
 def _format_help(state: "ParserState", color: bool = None) -> str:
     prog = state.prog or sys.argv[0]
 
@@ -616,8 +659,37 @@ def _format_help(state: "ParserState", color: bool = None) -> str:
 
     # ── Usage ─────────────────────────────────────────────────────────────────
     opts_placeholder = c_dim("[OPTIONS]")
-    pos_part = "".join(f" {c_meta(e['display'])}" for e in pos_entries)
-    lines = [f"{c_header('Usage:')} {c_prog(prog)} {opts_placeholder}{pos_part}", ""]
+    # Build the "choices already made" prefix from fired unlocks.
+    choice_parts: list[str] = []
+    remaining_pos_entries = list(pos_entries)
+    for unlock, value in state._fired_unlocks:
+        is_positional = unlock.field is not None and unlock.field.metadata.get("positional", False)
+        if is_positional:
+            # Positional unlock: show the value bare; remove from remaining positionals.
+            choice_parts.append(c_meta(str(value)))
+            remaining_pos_entries = [
+                e for e in remaining_pos_entries if e["display"].lower() != str(value)
+            ]
+        else:
+            prim, _ = _option_strings(unlock)
+            short_name = prim[-1]  # shortest primary name
+            opt_tok = c_opt(_opt_str(short_name))
+            if unlock.type is bool:
+                choice_parts.append(opt_tok)
+            else:
+                choice_parts.append(f"{opt_tok} {c_meta(str(value))}")
+    choices_str = (" ".join(choice_parts) + " ") if choice_parts else ""
+    # Remaining positionals not consumed by a choice
+    pos_part = "".join(f" {c_meta(e['display'])}" for e in remaining_pos_entries)
+    lines = [f"{c_header('Usage:')} {c_prog(prog)} {choices_str}{opts_placeholder}{pos_part}", ""]
+
+    # ── Description (root type or latest selected choice) ─────────────────────
+    doc_cls = state._last_doc_cls or state.root_type
+    if doc_cls is not None:
+        doc_str = _class_doc(doc_cls)
+        if doc_str:
+            lines.append(doc_str)
+            lines.append("")
 
     # ── Arguments section ─────────────────────────────────────────────────────
     if pos_entries:
@@ -762,6 +834,10 @@ class ParserState:
         self._argv: list[str] = []  # populated by run()
         self._current_arg_idx: int = -1  # updated as tokens are consumed
         self._field_added_at: dict[str, int] = {}  # path → arg_index when added
+        self._last_doc_cls: type | None = None  # class selected by the most recent union unlock
+        self._fired_unlocks: list[
+            tuple[LinearUnlock, Any]
+        ] = []  # (unlock, value) in activation order
         self._add_group(root_group)
 
     def _ploc(self, loc: Loc) -> Loc:
@@ -880,6 +956,11 @@ class ParserState:
             # Same branch already active — just update the stored value
         else:
             self.activated[gid] = unlock.choice_id
+            if self.root_type is not None:
+                cls = _cls_for_unlock(self.root_type, unlock)
+                if cls is not None:
+                    self._last_doc_cls = cls
+            self._fired_unlocks.append((unlock, value))
             self._current_arg_idx = value_loc.arg_index
             self._add_group(self.latent[gid][unlock.choice_id])
         self.result[unlock.path] = value
