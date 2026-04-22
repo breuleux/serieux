@@ -12,7 +12,6 @@ from ovld import ovld, recurse
 from serieux.features.linearize import (
     LinearField,
     LinearGroup,
-    LinearUnlock,
     linearize,
 )
 from serieux.features.tagset import TagDict, TaggedUnion
@@ -20,17 +19,15 @@ from serieux.features.tagset import TagDict, TaggedUnion
 
 @ovld
 def sexp(lin: LinearField):
-    return str(lin.path)
-
-
-@ovld
-def sexp(lin: LinearUnlock):
-    rval = f"<{lin.group_id}/{lin.choice_id}>{lin.path}"
-    if lin.expected_value:
-        rval = f"{rval}={lin.expected_value}"
-    if lin.type is NoneType:
-        rval += "-"
-    return rval
+    if ul := lin.unlock:
+        rval = f"<{ul.group.identifier}/{ul.choice_id}>{lin.identifier}"
+        if ul.expected_value:
+            rval = f"{rval}={ul.expected_value}"
+        if lin.type is NoneType:
+            rval += "-"
+        return rval
+    else:
+        return lin.identifier
 
 
 @ovld
