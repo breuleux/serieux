@@ -10,7 +10,7 @@ from ovld import call_next, ovld, recurse
 from ..model import Field, FieldModelizable, ListModelizable, Model, StringModelizable, model
 from ..tell import Tell, tells as get_tells
 from ..utils import UnionAlias
-from .tagset import Tagged, TagSet
+from .tagset import Tagged, TagSet, tag_field
 
 
 @dataclass(kw_only=True)
@@ -26,17 +26,17 @@ class LinearField:
 
     model: Model
     field: Field
-    repeat: bool = False
+    sequence: bool = False
 
     parent: LinearField | None = None
     unlock: Unlock | None = None
 
-    def follow(self, model, field, repeat=False):
+    def follow(self, model, field, sequence=False):
         assert field
         return type(self)(
             model=model,
             field=field,
-            repeat=repeat,
+            sequence=sequence,
             parent=self,
         )
 
@@ -49,8 +49,20 @@ class LinearField:
         return self.model.original_type
 
     @property
+    def metadata(self):
+        return self.field.metadata
+
+    @property
+    def doc(self):
+        return self.field.description
+
+    @property
+    def enclosing_doc(self):
+        return self.model.description
+
+    @property
     def label(self):
-        return "#" if self.repeat else self.field.serialized_name
+        return "#" if self.sequence else self.field.serialized_name
 
     @property
     def identifier(self):
@@ -66,23 +78,27 @@ class LinearField:
 class LinearGroup:
     """A group of LinearBase items for one branch of a union, with its associated type."""
 
+    group_field: LinearField = None
     fields: list[LinearField] = field(default_factory=list)
     option_groups: dict[str, list[LinearGroup]] = field(default_factory=dict)
 
     def __or__(self, other):
         return LinearGroup(
+            group_field=self.group_field,
             fields=[*self.fields, *other.fields],
             option_groups={**self.option_groups, **other.option_groups},
         )
 
 
 @ovld
-def linearize(t: type[Any], prefix: str = ""):
+def linearize(t: type[Any], prefix: str = "", description: str = None):
+    if description is None:
+        description = getattr(t, "__doc__", None)
     return recurse(
         t,
         LinearField(
             model=None,
-            field=Field(type=t, serialized_name=prefix),
+            field=Field(type=t, serialized_name=prefix, description=description),
             parent=None,
         ),
     )
@@ -113,7 +129,12 @@ def linearize(ft: type[Any @ TagSet], fld: LinearField):
     _, ts = TagSet.decompose(ft)
     opts = list(ts.iterate(object))
     if len(opts) == 1:
-        tag_fld = Field(type=str, metadata=fld.field.metadata, serialized_name="$class")
+        tag_fld = Field(
+            type=str,
+            metadata=fld.field.metadata,
+            serialized_name=tag_field,
+            description=model(ft).description,
+        )
         results.fields.insert(
             0,
             fld.follow(model=Model(ft), field=tag_fld),
@@ -152,7 +173,7 @@ def linearize(ft: type[UnionAlias], fld: LinearField):
         raise Exception("Cannot differentiate options")
 
     group_id = fld.identifier
-    rval = LinearGroup(option_groups={group_id: []})
+    rval = LinearGroup(group_field=fld, option_groups={group_id: []})
 
     groups = [recurse(t, fld) for t in options]
 
@@ -187,14 +208,14 @@ def linearize(ft: type[UnionAlias], fld: LinearField):
 @ovld(priority=1)
 def linearize(ft: type[StringModelizable], fld: LinearField):
     """StringModelizable is treated as a leaf even if it also has fields."""
-    return LinearGroup(fields=[fld])
+    return LinearGroup(group_field=fld, fields=[fld])
 
 
 @ovld
 def linearize(ft: type[FieldModelizable], fld: LinearField):
     """Nested struct field → flatten recursively."""
     m = model(ft)
-    result = LinearGroup()
+    result = LinearGroup(group_field=fld)
     for subfld in m.fields:
         result |= recurse(subfld.type, fld.follow(model=m, field=subfld))
     return result
@@ -205,10 +226,10 @@ def linearize(ft: type[ListModelizable], fld: LinearField):
     """List field."""
     m = model(ft)
     ef = m.element_field
-    return recurse(ef.type, fld.follow(model=m, field=ef, repeat=True))
+    return recurse(ef.type, fld.follow(model=m, field=ef, sequence=True))
 
 
 @ovld
 def linearize(ft: type[Any], fld: LinearField):
     """Primitive / leaf field."""
-    return LinearGroup(fields=[fld])
+    return LinearGroup(group_field=fld, fields=[fld])

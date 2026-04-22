@@ -43,12 +43,16 @@ def sexp(lin: list):
 
 @dataclass
 class Person:
+    """A person."""
+
     name: str
     age: int
 
 
 @dataclass
 class Job:
+    """A job."""
+
     name: str
     salary: int
 
@@ -68,17 +72,25 @@ class Employee:
 
 @dataclass
 class Cat:
+    """Meower."""
+
     indoor: bool
 
 
 @dataclass
 class Dog:
+    """Woofer."""
+
     breed: str
 
 
 @dataclass
 class Pet:
+    """Pet!"""
+
+    # The animal
     animal: TaggedUnion[Cat, Dog]
+    # The animal's name
     name: str
 
 
@@ -113,7 +125,9 @@ class Capharnaum:
 
 @dataclass
 class MultiU:
+    # A person... or a job!
     u1: Person | Job
+    # A cat... or a DOG!
     u2: Cat | Dog
 
 
@@ -258,3 +272,33 @@ def test_enum_leaf():
     items = linearize(WithEnum)
     assert sexp(items) == ["color", "count"]
     assert items.fields[0].type is Color
+
+
+def test_documentation():
+    items = linearize(Pet)
+    docs = {
+        sexp(f): {
+            "doc": f.doc,
+            "enclosing": f.enclosing_doc,
+            "parent": f.parent.doc,
+        }
+        for f in items.fields
+    }
+    assert docs == {
+        "<animal/0>animal.$class=cat": {
+            "doc": "Meower.",
+            "enclosing": "Meower.",
+            "parent": "The animal",
+        },
+        "<animal/1>animal.$class=dog": {
+            "doc": "Woofer.",
+            "enclosing": "Woofer.",
+            "parent": "The animal",
+        },
+        "name": {
+            "doc": "The animal's name",
+            "enclosing": "Pet!",
+            "parent": "Pet!",
+        },
+    }
+    assert items.group_field.doc == "Pet!"
