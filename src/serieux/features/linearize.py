@@ -43,17 +43,30 @@ class Path:
     def last(self):
         return self.steps[-1]
 
+    def up(self):
+        return Path(steps=self.steps[:-1])
+
     def __str__(self):
-        return ".".join(p.name() for p in self.steps)
+        return ".".join(pn for p in self.steps if (pn := p.name()))
 
 
 @dataclass(kw_only=True)
 class LinearField:
     """A leaf field in the linearized representation."""
 
-    field: Field
     path: Path
-    type: type
+
+    @property
+    def field(self):
+        return self.path.last.field
+
+    @property
+    def type(self):
+        return self.path.last.type
+
+    @property
+    def identifier(self):
+        return str(self.path)
 
 
 @dataclass(kw_only=True)
@@ -74,7 +87,10 @@ class LinearGroup:
 class LinearUnlock(LinearField):
     """A branch point in the linearized representation."""
 
-    group_id: str
+    @property
+    def group_id(self):
+        return str(self.path.up())
+
     choice_id: int
     expected_value: str = None
 
@@ -84,9 +100,7 @@ def linearize(t: type[Any], prefix: str = ""):
     return recurse(
         t,
         None,
-        Path(steps=[Step(model=None, field=Field(type=NoneType, serialized_name=prefix))])
-        if prefix
-        else Path(),
+        Path(steps=[Step(model=None, field=Field(type=t, serialized_name=prefix))]),
     )
 
 
@@ -118,7 +132,7 @@ def linearize(ft: type[Any @ TagSet], fld: Field | None, path: Path):
         tag_fld = Field(type=str, metadata=fld.metadata, serialized_name="$class")
         results.fields.insert(
             0,
-            LinearField(type=str, field=tag_fld, path=path.follow(Model(ft), tag_fld)),
+            LinearField(path=path.follow(Model(ft), tag_fld)),
         )
         return results
     else:
@@ -168,7 +182,6 @@ def linearize(ft: type[UnionAlias], fld: Field | None, path: Path):
                 rval.fields.append(
                     LinearUnlock(
                         choice_id=i,
-                        group_id=group_id,
                         **vars(lfld),
                     )
                 )
@@ -181,7 +194,6 @@ def linearize(ft: type[UnionAlias], fld: Field | None, path: Path):
                                 LinearUnlock(
                                     choice_id=i,
                                     expected_value=getattr(tl, "value", None),
-                                    group_id=group_id,
                                     **vars(lfld),
                                 )
                             )
@@ -196,9 +208,7 @@ def linearize(ft: type[UnionAlias], fld: Field | None, path: Path):
 @ovld(priority=1)
 def linearize(ft: type[StringModelizable], fld: Field | None, path: Path):
     """StringModelizable is treated as a leaf even if it also has fields."""
-    return LinearGroup(
-        fields=[LinearField(type=ft, field=fld, path=path)],
-    )
+    return LinearGroup(fields=[LinearField(path=path)])
 
 
 @ovld
@@ -222,6 +232,4 @@ def linearize(ft: type[ListModelizable], fld: Field | None, path: Path):
 @ovld
 def linearize(ft: type[Any], fld: Field | None, path: Path):
     """Primitive / leaf field."""
-    return LinearGroup(
-        fields=[LinearField(type=ft, field=fld, path=path)],
-    )
+    return LinearGroup(fields=[LinearField(path=path)])
