@@ -465,39 +465,6 @@ def _class_doc(cls: type) -> str:
     return "" if doc.startswith(cls.__name__ + "(") else doc
 
 
-def _cls_for_unlock(lf: LinearField) -> "type | None":
-    """Return the Python class selected by a fired LinearField (with unlock set)."""
-
-    if lf.parent is None:
-        return None
-
-    if lf.field.serialized_name == tag_field:
-        # Tagged union: parent.type is the TaggedUnion type; match by tag.
-        for tag, cls in _tag_classes(lf.parent.type):
-            if tag == lf.unlock.expected_value:
-                return cls
-        return None
-
-    # Plain union: parent.type is the union; find which branch owns this discriminator.
-    from typing import Union, get_args, get_origin
-
-    from ..model import model as _model
-
-    parent_type = lf.parent.type
-    if get_origin(parent_type) is not Union:
-        return None
-    disc_name = lf.field.serialized_name
-    for opt in get_args(parent_type):
-        try:
-            m = _model(opt)
-            if m and m.fields:
-                for f in m.fields:
-                    if f.serialized_name == disc_name or f.name == disc_name:
-                        return opt
-        except Exception:
-            pass
-    return None
-
 
 def _format_help(state: "ParserState", color: bool = None) -> str:
     prog = state.prog or sys.argv[0]
@@ -653,12 +620,10 @@ def _format_help(state: "ParserState", color: bool = None) -> str:
     lines = [f"{c_header('Usage:')} {c_prog(prog)} {choices_str}{opts_placeholder}{pos_part}", ""]
 
     # ── Description (root type or latest selected choice) ─────────────────────
-    doc_cls = state._last_doc_cls or state.root_type
-    if doc_cls is not None:
-        doc_str = _class_doc(doc_cls)
-        if doc_str:
-            lines.append(doc_str)
-            lines.append("")
+    doc_str = state._last_unlock_lf.doc or ""
+    if doc_str:
+        lines.append(doc_str)
+        lines.append("")
 
     # ── Arguments section ─────────────────────────────────────────────────────
     if pos_entries:
@@ -803,10 +768,10 @@ class ParserState:
         self._argv: list[str] = []  # populated by run()
         self._current_arg_idx: int = -1  # updated as tokens are consumed
         self._field_added_at: dict[str, int] = {}  # path → arg_index when added
-        self._last_doc_cls: type | None = None  # class selected by the most recent union unlock
+        self._last_unlock_lf: LinearField = root_group.group_field  # lf from the most recent union unlock (or root)
         self._fired_unlocks: list[
-            tuple[LinearUnlock, Any]
-        ] = []  # (unlock, value) in activation order
+            tuple[LinearField, Any]
+        ] = []  # (unlock lf, value) in activation order
         self._add_group(root_group)
 
     def _ploc(self, loc: Loc) -> Loc:
@@ -928,9 +893,7 @@ class ParserState:
             # Same branch already active — just update the stored value
         else:
             self.activated[gid] = lf.unlock.choice_id
-            cls = _cls_for_unlock(lf)
-            if cls is not None:
-                self._last_doc_cls = cls
+            self._last_unlock_lf = lf
             self._fired_unlocks.append((lf, value))
             self._current_arg_idx = value_loc.arg_index
             self._add_group(self.latent[gid][lf.unlock.choice_id])
