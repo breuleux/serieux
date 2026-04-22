@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from ovld import call_next, ovld, recurse
 
-from ..model import Field, FieldModelizable, StringModelizable, model
+from ..model import Field, FieldModelizable, ListModelizable, StringModelizable, model
 from ..tell import Tell, tells as get_tells
 from ..utils import UnionAlias
 from .tagset import Tagged, TagSet
@@ -181,6 +181,14 @@ def linearize(ft: type[FieldModelizable], fld: Field | None, path: str):
     for subfld in m.fields:
         result |= recurse(subfld.type, subfld, _subpath(path, subfld.name))
     return result
+
+
+@ovld
+def linearize(ft: type[ListModelizable], fld: Field | None, path: str):
+    """List field."""
+    m = model(ft)
+    ef = m.element_field
+    return recurse(ef.type, ef, _subpath(path, "#"))
 
 
 @ovld

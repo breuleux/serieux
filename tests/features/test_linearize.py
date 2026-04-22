@@ -114,6 +114,22 @@ class WithDate:
     name: str
 
 
+@dataclass
+class Thing:
+    color: str
+    size: str
+
+
+@dataclass
+class HasThings:
+    things: set[Thing]
+
+
+@dataclass
+class Capharnaum:
+    elements: list[TaggedUnion[Cat, Dog]]
+
+
 class Color(str, Enum):
     RED = "red"
     GREEN = "green"
@@ -223,6 +239,20 @@ def test_direct_tagset():
         "<G1.1>vehicle.$class=bike",
         "owner",
         {"G1.0": ["vehicle.horsepower"], "G1.1": ["vehicle.gears"]},
+    ]
+
+
+def test_list():
+    items = linearize(HasThings)
+    assert sexp(items) == ["things.#.color", "things.#.size"]
+
+
+def test_list_of_tagged():
+    items = linearize(Capharnaum)
+    assert sexp(items) == [
+        "<G1.0>elements.#.$class=cat",
+        "<G1.1>elements.#.$class=dog",
+        {"G1.0": ["elements.#.indoor"], "G1.1": ["elements.#.breed"]},
     ]
 
 
