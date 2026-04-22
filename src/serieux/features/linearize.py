@@ -18,15 +18,11 @@ def _subpath(p, field):
 
 
 @dataclass(kw_only=True)
-class LinearBase:
-    field: Field
-    path: str
-
-
-@dataclass(kw_only=True)
-class LinearField(LinearBase):
+class LinearField:
     """A leaf field in the linearized representation."""
 
+    field: Field
+    path: str
     type: type
 
 
