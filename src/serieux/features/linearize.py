@@ -20,6 +20,12 @@ class Unlock:
     expected_value: str | None = None
 
 
+@dataclass
+class Range:
+    min: int
+    max: int = None
+
+
 @dataclass(kw_only=True)
 class LinearField:
     """A leaf field in the linearized representation."""
@@ -61,17 +67,13 @@ class LinearField:
         return self.model.description
 
     @property
-    def label(self):
-        return "#" if self.sequence else self.field.serialized_name
+    def signature(self):
+        p = self.parent.signature if self.parent is not None else ()
+        return (*p, Range(0, None) if self.sequence else self.field.serialized_name)
 
     @property
     def identifier(self):
-        pi = self.parent.identifier if self.parent else None
-        lbl = self.label
-        if pi and lbl:
-            return f"{pi}.{lbl}"
-        else:
-            return pi or lbl or ""
+        return ".".join("#" if isinstance(s, Range) else s for s in self.signature if s)
 
 
 @dataclass(kw_only=True)
