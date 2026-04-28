@@ -13,7 +13,7 @@ from typing import Annotated, Any, get_args, get_origin
 from ovld import Medley, ovld, recurse
 
 from ..ctx import Context
-from ..model import ListModelizable
+from ..model import FieldModelizable, ListModelizable
 from .dotted import unflatten
 from .linearize import LinearField, LinearGroup, linearize
 from .tagset import Tag, tag_field
@@ -465,7 +465,6 @@ def _class_doc(cls: type) -> str:
     return "" if doc.startswith(cls.__name__ + "(") else doc
 
 
-
 def _format_help(state: "ParserState", color: bool = None) -> str:
     prog = state.prog or sys.argv[0]
 
@@ -513,6 +512,19 @@ def _format_help(state: "ParserState", color: bool = None) -> str:
         return chosen
 
     # ── Entry builder ─────────────────────────────────────────────────────────
+    def _make_latent_entry(lf: LinearField) -> dict:
+        """Build a help entry directly from a LinearField not in option_map."""
+        primary, _ = _option_strings(lf)
+        short = [n for n in primary if "." not in n]
+        names = sorted(short if short else primary, key=lambda n: (len(n) > 1, n))
+        desc = lf.doc or ""
+        if not lf.field.required:
+            dflt = lf.field.default
+            if dflt is not MISSING and dflt is not False:
+                suffix = f"[default: {dflt}]"
+                desc = f"{desc}  {c_dim(suffix)}".lstrip() if desc else c_dim(suffix)
+        return {"names": names, "metavar": _type_metavar(lf.type), "desc": desc, "tag_info": []}
+
     def _make_entry(handler: Handler) -> dict:
         src: LinearField = handler.unlocks[0] if isinstance(handler, ChoiceSet) else handler
         names = _display_names(handler)
@@ -541,18 +553,56 @@ def _format_help(state: "ParserState", color: bool = None) -> str:
                     suffix = f"[default: {dflt}]"
                     desc = f"{desc}  {c_dim(suffix)}".lstrip() if desc else c_dim(suffix)
 
-        return {"names": names, "metavar": metavar, "desc": desc, "tag_info": tag_info}
+        # group_key, union_gid, union_choice_id
+        union_gid = None
+        union_choice_id = None
+        if is_class:
+            group_key = parent.model.original_type if (parent and parent.model) else None
+        elif src.identifier.startswith(_CTRL_NS):
+            group_key = _CTRL_NS
+        else:
+            group_key = src.model.original_type if src.model is not None else None
+            if isinstance(handler, LinearField) and handler.unlock is not None:
+                gid = handler.unlock.group.identifier
+                if gid not in state.activated:
+                    union_gid = gid
+                    union_choice_id = handler.unlock.choice_id
 
-    # ── Collect options ───────────────────────────────────────────────────────
+        try:
+            is_nested = (
+                not is_class
+                and src.parent is not None
+                and issubclass(src.parent.type, FieldModelizable)
+            )
+        except TypeError:
+            is_nested = False
+
+        return {
+            "names": names,
+            "metavar": metavar,
+            "desc": desc,
+            "tag_info": tag_info,
+            "group_key": group_key,
+            "union_gid": union_gid,
+            "union_choice_id": union_choice_id,
+            "is_nested": is_nested,
+        }
+
+    # ── Collect options grouped by model ──────────────────────────────────────
     seen: set[int] = set()
-    option_entries: list[dict] = []
+    option_groups: dict = {}  # group_key → list[dict], insertion-ordered
     for handler in state.option_map.values():
         if id(handler) in seen:
             continue
         seen.add(id(handler))
         if isinstance(handler, Ambiguous):
             continue
-        option_entries.append(_make_entry(handler))
+        entry = _make_entry(handler)
+        key = entry["group_key"]
+        if key not in option_groups:
+            option_groups[key] = []
+        option_groups[key].append(entry)
+    ctrl_entries = option_groups.pop(_CTRL_NS, [])
 
     # ── Collect positionals ───────────────────────────────────────────────────
     pos_entries: list[dict] = []
@@ -581,7 +631,8 @@ def _format_help(state: "ParserState", color: bool = None) -> str:
         pos_entries.append({"display": display, "desc": desc, "tag_info": tag_info})
 
     # ── Global tag width (aligned across all sections) ────────────────────────
-    all_tags = [tag for e in option_entries + pos_entries for tag, _ in e["tag_info"]]
+    all_option_entries = [e for grp in option_groups.values() for e in grp] + ctrl_entries
+    all_tags = [tag for e in all_option_entries + pos_entries for tag, _ in e["tag_info"]]
     tag_w = max((len(t) for t in all_tags), default=0)
 
     def _tag_lines(tag_info: list) -> list[str]:
@@ -636,20 +687,92 @@ def _format_help(state: "ParserState", color: bool = None) -> str:
         lines.append("")
 
     # ── Options section ───────────────────────────────────────────────────────
-    lines.append(c_header("Options:"))
-    if option_entries:
-        opt_w = max(len(", ".join(_opt_str(n) for n in e["names"])) for e in option_entries)
-        mv_w = max(len(e["metavar"]) for e in option_entries)
-        for e in option_entries:
+    def _render_entries(entries: list[dict], indent: str = "  ") -> None:
+        if not entries:
+            return
+        opt_w = max(len(", ".join(_opt_str(n) for n in e["names"])) for e in entries)
+        mv_w = max(len(e["metavar"]) for e in entries)
+        for e in entries:
             raw_opt = ", ".join(_opt_str(n) for n in e["names"])
-            # Pad based on plain width, then colorize
             padded_opt = f"{raw_opt:<{opt_w}}"
             mv_raw = e["metavar"]
             mv_padded = f"{mv_raw:<{mv_w}}" if mv_w else ""
             opt_part = c_opt(padded_opt)
             mv_part = f"  {c_meta(mv_padded)}" if mv_w else ""
-            lines.append(f"  {opt_part}{mv_part}  {e['desc']}".rstrip())
+            lines.append(f"{indent}{opt_part}{mv_part}  {e['desc']}".rstrip())
             lines.extend(_tag_lines(e["tag_info"]))
+
+    # Reorganize option_groups into render_items: model sections and union sections
+    union_branches: dict[str, dict] = {}  # gid → {model_key → [entry]}
+    for model_key, entries in option_groups.items():
+        for e in entries:
+            gid = e.get("union_gid")
+            if gid:
+                union_branches.setdefault(gid, {}).setdefault(model_key, []).append(e)
+
+    render_items: list = []  # ("model", key, entries) | ("union", gid, branches_dict)
+    added_union_gids: set[str] = set()
+    for model_key, entries in option_groups.items():
+        plain = [e for e in entries if not e.get("union_gid")]
+        if plain:
+            render_items.append(("model", model_key, plain))
+        for e in entries:
+            gid = e.get("union_gid")
+            if gid and gid not in added_union_gids:
+                added_union_gids.add(gid)
+                render_items.append(("union", gid, union_branches[gid]))
+
+    def _render_union_item(gid: str, branches: dict) -> None:
+        branch_groups = state.latent.get(gid, [])
+        field_doc = branch_groups[0].group_field.doc if branch_groups else None
+        field_name = gid.split(".")[-1]
+        lines.append(c_header((field_doc or field_name) + ":"))
+        multi = len(branches) > 1
+        first_branch = True
+        for i, (model_key, unlock_entries) in enumerate(branches.items()):
+            if not first_branch:
+                lines.append("")
+            first_branch = False
+            branch_doc = _class_doc(model_key) if isinstance(model_key, type) else ""
+            branch_name = model_key.__name__ if isinstance(model_key, type) else "?"
+            if multi:
+                letter = chr(ord("A") + i)
+                lines.append(f"  [{c_dim(f'Option {letter}')}] {branch_doc or branch_name}")
+                opt_indent, lat_indent = "    ", "      "
+            else:
+                opt_indent, lat_indent = "  ", "    "
+            _render_entries(unlock_entries, opt_indent)
+            choice_id = unlock_entries[0].get("union_choice_id", i)
+            if choice_id < len(branch_groups):
+                seen_ids: set[str] = set()
+                latent: list[dict] = []
+                for lf in branch_groups[choice_id].fields:
+                    if lf.identifier not in seen_ids:
+                        seen_ids.add(lf.identifier)
+                        latent.append(_make_latent_entry(lf))
+                _render_entries(latent, lat_indent)
+
+    first_item = True
+    for item in render_items:
+        if not first_item:
+            lines.append("")
+        first_item = False
+        if item[0] == "model":
+            _, key, entries = item
+            if key is state.root_type:
+                lines.append(c_header("Options:"))
+            elif key is not None and any(e.get("is_nested") for e in entries):
+                doc = _class_doc(key)
+                lines.append(c_header((doc or key.__name__) + ":"))
+            _render_entries(entries)
+        else:
+            _, gid, branches = item
+            _render_union_item(gid, branches)
+    if ctrl_entries:
+        if not first_item:
+            lines.append("")
+        lines.append(c_header("Global options:"))
+        _render_entries(ctrl_entries)
 
     return "\n".join(lines)
 
@@ -768,7 +891,9 @@ class ParserState:
         self._argv: list[str] = []  # populated by run()
         self._current_arg_idx: int = -1  # updated as tokens are consumed
         self._field_added_at: dict[str, int] = {}  # path → arg_index when added
-        self._last_unlock_lf: LinearField = root_group.group_field  # lf from the most recent union unlock (or root)
+        self._last_unlock_lf: LinearField = (
+            root_group.group_field
+        )  # lf from the most recent union unlock (or root)
         self._fired_unlocks: list[
             tuple[LinearField, Any]
         ] = []  # (unlock lf, value) in activation order
