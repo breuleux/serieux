@@ -196,6 +196,8 @@ def linearize(ft: type[UnionAlias], fld: LinearField):
                 rval.fields.append(replace(lfld, unlock=ul))
             case _:
                 for lfld in group.fields:
+                    if lfld.unlock:
+                        continue
                     for tl in tls:
                         if tl.key == lfld.field.serialized_name:
                             filter_out.append(lfld)
@@ -274,9 +276,9 @@ def _all_subfields(group: LinearGroup):
 
 
 def _sequence_chain(fld: LinearField) -> list[LinearField]:
-    """Return sequence ancestor fields, innermost first."""
+    """Return sequence fields from fld itself and ancestors, innermost first."""
     chain = []
-    p = fld.parent
+    p = fld
     while p is not None:
         if p.sequence:
             chain.append(p)
@@ -306,11 +308,20 @@ class GroupState:
         self._initial_state = {fld: fs.state for fld, fs in raw.items()}
         self.sequences = {}
         for fld in raw:
-            p = fld.parent
+            p = fld  # include fld itself in case it is sequence=True
             while p is not None:
                 if p.sequence and p not in self.sequences:
                     self.sequences[p] = 0
                 p = p.parent
+        # Flatten all nested option_groups into one lookup dict keyed by group_id
+        self._option_groups: dict[str, list[LinearGroup]] = {}
+        self._collect_option_groups(self.initial)
+
+    def _collect_option_groups(self, group: LinearGroup) -> None:
+        for k, subgroups in group.option_groups.items():
+            self._option_groups[k] = subgroups
+            for subgroup in subgroups:
+                self._collect_option_groups(subgroup)
 
     def _concrete_id(self, fld: LinearField) -> str:
         """Return the field identifier with Range placeholders replaced by current indices."""
@@ -323,7 +334,7 @@ class GroupState:
                 parts.append(s)
         return ".".join(parts)
 
-    def _apply_unlock(self, fld: LinearField) -> None:
+    def _apply_unlock(self, fld: LinearField, sibling_state: LinearState) -> None:
         ul = fld.unlock
         group_id = ul.group.identifier
         choice_id = ul.choice_id
@@ -334,13 +345,13 @@ class GroupState:
                 and other_fld.unlock is not None
                 and other_fld.unlock.group is ul.group
             ):
-                self.state[other_fld] = FieldState(state=LinearState.UNAVAILABLE)
+                self.state[other_fld] = FieldState(state=sibling_state)
 
-        for i, subgroup in enumerate(self.initial.option_groups.get(group_id, [])):
+        for i, subgroup in enumerate(self._option_groups.get(group_id, [])):
             if i == choice_id:
                 for sub_fld in subgroup.fields:
                     self.state[sub_fld] = FieldState(state=LinearState.AVAILABLE)
-            else:
+            elif sibling_state == LinearState.UNAVAILABLE:
                 for sub_fld in _all_subfields(subgroup):
                     self.state[sub_fld] = FieldState(state=LinearState.UNAVAILABLE)
 
@@ -350,13 +361,22 @@ class GroupState:
             return False
 
         chain = _sequence_chain(fld)  # innermost first
+        in_sequence = bool(chain)
 
         if fs.state == LinearState.AVAILABLE:
-            self.state[fld] = FieldState(
-                state=LinearState.ADVANCE if chain else LinearState.FILLED
+            is_structural = fld.sequence or self._initial_state[fld] == LinearState.AVAILABLE
+            new_state = (
+                LinearState.ADVANCE if (in_sequence and is_structural) else LinearState.FILLED
             )
+            self.state[fld] = FieldState(state=new_state)
             if fld.unlock:
-                self._apply_unlock(fld)
+                if new_state == LinearState.ADVANCE:
+                    sibling_state = LinearState.ADVANCE
+                elif in_sequence:
+                    sibling_state = LinearState.AVAILABLE
+                else:
+                    sibling_state = LinearState.UNAVAILABLE
+                self._apply_unlock(fld, sibling_state)
             return self._concrete_id(fld)
 
         elif fs.state == LinearState.ADVANCE:
@@ -375,6 +395,8 @@ class GroupState:
                     if _is_descendant_of(other_fld, seq):
                         self.state[other_fld] = FieldState(state=self._initial_state[other_fld])
                 self.state[fld] = FieldState(state=LinearState.ADVANCE)
+                if fld.unlock:
+                    self._apply_unlock(fld, LinearState.ADVANCE)
                 return self._concrete_id(fld)
             return False
 

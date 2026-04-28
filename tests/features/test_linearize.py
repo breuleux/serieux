@@ -97,6 +97,16 @@ class Pet:
 
 
 @dataclass
+class Lifeform:
+    being: TaggedUnion[Person, Pet]
+
+
+@dataclass
+class Lifeforms:
+    beings: list[TaggedUnion[Person, Pet]]
+
+
+@dataclass
 class WithOptional:
     label: str
     person: Optional[Person]
@@ -164,6 +174,26 @@ def test_tagged_union():
         {
             "animal/0": ["animal.indoor"],
             "animal/1": ["animal.breed"],
+        },
+    ]
+
+
+def test_tagged_union_deep():
+    items = linearize(Lifeform)
+    assert sexp(items) == [
+        "<being/0>being.$class=person",
+        "<being/1>being.$class=pet",
+        {
+            "being/0": ["being.name", "being.age"],
+            "being/1": [
+                "<being.animal/0>being.animal.$class=cat",
+                "<being.animal/1>being.animal.$class=dog",
+                "being.name",
+                {
+                    "being.animal/0": ["being.animal.indoor"],
+                    "being.animal/1": ["being.animal.breed"],
+                },
+            ],
         },
     ]
 
@@ -267,6 +297,26 @@ def test_list_of_tagged():
         "<elements.#/0>elements.#.$class=cat",
         "<elements.#/1>elements.#.$class=dog",
         {"elements.#/0": ["elements.#.indoor"], "elements.#/1": ["elements.#.breed"]},
+    ]
+
+
+def test_list_of_tagged_union_deep():
+    items = linearize(Lifeforms)
+    assert sexp(items) == [
+        "<beings.#/0>beings.#.$class=person",
+        "<beings.#/1>beings.#.$class=pet",
+        {
+            "beings.#/0": ["beings.#.name", "beings.#.age"],
+            "beings.#/1": [
+                "<beings.#.animal/0>beings.#.animal.$class=cat",
+                "<beings.#.animal/1>beings.#.animal.$class=dog",
+                "beings.#.name",
+                {
+                    "beings.#.animal/0": ["beings.#.animal.indoor"],
+                    "beings.#.animal/1": ["beings.#.animal.breed"],
+                },
+            ],
+        },
     ]
 
 
@@ -464,3 +514,131 @@ def test_groupstate_list_of_tagged():
     }
 
     assert gs.advance(breed) is False
+
+    assert gs.advance(trig_cat) == "elements.2.$class"
+    assert gs.advance(indoor) == "elements.2.indoor"
+
+    assert _state(gs) == {
+        trig_cat: LS.ADVANCE,
+        trig_dog: LS.ADVANCE,
+        indoor: LS.FILLED,
+        breed: LS.LATENT,
+    }
+
+
+@dataclass
+class Colors:
+    colors: list[str]
+
+
+@dataclass
+class Sizes:
+    sizes: list[int]
+
+
+@dataclass
+class Description:
+    descr: TaggedUnion[Colors, Sizes]
+
+
+def test_groupstate_tagged_lists():
+    items = linearize(Description)
+    [trig_colors, trig_sizes] = items.fields
+    ((gcolors, gsizes),) = items.option_groups.values()
+    [colors] = gcolors.fields
+    [sizes] = gsizes.fields
+
+    gs = GroupState(items)
+    assert _state(gs) == {
+        trig_colors: LS.AVAILABLE,
+        trig_sizes: LS.AVAILABLE,
+        colors: LS.LATENT,
+        sizes: LS.LATENT,
+    }
+
+    assert gs.advance(trig_colors) == "descr.$class"
+
+    assert _state(gs) == {
+        trig_colors: LS.FILLED,
+        trig_sizes: LS.UNAVAILABLE,
+        colors: LS.AVAILABLE,
+        sizes: LS.UNAVAILABLE,
+    }
+
+    assert gs.advance(colors) == "descr.colors.0"
+
+    assert _state(gs) == {
+        trig_colors: LS.FILLED,
+        trig_sizes: LS.UNAVAILABLE,
+        colors: LS.ADVANCE,
+        sizes: LS.UNAVAILABLE,
+    }
+
+    assert gs.advance(colors) == "descr.colors.1"
+    assert gs.advance(colors) == "descr.colors.2"
+
+
+def test_groupstate_list_of_tagged_deeper():
+    items = linearize(Lifeforms)
+    [trig_person, trig_pet] = items.fields
+    ((gperson, gpet),) = items.option_groups.values()
+    [person_name, age] = gperson.fields
+    trig_cat, trig_dog, pet_name = gpet.fields
+    ((gcat, gdog),) = gpet.option_groups.values()
+    [indoor] = gcat.fields
+    [breed] = gdog.fields
+
+    gs = GroupState(items)
+    assert _state(gs) == {
+        trig_person: LS.AVAILABLE,
+        person_name: LS.LATENT,
+        age: LS.LATENT,
+        trig_pet: LS.AVAILABLE,
+        trig_cat: LS.LATENT,
+        trig_dog: LS.LATENT,
+        pet_name: LS.LATENT,
+        indoor: LS.LATENT,
+        breed: LS.LATENT,
+    }
+
+    assert gs.advance(trig_pet) == "beings.0.$class"
+
+    assert _state(gs) == {
+        trig_person: LS.ADVANCE,
+        person_name: LS.LATENT,
+        age: LS.LATENT,
+        trig_pet: LS.ADVANCE,
+        trig_cat: LS.AVAILABLE,
+        trig_dog: LS.AVAILABLE,
+        pet_name: LS.AVAILABLE,
+        indoor: LS.LATENT,
+        breed: LS.LATENT,
+    }
+
+    assert gs.advance(trig_cat) == "beings.0.animal.$class"
+
+    assert _state(gs) == {
+        trig_person: LS.ADVANCE,
+        person_name: LS.LATENT,
+        age: LS.LATENT,
+        trig_pet: LS.ADVANCE,
+        trig_cat: LS.FILLED,
+        trig_dog: LS.AVAILABLE,
+        pet_name: LS.AVAILABLE,
+        indoor: LS.AVAILABLE,
+        breed: LS.LATENT,
+    }
+
+    assert gs.advance(trig_person) == "beings.1.$class"
+
+    assert _state(gs) == {
+        trig_person: LS.ADVANCE,
+        person_name: LS.AVAILABLE,
+        age: LS.AVAILABLE,
+        trig_pet: LS.ADVANCE,
+        trig_cat: LS.LATENT,
+        trig_dog: LS.LATENT,
+        pet_name: LS.LATENT,
+        indoor: LS.LATENT,
+        breed: LS.LATENT,
+    }
