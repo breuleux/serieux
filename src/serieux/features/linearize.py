@@ -364,10 +364,19 @@ class GroupState:
         in_sequence = bool(chain)
 
         if fs.state == LinearState.AVAILABLE:
-            is_structural = fld.sequence or self._initial_state[fld] == LinearState.AVAILABLE
-            new_state = (
-                LinearState.ADVANCE if (in_sequence and is_structural) else LinearState.FILLED
+            # A field is structural (→ ADVANCE) unless an unlock field has already
+            # committed the innermost sequence to a specific union branch (→ FILLED).
+            is_structural = in_sequence and (
+                fld.sequence
+                or not any(
+                    f is not fld
+                    and self.state[f].state in (LinearState.FILLED, LinearState.ADVANCE)
+                    and f.unlock is not None
+                    and f.unlock.group is chain[0]
+                    for f in self.state
+                )
             )
+            new_state = LinearState.ADVANCE if is_structural else LinearState.FILLED
             self.state[fld] = FieldState(state=new_state)
             if fld.unlock:
                 if new_state == LinearState.ADVANCE:
@@ -391,9 +400,24 @@ class GroupState:
                 # Advance this sequence
                 self.sequences[seq] += 1
                 # Reset all descendants to their initial state
-                for other_fld in self.state:
+                for other_fld in list(self.state):
                     if _is_descendant_of(other_fld, seq):
                         self.state[other_fld] = FieldState(state=self._initial_state[other_fld])
+                # Re-apply outer committed unlocks whose effects may have been wiped by the reset
+                for f in list(self.state):
+                    if (
+                        not _is_descendant_of(f, seq)
+                        and f.unlock is not None
+                        and self.state[f].state in (LinearState.FILLED, LinearState.ADVANCE)
+                    ):
+                        f_chain = _sequence_chain(f)
+                        if self.state[f].state == LinearState.ADVANCE:
+                            ss = LinearState.ADVANCE
+                        elif f_chain:
+                            ss = LinearState.AVAILABLE
+                        else:
+                            ss = LinearState.UNAVAILABLE
+                        self._apply_unlock(f, ss)
                 self.state[fld] = FieldState(state=LinearState.ADVANCE)
                 if fld.unlock:
                     self._apply_unlock(fld, LinearState.ADVANCE)

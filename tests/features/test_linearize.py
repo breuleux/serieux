@@ -356,6 +356,11 @@ def test_documentation():
     assert items.group_field.doc == "Pet!"
 
 
+####################
+# GroupState tests #
+####################
+
+
 def _state(gs):
     return {field: state.state for field, state in gs.state.items()}
 
@@ -524,6 +529,48 @@ def test_groupstate_list_of_tagged():
         indoor: LS.FILLED,
         breed: LS.LATENT,
     }
+
+
+thing_dict = TagDict()
+
+
+@thing_dict.register("with_things")
+@dataclass
+class WithThings:
+    things: list[Thing]
+
+
+@thing_dict.register("simple")
+@dataclass
+class Simple:
+    value: int
+
+
+@dataclass
+class Container:
+    inner: Annotated[object, thing_dict]
+
+
+def test_groupstate_struct_list_in_union():
+    """Struct fields inside a list inside a union branch should go to ADVANCE, not FILLED."""
+    items = linearize(Container)
+    trig_with, trig_simple = items.fields
+    ((gwith, _),) = items.option_groups.values()
+    color, size = gwith.fields
+
+    gs = GroupState(items)
+    gs.advance(trig_with)
+
+    assert gs.advance(color) == "inner.things.0.color"
+    assert gs.state[color].state == LS.ADVANCE
+
+    assert gs.advance(size) == "inner.things.0.size"
+    assert gs.state[size].state == LS.ADVANCE
+
+    # Repeating color advances the cursor
+    assert gs.advance(color) == "inner.things.1.color"
+    assert gs.advance(size) == "inner.things.1.size"
+    assert gs.advance(color) == "inner.things.2.color"
 
 
 @dataclass
