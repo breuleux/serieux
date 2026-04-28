@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from enum import Enum
 from itertools import pairwise
 from types import NoneType
 from typing import Any, Union, get_args
@@ -20,13 +21,13 @@ class Unlock:
     expected_value: str | None = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class Range:
     min: int
     max: int = None
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, eq=False)
 class LinearField:
     """A leaf field in the linearized representation."""
 
@@ -74,6 +75,11 @@ class LinearField:
     @property
     def identifier(self):
         return ".".join("#" if isinstance(s, Range) else s for s in self.signature if s)
+
+    def __str__(self):
+        return f"<LinearField {self.identifier}>"
+
+    __repr__ = __str__
 
 
 @dataclass(kw_only=True)
@@ -235,3 +241,142 @@ def linearize(ft: type[ListModelizable], fld: LinearField):
 def linearize(ft: type[Any], fld: LinearField):
     """Primitive / leaf field."""
     return LinearGroup(group_field=fld, fields=[fld])
+
+
+class LinearState(str, Enum):
+    AVAILABLE = "AVAILABLE"
+    FILLED = "FILLED"
+    LATENT = "LATENT"
+    UNAVAILABLE = "UNAVAILABLE"
+    ADVANCE = "ADVANCE"
+
+
+@dataclass(kw_only=True)
+class FieldState:
+    state: LinearState
+    note: str | None = None
+
+
+@ovld
+def _flatten(group: LinearGroup, state: str = LinearState.AVAILABLE):
+    for field in group.fields:
+        yield (field, FieldState(state=state))
+    for _, subgroups in group.option_groups.items():
+        for subgroup in subgroups:
+            yield from recurse(subgroup, LinearState.LATENT)
+
+
+def _all_subfields(group: LinearGroup):
+    yield from group.fields
+    for subgroups in group.option_groups.values():
+        for subgroup in subgroups:
+            yield from _all_subfields(subgroup)
+
+
+def _sequence_chain(fld: LinearField) -> list[LinearField]:
+    """Return sequence ancestor fields, innermost first."""
+    chain = []
+    p = fld.parent
+    while p is not None:
+        if p.sequence:
+            chain.append(p)
+        p = p.parent
+    return chain
+
+
+def _is_descendant_of(fld: LinearField, ancestor: LinearField) -> bool:
+    p = fld.parent
+    while p is not None:
+        if p is ancestor:
+            return True
+        p = p.parent
+    return False
+
+
+@dataclass
+class GroupState:
+    initial: LinearGroup
+    state: dict[LinearField, FieldState] = None
+    _initial_state: dict[LinearField, LinearState] = None
+    sequences: dict[LinearField, int] = None
+
+    def __post_init__(self):
+        raw = dict(_flatten(self.initial))
+        self.state = raw
+        self._initial_state = {fld: fs.state for fld, fs in raw.items()}
+        self.sequences = {}
+        for fld in raw:
+            p = fld.parent
+            while p is not None:
+                if p.sequence and p not in self.sequences:
+                    self.sequences[p] = 0
+                p = p.parent
+
+    def _concrete_id(self, fld: LinearField) -> str:
+        """Return the field identifier with Range placeholders replaced by current indices."""
+        seq_iter = iter(reversed(_sequence_chain(fld)))  # outermost first
+        parts = []
+        for s in fld.signature:
+            if isinstance(s, Range):
+                parts.append(str(self.sequences[next(seq_iter)]))
+            elif s:
+                parts.append(s)
+        return ".".join(parts)
+
+    def _apply_unlock(self, fld: LinearField) -> None:
+        ul = fld.unlock
+        group_id = ul.group.identifier
+        choice_id = ul.choice_id
+
+        for other_fld in self.state:
+            if (
+                other_fld is not fld
+                and other_fld.unlock is not None
+                and other_fld.unlock.group is ul.group
+            ):
+                self.state[other_fld] = FieldState(state=LinearState.UNAVAILABLE)
+
+        for i, subgroup in enumerate(self.initial.option_groups.get(group_id, [])):
+            if i == choice_id:
+                for sub_fld in subgroup.fields:
+                    self.state[sub_fld] = FieldState(state=LinearState.AVAILABLE)
+            else:
+                for sub_fld in _all_subfields(subgroup):
+                    self.state[sub_fld] = FieldState(state=LinearState.UNAVAILABLE)
+
+    def advance(self, fld: LinearField) -> bool:
+        fs = self.state.get(fld)
+        if fs is None:
+            return False
+
+        chain = _sequence_chain(fld)  # innermost first
+
+        if fs.state == LinearState.AVAILABLE:
+            self.state[fld] = FieldState(
+                state=LinearState.ADVANCE if chain else LinearState.FILLED
+            )
+            if fld.unlock:
+                self._apply_unlock(fld)
+            return self._concrete_id(fld)
+
+        elif fs.state == LinearState.ADVANCE:
+            for i, seq in enumerate(chain):  # innermost first
+                r = seq.signature[-1]
+                assert isinstance(r, Range)
+                if r.max is not None and self.sequences[seq] >= r.max - 1:
+                    continue
+                # Reset inner sequence indices
+                for inner in chain[:i]:
+                    self.sequences[inner] = 0
+                # Advance this sequence
+                self.sequences[seq] += 1
+                # Reset all descendants to their initial state
+                for other_fld in self.state:
+                    if _is_descendant_of(other_fld, seq):
+                        self.state[other_fld] = FieldState(state=self._initial_state[other_fld])
+                self.state[fld] = FieldState(state=LinearState.ADVANCE)
+                return self._concrete_id(fld)
+            return False
+
+        else:
+            return False

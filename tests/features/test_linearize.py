@@ -10,8 +10,10 @@ import pytest
 from ovld import ovld, recurse
 
 from serieux.features.linearize import (
+    GroupState,
     LinearField,
     LinearGroup,
+    LinearState as LS,
     linearize,
 )
 from serieux.features.tagset import TagDict, TaggedUnion
@@ -302,3 +304,163 @@ def test_documentation():
         },
     }
     assert items.group_field.doc == "Pet!"
+
+
+def _state(gs):
+    return {field: state.state for field, state in gs.state.items()}
+
+
+def test_groupstate_simple():
+    items = linearize(Employee)
+    assert sexp(items) == ["person.name", "person.age", "address.street", "address.city", "salary"]
+    [name, age, street, city, salary] = items.fields
+
+    gs = GroupState(items)
+    assert _state(gs) == {
+        name: LS.AVAILABLE,
+        age: LS.AVAILABLE,
+        street: LS.AVAILABLE,
+        city: LS.AVAILABLE,
+        salary: LS.AVAILABLE,
+    }
+
+    assert gs.advance(street) == street.identifier
+
+    assert _state(gs) == {
+        name: LS.AVAILABLE,
+        age: LS.AVAILABLE,
+        street: LS.FILLED,
+        city: LS.AVAILABLE,
+        salary: LS.AVAILABLE,
+    }
+
+    assert gs.advance(name) == name.identifier
+    assert gs.advance(age) == age.identifier
+    assert gs.advance(street) is False
+    assert gs.advance(city) == city.identifier
+    assert gs.advance(salary) == salary.identifier
+
+    assert _state(gs) == {
+        name: LS.FILLED,
+        age: LS.FILLED,
+        street: LS.FILLED,
+        city: LS.FILLED,
+        salary: LS.FILLED,
+    }
+
+
+def test_groupstate_tagged_union():
+    items = linearize(Pet)
+    trig_cat, trig_dog, name = items.fields
+    ag = items.option_groups["animal"]
+    [indoors] = ag[0].fields
+    [breed] = ag[1].fields
+
+    gs = GroupState(items)
+    assert _state(gs) == {
+        trig_cat: LS.AVAILABLE,
+        trig_dog: LS.AVAILABLE,
+        name: LS.AVAILABLE,
+        indoors: LS.LATENT,
+        breed: LS.LATENT,
+    }
+
+    assert gs.advance(trig_cat) == trig_cat.identifier
+    assert gs.advance(trig_dog) is False
+
+    assert _state(gs) == {
+        trig_cat: LS.FILLED,
+        trig_dog: LS.UNAVAILABLE,
+        name: LS.AVAILABLE,
+        indoors: LS.AVAILABLE,
+        breed: LS.UNAVAILABLE,
+    }
+
+    assert gs.advance(indoors) == indoors.identifier
+
+    assert _state(gs) == {
+        trig_cat: LS.FILLED,
+        trig_dog: LS.UNAVAILABLE,
+        name: LS.AVAILABLE,
+        indoors: LS.FILLED,
+        breed: LS.UNAVAILABLE,
+    }
+
+    assert gs.advance(indoors) is False
+
+
+def test_groupstate_list():
+    items = linearize(HasThings)
+    [color, size] = items.fields
+
+    gs = GroupState(items)
+    assert _state(gs) == {
+        color: LS.AVAILABLE,
+        size: LS.AVAILABLE,
+    }
+
+    assert gs.advance(color) == "things.0.color"
+
+    assert _state(gs) == {
+        color: LS.ADVANCE,
+        size: LS.AVAILABLE,
+    }
+
+    assert gs.advance(color) == "things.1.color"
+
+    assert _state(gs) == {
+        color: LS.ADVANCE,
+        size: LS.AVAILABLE,
+    }
+
+    assert gs.advance(size) == "things.1.size"
+
+    assert _state(gs) == {
+        color: LS.ADVANCE,
+        size: LS.ADVANCE,
+    }
+
+
+def test_groupstate_list_of_tagged():
+    items = linearize(Capharnaum)
+    trig_cat, trig_dog = items.fields
+    ((gcat, gdog),) = items.option_groups.values()
+    [indoor] = gcat.fields
+    [breed] = gdog.fields
+
+    gs = GroupState(items)
+    assert _state(gs) == {
+        trig_cat: LS.AVAILABLE,
+        trig_dog: LS.AVAILABLE,
+        indoor: LS.LATENT,
+        breed: LS.LATENT,
+    }
+
+    assert gs.advance(trig_cat) == "elements.0.$class"
+
+    assert _state(gs) == {
+        trig_cat: LS.ADVANCE,
+        trig_dog: LS.ADVANCE,
+        indoor: LS.AVAILABLE,
+        breed: LS.LATENT,
+    }
+
+    assert gs.advance(trig_dog) == "elements.1.$class"
+
+    assert _state(gs) == {
+        trig_cat: LS.ADVANCE,
+        trig_dog: LS.ADVANCE,
+        indoor: LS.LATENT,
+        breed: LS.AVAILABLE,
+    }
+
+    assert gs.advance(breed) == "elements.1.breed"
+
+    assert _state(gs) == {
+        trig_cat: LS.ADVANCE,
+        trig_dog: LS.ADVANCE,
+        indoor: LS.LATENT,
+        breed: LS.FILLED,
+    }
+
+    assert gs.advance(breed) is False
