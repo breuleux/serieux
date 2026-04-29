@@ -21,10 +21,11 @@ from serieux.features.tagset import TagDict, TaggedUnion
 
 @ovld
 def sexp(lin: LinearField):
-    if ul := lin.unlock:
-        rval = f"<{ul.group.identifier}/{ul.choice_id}>{lin.identifier}"
-        if ul.expected_value:
-            rval = f"{rval}={ul.expected_value}"
+    if lin.unlock:
+        prefix = "".join(f"<{ul.group.identifier}/{ul.choice_id}>" for ul in lin.unlock)
+        rval = f"{prefix}{lin.identifier}"
+        if lin.expected_value:
+            rval = f"{rval}={lin.expected_value}"
         if lin.type is NoneType:
             rval += "-"
         return rval
@@ -91,6 +92,7 @@ class Pet:
     """Pet!"""
 
     # The animal
+    # [positional]
     animal: TaggedUnion[Cat, Dog]
     # The animal's name
     name: str
@@ -152,6 +154,29 @@ class Color(str, Enum):
 class WithEnum:
     color: Color
     count: int
+
+
+@dataclass
+class Add:
+    # [positional]
+    x: float
+    # [positional]
+    y: float
+
+
+@dataclass
+class Div:
+    num: float
+    denom: float
+
+
+@dataclass
+class Calculator:
+    # [positional]
+    operation: TaggedUnion[Add, Div]
+
+    # [positional]
+    other: float = 0.0
 
 
 def test_flat():
@@ -324,6 +349,26 @@ def test_enum_leaf():
     items = linearize(WithEnum)
     assert sexp(items) == ["color", "count"]
     assert items.fields[0].type is Color
+
+
+def test_positional():
+    items = linearize(Add)
+    assert sexp(items) == ["<x/0>x", {"x/0": ["y"]}]
+
+
+def test_positional_with_tagged():
+    items = linearize(Calculator)
+    assert sexp(items) == [
+        "<operation/0>operation.$class=add",
+        "<operation/1>operation.$class=div",
+        {
+            "operation/0": [
+                "<operation.x/0>operation.x",
+                {"operation.x/0": ["operation.y", "other"]},
+            ],
+            "operation/1": ["operation.num", "operation.denom", "other"],
+        },
+    ]
 
 
 def test_documentation():

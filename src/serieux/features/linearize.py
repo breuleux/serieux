@@ -18,7 +18,6 @@ from .tagset import Tagged, TagSet, tag_field
 class Unlock:
     group: LinearField
     choice_id: int
-    expected_value: str | None = None
 
 
 @dataclass(frozen=True)
@@ -36,7 +35,8 @@ class LinearField:
     sequence: bool = False
 
     parent: LinearField | None = None
-    unlock: Unlock | None = None
+    unlock: list[Unlock] = field(default_factory=list)
+    expected_value: str | None = None
 
     def follow(self, model, field, sequence=False):
         assert field
@@ -58,6 +58,10 @@ class LinearField:
     @property
     def metadata(self):
         return self.field.metadata
+
+    @property
+    def positional(self):
+        return self.field.metadata.get("positional", False)
 
     @property
     def doc(self):
@@ -91,11 +95,79 @@ class LinearGroup:
     option_groups: dict[str, list[LinearGroup]] = field(default_factory=dict)
 
     def __or__(self, other):
-        return LinearGroup(
-            group_field=self.group_field,
-            fields=[*self.fields, *other.fields],
-            option_groups={**self.option_groups, **other.option_groups},
-        )
+        def _push_into_positional_chain(
+            subgroup: LinearGroup, other_pos: list, other_pos_ogs: dict
+        ) -> LinearGroup:
+            """Append other_pos at the terminal end of subgroup's positional chain."""
+            current_pos = [f for f in subgroup.fields if f.positional]
+            if not current_pos:
+                return replace(
+                    subgroup,
+                    fields=[*subgroup.fields, *other_pos],
+                    option_groups={**subgroup.option_groups, **other_pos_ogs},
+                )
+            pos_og_keys = {ul.group.identifier for f in current_pos for ul in f.unlock}
+            if not pos_og_keys:
+                return replace(
+                    subgroup,
+                    fields=[*subgroup.fields, *other_pos],
+                    option_groups={**subgroup.option_groups, **other_pos_ogs},
+                )
+            new_ogs = {
+                k: [_push_into_positional_chain(sg, other_pos, other_pos_ogs) for sg in sgs]
+                if k in pos_og_keys
+                else sgs
+                for k, sgs in subgroup.option_groups.items()
+            }
+            return replace(subgroup, option_groups=new_ogs)
+
+        self_pos = [f for f in self.fields if f.positional]
+        other_pos = [f for f in other.fields if f.positional]
+
+        if not self_pos or not other_pos:
+            return LinearGroup(
+                group_field=self.group_field,
+                fields=[*self.fields, *other.fields],
+                option_groups={**self.option_groups, **other.option_groups},
+            )
+
+        other_pos_og_keys = {ul.group.identifier for f in other_pos for ul in f.unlock}
+        other_pos_ogs = {k: v for k, v in other.option_groups.items() if k in other_pos_og_keys}
+        other_nonpos_ogs = {
+            k: v for k, v in other.option_groups.items() if k not in other_pos_og_keys
+        }
+        other_nonpos = [f for f in other.fields if not f.positional]
+
+        if self_pos[0].unlock:
+            # self's positionals are union triggers — push other_pos into terminal of each branch
+            gids = {ul.group.identifier for f in self_pos for ul in f.unlock}
+            new_ogs = {
+                k: [_push_into_positional_chain(sg, other_pos, other_pos_ogs) for sg in sgs]
+                if k in gids
+                else sgs
+                for k, sgs in self.option_groups.items()
+            }
+            return LinearGroup(
+                group_field=self.group_field,
+                fields=[*self.fields, *other_nonpos],
+                option_groups={**new_ogs, **other_nonpos_ogs},
+            )
+        else:
+            # self's positionals are leaves — the last one gates other_pos
+            last_pos = self_pos[-1]
+            ul = Unlock(group=last_pos, choice_id=0)
+            updated_last = replace(last_pos, unlock=[*last_pos.unlock, ul])
+            new_self_fields = [updated_last if f is last_pos else f for f in self.fields]
+            subgroup = LinearGroup(fields=list(other_pos), option_groups=other_pos_ogs)
+            return LinearGroup(
+                group_field=self.group_field,
+                fields=[*new_self_fields, *other_nonpos],
+                option_groups={
+                    **self.option_groups,
+                    last_pos.identifier: [subgroup],
+                    **other_nonpos_ogs,
+                },
+            )
 
 
 @ovld
@@ -193,10 +265,10 @@ def linearize(ft: type[UnionAlias], fld: LinearField):
             case [LeafTell()]:
                 (lfld,) = group.fields
                 filter_out.append(lfld)
-                rval.fields.append(replace(lfld, unlock=ul))
+                rval.fields.append(replace(lfld, unlock=[*lfld.unlock, ul]))
             case _:
                 for lfld in group.fields:
-                    if lfld.unlock:
+                    if lfld.parent is not fld:
                         continue
                     for tl in tls:
                         if tl.key == lfld.field.serialized_name:
@@ -204,7 +276,8 @@ def linearize(ft: type[UnionAlias], fld: LinearField):
                             rval.fields.append(
                                 replace(
                                     lfld,
-                                    unlock=replace(ul, expected_value=getattr(tl, "value", None)),
+                                    unlock=[*lfld.unlock, ul],
+                                    expected_value=getattr(tl, "value", None),
                                 )
                             )
                             break
@@ -335,25 +408,21 @@ class GroupState:
         return ".".join(parts)
 
     def _apply_unlock(self, fld: LinearField, sibling_state: LinearState) -> None:
-        ul = fld.unlock
-        group_id = ul.group.identifier
-        choice_id = ul.choice_id
+        for ul in fld.unlock:
+            group_id = ul.group.identifier
+            choice_id = ul.choice_id
 
-        for other_fld in self.state:
-            if (
-                other_fld is not fld
-                and other_fld.unlock is not None
-                and other_fld.unlock.group is ul.group
-            ):
-                self.state[other_fld] = FieldState(state=sibling_state)
+            for other_fld in self.state:
+                if other_fld is not fld and any(u.group is ul.group for u in other_fld.unlock):
+                    self.state[other_fld] = FieldState(state=sibling_state)
 
-        for i, subgroup in enumerate(self._option_groups.get(group_id, [])):
-            if i == choice_id:
-                for sub_fld in subgroup.fields:
-                    self.state[sub_fld] = FieldState(state=LinearState.AVAILABLE)
-            elif sibling_state == LinearState.UNAVAILABLE:
-                for sub_fld in _all_subfields(subgroup):
-                    self.state[sub_fld] = FieldState(state=LinearState.UNAVAILABLE)
+            for i, subgroup in enumerate(self._option_groups.get(group_id, [])):
+                if i == choice_id:
+                    for sub_fld in subgroup.fields:
+                        self.state[sub_fld] = FieldState(state=LinearState.AVAILABLE)
+                elif sibling_state == LinearState.UNAVAILABLE:
+                    for sub_fld in _all_subfields(subgroup):
+                        self.state[sub_fld] = FieldState(state=LinearState.UNAVAILABLE)
 
     def advance(self, fld: LinearField) -> bool:
         fs = self.state.get(fld)
@@ -371,8 +440,8 @@ class GroupState:
                 or not any(
                     f is not fld
                     and self.state[f].state in (LinearState.FILLED, LinearState.ADVANCE)
-                    and f.unlock is not None
-                    and f.unlock.group is chain[0]
+                    and f.unlock
+                    and any(u.group is chain[0] for u in f.unlock)
                     for f in self.state
                 )
             )
@@ -407,7 +476,7 @@ class GroupState:
                 for f in list(self.state):
                     if (
                         not _is_descendant_of(f, seq)
-                        and f.unlock is not None
+                        and f.unlock
                         and self.state[f].state in (LinearState.FILLED, LinearState.ADVANCE)
                     ):
                         f_chain = _sequence_chain(f)
