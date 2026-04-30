@@ -38,6 +38,11 @@ class LinearField:
     unlock: list[Unlock] = field(default_factory=list)
     expected_value: str | None = None
 
+    metadata: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        self.metadata = dict(self.field.metadata)
+
     def follow(self, model, field, sequence=False):
         assert field
         return type(self)(
@@ -54,10 +59,6 @@ class LinearField:
     @property
     def enclosing_type(self):
         return self.model.original_type
-
-    @property
-    def metadata(self):
-        return self.field.metadata
 
     @property
     def positional(self):
@@ -108,10 +109,16 @@ class LinearGroup:
                 )
             pos_og_keys = {ul.group.identifier for f in current_pos for ul in f.unlock}
             if not pos_og_keys:
+                # Terminal leaf positionals — the last one gates other_pos.
+                last_pos = current_pos[-1]
+                ul = Unlock(group=last_pos, choice_id=0)
+                updated_last = replace(last_pos, unlock=[*last_pos.unlock, ul])
+                new_fields = [updated_last if f is last_pos else f for f in subgroup.fields]
+                new_subgroup = LinearGroup(fields=list(other_pos), option_groups=other_pos_ogs)
                 return replace(
                     subgroup,
-                    fields=[*subgroup.fields, *other_pos],
-                    option_groups={**subgroup.option_groups, **other_pos_ogs},
+                    fields=new_fields,
+                    option_groups={**subgroup.option_groups, last_pos.identifier: [new_subgroup]},
                 )
             new_ogs = {
                 k: [_push_into_positional_chain(sg, other_pos, other_pos_ogs) for sg in sgs]
@@ -211,7 +218,7 @@ def linearize(ft: type[Any @ TagSet], fld: LinearField):
     if len(opts) == 1:
         tag_fld = Field(
             type=str,
-            metadata=fld.field.metadata,
+            metadata=fld.metadata,
             serialized_name=tag_field,
             description=model(ft).description,
         )
@@ -309,7 +316,9 @@ def linearize(ft: type[ListModelizable], fld: LinearField):
     """List field."""
     m = model(ft)
     ef = m.element_field
-    return recurse(ef.type, fld.follow(model=m, field=ef, sequence=True))
+    subfld = fld.follow(model=m, field=ef, sequence=True)
+    subfld.metadata = fld.metadata
+    return recurse(ef.type, subfld)
 
 
 @ovld

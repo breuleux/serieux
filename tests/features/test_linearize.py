@@ -364,7 +364,7 @@ def test_positional_with_tagged():
         {
             "operation/0": [
                 "<operation.x/0>operation.x",
-                {"operation.x/0": ["operation.y", "other"]},
+                {"operation.x/0": ["<operation.y/0>operation.y", {"operation.y/0": ["other"]}]},
             ],
             "operation/1": ["operation.num", "operation.denom", "other"],
         },
