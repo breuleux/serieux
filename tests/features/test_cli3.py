@@ -347,3 +347,90 @@ class ConflictingTypes:
 def test_undifferentiable_union_raises():
     with pytest.raises(Exception, match="differentiate"):
         parse(ConflictingTypes, [])
+
+
+# ── multiple positional fields ────────────────────────────────────────────────
+
+
+@dataclass
+class Copy:
+    # [positional]
+    src: str
+    # [positional]
+    dst: str
+
+
+def test_two_positionals():
+    check("hello world", Copy(src="hello", dst="world"))
+
+
+def test_two_positionals_with_option():
+    @dataclass
+    class Move:
+        # [positional]
+        src: str
+        # [positional]
+        dst: str
+        verbose: bool = False
+
+    flat = parse(Move, ["a.txt", "--verbose", "b.txt"])
+    got = serieux.deserialize(Move, flat)
+    assert got == Move(src="a.txt", dst="b.txt", verbose=True)
+
+
+def test_positional_tagged_union_then_positional():
+    # Calculator: positional tag selects operation, then positional args fill the branch.
+    # Add has positional x and y; the outer 'other' positional follows.
+    from serieux.features.linearize import linearize, GroupState
+    from tests.features.test_linearize import Calculator, Add, Div
+
+    r = parse(Calculator, ["add", "3.0", "4.5"])
+    got = serieux.deserialize(Calculator, r)
+    assert got == Calculator(operation=Add(x=3.0, y=4.5), other=0.0)
+
+    r = parse(Calculator, ["div", "--num", "10.0", "--denom", "2.0"])
+    got = serieux.deserialize(Calculator, r)
+    assert got == Calculator(operation=Div(num=10.0, denom=2.0), other=0.0)
+
+
+# ── list fields ───────────────────────────────────────────────────────────────
+
+
+@dataclass
+class Tags:
+    words: list[str]
+
+
+def test_list_str_repeated_option():
+    check("--words hello --words world --words foo", Tags(words=["hello", "world", "foo"]))
+
+
+def test_list_str_single():
+    check("--words only", Tags(words=["only"]))
+
+
+def test_list_tagged_union():
+    @dataclass
+    class Menagerie:
+        pets: list[TaggedUnion[Cat, Dog]]
+
+    flat = parse(
+        Menagerie,
+        ["--pets", "cat", "--indoor", "--pets", "dog", "--breed", "Husky"],
+    )
+    got = serieux.deserialize(Menagerie, flat)
+    assert got == Menagerie(pets=[Cat(indoor=True), Dog(breed="Husky")])
+
+
+def test_list_tagged_union_positional():
+    @dataclass
+    class Menagerie:
+        # [positional]
+        pets: list[TaggedUnion[Cat, Dog]]
+
+    flat = parse(
+        Menagerie,
+        ["cat", "--indoor", "dog", "--breed", "Husky"],
+    )
+    got = serieux.deserialize(Menagerie, flat)
+    assert got == Menagerie(pets=[Cat(indoor=True), Dog(breed="Husky")])

@@ -8,9 +8,14 @@ as state evolves via GroupState.advance().
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import sys
 from collections import deque
 from typing import Any
+
+from ovld import Medley, ovld, recurse
+
+from serieux.ctx import Context
 
 from .cli2 import (
     Loc,
@@ -19,11 +24,13 @@ from .cli2 import (
     Separator,
     ShortOpt,
     Value,
+    _cli_name,
     _option_strings,
     tokenize,
 )
 from .dotted import unflatten
 from .linearize import GroupState, LinearField, LinearState, linearize
+from .tagset import tag_field
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Helpers
@@ -50,6 +57,36 @@ def _eligible(gs: GroupState, fld: LinearField) -> bool:
     return fs is not None and fs.state in (LinearState.AVAILABLE, LinearState.ADVANCE)
 
 
+def _field_option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
+    """Like cli2's _option_strings but handles sequence element fields (serialized_name=None).
+
+    For sequence elements the option name is derived from the nearest named ancestor.
+    """
+    # Walk up to find the nearest ancestor with a real serialized_name.
+    # This handles both bare list elements (serialized_name=None) and
+    # $class fields whose parent is a list element.
+    def _effective_parent(lf: LinearField) -> LinearField | None:
+        p = lf.parent
+        while p is not None and p.field.serialized_name is None:
+            p = p.parent
+        return p
+
+    sn = fld.field.serialized_name
+    if sn is None or (sn == tag_field and fld.parent is not None and fld.parent.field.serialized_name is None):
+        # Derive option name from nearest named ancestor
+        anc = _effective_parent(fld) if sn is None else _effective_parent(fld.parent)
+        if anc is None:
+            return [], []
+        long = _cli_name(anc.identifier)
+        short = _cli_name(anc.field.serialized_name)
+        primary = [long] if long == short else [long, short]
+        aliases = fld.field.metadata.get("alias", [])
+        if isinstance(aliases, str):
+            aliases = [aliases]
+        return primary, [a.lstrip("-") for a in aliases]
+    return _option_strings(fld)
+
+
 def _named_candidates(gs: GroupState, name: str) -> list[LinearField]:
     """All eligible non-positional fields whose option strings include *name*.
 
@@ -59,19 +96,19 @@ def _named_candidates(gs: GroupState, name: str) -> list[LinearField]:
     for fld in gs.state:
         if not _eligible(gs, fld) or fld.positional:
             continue
-        primary, aliases = _option_strings(fld)
+        primary, aliases = _field_option_strings(fld)
         if name in primary + aliases:
             result.append(fld)
     return result
 
 
 def _positional_candidates(gs: GroupState) -> list[LinearField]:
-    """All eligible positional fields, in state-dict order (rightmost = last)."""
+    """All eligible positional fields, in state-dict order (leftmost = first)."""
     return [fld for fld in gs.state if _eligible(gs, fld) and fld.positional]
 
 
 def _pick(candidates: list[LinearField], value: str | None = None) -> LinearField | None:
-    """Pick the rightmost candidate.
+    """Pick the rightmost candidate (for named options).
 
     When *value* is known, prefer fields whose ``expected_value`` matches it;
     fall back to fields with no ``expected_value`` constraint; finally take
@@ -290,4 +327,35 @@ def parse(
     gs = GroupState(root_group)
     parser = Cli3Parser(gs, prog=prog, argv=argv)
     result = parser.run(tokens)
-    return unflatten(result)
+    return unflatten(result, allow_lists=True)
+
+
+@dataclass
+class CommandLineArguments:
+    """Wrapper around an argv list, consumed by :class:`FromArguments`."""
+
+    arguments: list[str]
+
+
+class FromArguments(Medley):
+    """Serieux Medley that allows deserializing any type directly from CLI args."""
+
+    @ovld(priority=1)
+    def deserialize(self, t: Any, obj: CommandLineArguments, ctx: Context):
+        vals = parse(t, obj.arguments)
+        try:
+            return recurse(t, vals, ctx)
+        except ParseError:
+            raise
+        except Exception as exc:
+            # Try to attach a source location from spans
+            try:
+                from ..exc import find_information
+
+                info = find_information(exc=exc, ctx=ctx)
+                path = ".".join(str(p) for p in info.path)
+                if loc := vals.spans.get(path):
+                    raise ParseError(str(exc), loc) from None
+            except Exception:
+                pass
+            raise
