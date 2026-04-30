@@ -343,8 +343,8 @@ class FieldState:
 
 @ovld
 def _flatten(group: LinearGroup, state: str = LinearState.AVAILABLE):
-    for field in group.fields:
-        yield (field, FieldState(state=state))
+    for fld in group.fields:
+        yield (fld, FieldState(state=state))
     for _, subgroups in group.option_groups.items():
         for subgroup in subgroups:
             yield from recurse(subgroup, LinearState.LATENT)
@@ -398,6 +398,14 @@ class GroupState:
         # Flatten all nested option_groups into one lookup dict keyed by group_id
         self._option_groups: dict[str, list[LinearGroup]] = {}
         self._collect_option_groups(self.initial)
+        # Maps (group_id, choice_id) -> list of trigger fields for that choice
+        self._triggers: dict[tuple[str, int], list[LinearField]] = {}
+        for fld in self.state:
+            for ul in fld.unlock:
+                key = (ul.group.identifier, ul.choice_id)
+                self._triggers.setdefault(key, []).append(fld)
+        # Maps id(fld) -> the field that disabled it
+        self._disabled_by: dict[int, LinearField] = {}
 
     def _collect_option_groups(self, group: LinearGroup) -> None:
         for k, subgroups in group.option_groups.items():
@@ -424,6 +432,8 @@ class GroupState:
             for other_fld in self.state:
                 if other_fld is not fld and any(u.group is ul.group for u in other_fld.unlock):
                     self.state[other_fld] = FieldState(state=sibling_state)
+                    if sibling_state == LinearState.UNAVAILABLE:
+                        self._disabled_by[id(other_fld)] = fld
 
             for i, subgroup in enumerate(self._option_groups.get(group_id, [])):
                 if i == choice_id:
@@ -432,6 +442,24 @@ class GroupState:
                 elif sibling_state == LinearState.UNAVAILABLE:
                     for sub_fld in _all_subfields(subgroup):
                         self.state[sub_fld] = FieldState(state=LinearState.UNAVAILABLE)
+                        self._disabled_by[id(sub_fld)] = fld
+
+    def latent_triggers(self, fld: LinearField) -> list[LinearField]:
+        """Return trigger fields that would make fld (LATENT) available."""
+        result = []
+        seen_ids: set[int] = set()
+        for gid, subgroups in self._option_groups.items():
+            for choice_id, subgroup in enumerate(subgroups):
+                if any(f is fld for f in _all_subfields(subgroup)):
+                    for t in self._triggers.get((gid, choice_id), []):
+                        if id(t) not in seen_ids:
+                            seen_ids.add(id(t))
+                            result.append(t)
+        return result
+
+    def disabled_by(self, fld: LinearField) -> LinearField | None:
+        """Return the field that disabled fld (UNAVAILABLE)."""
+        return self._disabled_by.get(id(fld))
 
     def advance(self, fld: LinearField) -> bool:
         fs = self.state.get(fld)

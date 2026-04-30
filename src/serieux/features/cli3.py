@@ -8,9 +8,9 @@ as state evolves via GroupState.advance().
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import sys
 from collections import deque
+from dataclasses import dataclass
 from typing import Any
 
 from ovld import Medley, ovld, recurse
@@ -62,6 +62,7 @@ def _field_option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
 
     For sequence elements the option name is derived from the nearest named ancestor.
     """
+
     # Walk up to find the nearest ancestor with a real serialized_name.
     # This handles both bare list elements (serialized_name=None) and
     # $class fields whose parent is a list element.
@@ -72,7 +73,9 @@ def _field_option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
         return p
 
     sn = fld.field.serialized_name
-    if sn is None or (sn == tag_field and fld.parent is not None and fld.parent.field.serialized_name is None):
+    if sn is None or (
+        sn == tag_field and fld.parent is not None and fld.parent.field.serialized_name is None
+    ):
         # Derive option name from nearest named ancestor
         anc = _effective_parent(fld) if sn is None else _effective_parent(fld.parent)
         if anc is None:
@@ -129,6 +132,53 @@ def _pick(candidates: list[LinearField], value: str | None = None) -> LinearFiel
 def _needs_value(fld: LinearField) -> bool:
     """Return True if the field must consume a value token (i.e. not a bool flag)."""
     return fld.type is not bool
+
+
+def _format_trigger(fld: LinearField) -> str:
+    """Format a single trigger field as a human-readable prerequisite."""
+    if fld.positional:
+        if fld.expected_value is not None:
+            return repr(fld.expected_value)
+        return fld.field.serialized_name.upper() if fld.field.serialized_name else "ARG"
+    primary, _ = _field_option_strings(fld)
+    opt = f"--{primary[0]}" if primary else fld.identifier
+    if fld.expected_value is not None:
+        return f"{opt}={fld.expected_value!r}"
+    return opt
+
+
+def _explain_unknown_named(gs: GroupState, name: str) -> str | None:
+    """If *name* matches a LATENT or UNAVAILABLE field, return an explanation string."""
+    latent_hints = []
+    unavailable_hints = []
+
+    for fld in gs.state:
+        fs = gs.state[fld]
+        if fld.positional:
+            continue
+        try:
+            primary, aliases = _field_option_strings(fld)
+        except Exception:
+            continue
+        if name not in primary + aliases:
+            continue
+
+        if fs.state == LinearState.LATENT:
+            triggers = gs.latent_triggers(fld)
+            if triggers:
+                prereqs = " or ".join(_format_trigger(t) for t in triggers)
+                latent_hints.append(f"--{name} requires {prereqs}")
+            else:
+                latent_hints.append(f"--{name} is not yet available")
+        elif fs.state == LinearState.UNAVAILABLE:
+            disabler = gs.disabled_by(fld)
+            if disabler is not None:
+                latent_hints.append(f"--{name} was disabled by {_format_trigger(disabler)}")
+            else:
+                unavailable_hints.append(f"--{name} is not available")
+
+    hints = latent_hints + unavailable_hints
+    return hints[0] if hints else None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -195,7 +245,9 @@ class Cli3Parser:
                     if concrete_id is not False:
                         self.result[concrete_id] = False
                     return
-            self.errors.append((f"Unknown option: --{name}", self._ploc(tok.name_loc)))
+            hint = _explain_unknown_named(self.gs, name)
+            msg = hint if hint else f"Unknown option: --{name}"
+            self.errors.append((msg, self._ploc(tok.name_loc)))
             # Speculatively skip the next Value — likely this option's argument.
             if tok.value is None and queue and isinstance(queue[0], Value):
                 queue.popleft()
@@ -243,7 +295,9 @@ class Cli3Parser:
 
             if not candidates:
                 full_loc = self._ploc(Loc(argv, idx, 0 if i == 0 else base + i, base + i + 1))
-                self.errors.append((f"Unknown option: -{ch}", full_loc))
+                hint = _explain_unknown_named(self.gs, ch)
+                msg = hint if hint else f"Unknown option: -{ch}"
+                self.errors.append((msg, full_loc))
                 i += 1
                 continue
 
@@ -277,7 +331,12 @@ class Cli3Parser:
 
     def _handle_positional(self, tok: Value) -> None:
         candidates = _positional_candidates(self.gs)
-        fld = _pick(candidates, tok.text)
+        # For positionals, prefer leftmost (declaration order); specific expected_value first.
+        fld = None
+        if candidates:
+            specific = [f for f in candidates if f.expected_value == tok.text]
+            generic = [f for f in candidates if f.expected_value is None]
+            fld = (specific or generic or candidates)[0]
         if fld is None:
             self.errors.append(
                 (f"Unexpected positional argument: {tok.text!r}", self._ploc(tok.loc))
