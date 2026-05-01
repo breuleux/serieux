@@ -296,7 +296,7 @@ def test_two_positionals_with_option():
 
 
 def test_positional_tagged_union_then_positional():
-    from tests.features.test_linearize import Add, Calculator, Div
+    from tests.test_linearize import Add, Calculator, Div
 
     check(Calculator(operation=Add(x=3.0, y=4.5), other=0.0), "add 3.0 4.5")
     check(Calculator(operation=Div(num=10.0, denom=2.0), other=0.0), "div --num 10.0 --denom 2.0")
