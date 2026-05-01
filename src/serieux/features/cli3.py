@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import sys
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field, make_dataclass
 from typing import Any
 
 from ovld import Medley, ovld, recurse
+from ovld.utils import clsstring
 
-from serieux.ctx import Context
-
+from ..ctx import Context
 from .cli2 import (
     Loc,
     LongOpt,
@@ -35,20 +35,6 @@ from .tagset import tag_field
 # ═══════════════════════════════════════════════════════════════════════════════
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════════════
-
-
-def _coerce(tp: type, value: str) -> Any:
-    """Convert a CLI string to a Python primitive type when possible."""
-    if not isinstance(value, str):
-        return value
-    try:
-        if tp is int:
-            return int(value)
-        if tp is float:
-            return float(value)
-    except (ValueError, TypeError):
-        pass
-    return value
 
 
 def _eligible(gs: GroupState, fld: LinearField) -> bool:
@@ -82,7 +68,7 @@ def _field_option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
             return [], []
         long = _cli_name(anc.identifier)
         short = _cli_name(anc.field.serialized_name)
-        primary = [long] if long == short else [long, short]
+        primary = [long] if (not long or long == short) else [long, short]
         aliases = fld.field.metadata.get("alias", [])
         if isinstance(aliases, str):
             aliases = [aliases]
@@ -192,12 +178,14 @@ class Cli3Parser:
         gs: GroupState,
         prog: str | None = None,
         argv: list[str] | None = None,
+        deserialize=None,
     ) -> None:
         self.gs = gs
         self.prog = prog
         self.argv = argv or []
         self.result: dict[str, Any] = {}
         self.errors: list[tuple[str, Loc | None]] = []
+        self.deserialize = deserialize
 
     def _ploc(self, loc: Loc) -> Loc:
         if self.prog and loc.prog != self.prog:
@@ -211,7 +199,7 @@ class Cli3Parser:
         if concrete_id is False:
             self.errors.append((f"Cannot assign field {fld.identifier!r}", loc))
             return
-        self.result[concrete_id] = _coerce(fld.type, value)
+        self.result[concrete_id] = self.deserialize(fld.type, Word(value))
 
     def _consume_value(
         self, key_loc: Loc, queue: deque, name: str | None = None
@@ -362,9 +350,6 @@ class Cli3Parser:
             else:
                 self._handle_positional(tok)
 
-        if self.errors:
-            raise ParseError._from_items(self.errors)
-
         return self.result
 
 
@@ -392,19 +377,78 @@ def parse(
     return unflatten(result, allow_lists=True)
 
 
+@dataclass(kw_only=True)
+class Control:
+    # [alias: -h]
+    # Show this help message and exit
+    help: bool = False
+
+    def build(self, parser, vals):
+        if self.help:
+            print("TODO")
+            sys.exit(0)
+
+        if parser.errors:
+            raise ParseError._from_items(parser.errors)
+
+        return vals
+
+
+class Word:
+    def __init__(self, word: str):
+        self.value = word
+
+
 @dataclass
 class CommandLineArguments:
     """Wrapper around an argv list, consumed by :class:`FromArguments`."""
 
-    arguments: list[str]
+    arguments: list[str] = None
+    prog: str = None
+
+    def __post_init__(self):
+        if self.arguments is None:
+            self.arguments = sys.argv[1:]
+        if self.prog is None:
+            self.prog = sys.argv[0]
 
 
 class FromArguments(Medley):
     """Serieux Medley that allows deserializing any type directly from CLI args."""
 
     @ovld(priority=1)
+    def deserialize(self, t: type[int], obj: Word, ctx: Context):
+        return int(obj.value)
+
+    @ovld(priority=1)
+    def deserialize(self, t: type[float], obj: Word, ctx: Context):
+        return float(obj.value)
+
+    @ovld(priority=1)
+    def deserialize(self, t: Any, obj: Word, ctx: Context):
+        return recurse(t, obj.value)
+
+    @ovld(priority=1)
     def deserialize(self, t: Any, obj: CommandLineArguments, ctx: Context):
-        vals = parse(t, obj.arguments)
+        augmented_type = make_dataclass(
+            cls_name=f"Args_{clsstring(t)}",
+            bases=(),
+            fields=[
+                ("__value", t, field()),
+                ("__control", Control, field()),
+            ],
+        )
+
+        tokens = tokenize(obj.arguments)
+        root_group = linearize(augmented_type)
+        gs = GroupState(root_group)
+        parser = Cli3Parser(gs, prog=obj.prog, argv=obj.arguments, deserialize=self.deserialize)
+        result = parser.run(tokens)
+        vals = unflatten(result, allow_lists=True)
+
+        control = recurse(Control, vals.get("__control", {}))
+        vals = control.build(parser, vals.get("__value", {}))
+
         try:
             return recurse(t, vals, ctx)
         except ParseError:
