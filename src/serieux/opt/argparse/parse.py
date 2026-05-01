@@ -9,7 +9,7 @@ as state evolves via GroupState.advance().
 from __future__ import annotations
 
 import sys
-from collections import deque
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from functools import cache, cached_property
 from typing import Any
@@ -108,11 +108,6 @@ def _option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
 ###########
 
 
-def _positional_candidates(gs: GroupState) -> list[LinearField]:
-    """All eligible positional fields, in state-dict order (leftmost = first)."""
-    return [fld for fld in gs.state if gs.eligible(fld) and fld.positional]
-
-
 def _pick(candidates: list[LinearField], value: str | None = None) -> LinearField | None:
     """Pick the rightmost candidate (for named options).
 
@@ -158,6 +153,8 @@ class CliParser:
         self.errors: list[tuple[str, Loc | None]] = []
         self.deserialize = deserialize
         self.root_type = root_type
+        self.option_map = defaultdict(list)
+        self.populate_options()
 
     def _ploc(self, loc: Loc) -> Loc:
         if self.prog and loc.prog != self.prog:
@@ -191,36 +188,37 @@ class CliParser:
 
     # ── Options names ─────────────────────────────────────────────────────────-
 
+    def populate_options(self):
+        for fld in self.gs.state:
+            if fld.positional:
+                primary, aliases = ["*"], []
+            else:
+                primary, aliases = self.option_strings(fld)
+            for name in primary + aliases:
+                self.option_map[name].append(fld)
+
     @cache
     def option_strings(self, fld: LinearField):
         return _option_strings(fld)
 
-    @cache
-    def named_candidates(self, name: str) -> list[LinearField]:
-        """All eligible non-positional fields whose option strings include *name*.
+    def candidates(self, key: str) -> list[LinearField]:
+        """All eligible fields, key being an option or '*' if positional.
 
         Returned in state-dict order; the rightmost eligible match is last.
         """
-        result = []
-        for fld in self.gs.state:
-            if not self.gs.eligible(fld) or fld.positional:
-                continue
-            primary, aliases = _option_strings(fld)
-            if name in primary + aliases:
-                result.append(fld)
-        return result
+        return [fld for fld in self.option_map[key] if self.gs.eligible(fld)]
 
     # ── Token handlers ─────────────────────────────────────────────────────────
 
     @ovld
     def _handle(self, tok: LongOpt, queue: deque) -> None:
         opt = tok.name
-        candidates = self.named_candidates(opt)
+        candidates = self.candidates(opt)
 
         if not candidates:
             # Support --no-X negation for plain bool fields
             if opt.startswith("--no-"):
-                neg_cands = self.named_candidates(dashify(opt[5:]))
+                neg_cands = self.candidates(dashify(opt[5:]))
                 plain_bool = [f for f in neg_cands if not _needs_value(f) and not f.unlock]
                 if plain_bool:
                     fld = plain_bool[-1]
@@ -283,7 +281,7 @@ class CliParser:
             ch = chars[i]
             opt = f"-{ch}"
             char_loc = self._ploc(Loc(argv, idx, base + i, base + i + 1))
-            candidates = self.named_candidates(opt)
+            candidates = self.candidates(opt)
 
             if not candidates:
                 full_loc = self._ploc(Loc(argv, idx, 0 if i == 0 else base + i, base + i + 1))
@@ -322,7 +320,7 @@ class CliParser:
 
     @ovld
     def _handle(self, tok: Value, queue: deque) -> None:
-        candidates = _positional_candidates(self.gs)
+        candidates = self.candidates("*")
         # For positionals, prefer leftmost (declaration order); specific expected_value first.
         fld = None
         if candidates:
