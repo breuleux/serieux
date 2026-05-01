@@ -17,10 +17,10 @@ from typing import Any
 from ovld import Medley, ovld, recurse
 from ovld.utils import clsstring
 
-from ..ctx import Context
-from ..linearize import GroupState, LinearField, LinearState, linearize
-from .dotted import unflatten
-from .tagset import tag_field
+from ...ctx import Context
+from ...features.dotted import unflatten
+from ...features.tagset import tag_field
+from ...linearize import GroupState, LinearField, LinearState, linearize
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Errors

@@ -8,8 +8,8 @@ import pytest
 from ovld import ovld
 
 from serieux import Serieux
-from serieux.features.cli3 import CommandLineArguments, FromArguments
 from serieux.features.tagset import TaggedUnion
+from serieux.opt.argparse import CommandLineArguments, FromArguments
 
 serieux = Serieux() + FromArguments()
 
