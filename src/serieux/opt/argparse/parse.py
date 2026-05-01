@@ -11,13 +11,13 @@ from __future__ import annotations
 import sys
 from collections import deque
 from dataclasses import dataclass
+from functools import cache, cached_property
 from typing import Any
 
 from ...features.tagset import tag_field
-from ...linearize import GroupState, LinearField, LinearState
+from ...linearize import GroupState, LinearField
 from .errors import ParseError
 from .tokenize import Loc, LongOpt, Separator, ShortOpt, Value
-
 
 ########
 # Misc #
@@ -39,7 +39,7 @@ class Control:
         from .help import format_help
 
         if self.help:
-            print(format_help(parser.gs, parser.prog, parser.root_type, color=sys.stdout.isatty()))
+            print(format_help(parser, parser.root_type, color=sys.stdout.isatty()))
             sys.exit(0)
 
         if parser.errors:
@@ -51,6 +51,11 @@ class Control:
 #################
 # Option naming #
 #################
+
+
+def _cli_name(s: str) -> str:
+    parts = [p for p in s.split(".") if not p.startswith("__")]
+    return ".".join(parts).replace("_", "-")
 
 
 def _option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
@@ -118,26 +123,6 @@ def _option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
 ###########
 
 
-def _cli_name(s: str) -> str:
-    parts = [p for p in s.split(".") if not p.startswith("__")]
-    return ".".join(parts).replace("_", "-")
-
-
-def _named_candidates(gs: GroupState, name: str) -> list[LinearField]:
-    """All eligible non-positional fields whose option strings include *name*.
-
-    Returned in state-dict order; the rightmost eligible match is last.
-    """
-    result = []
-    for fld in gs.state:
-        if not gs.eligible(fld) or fld.positional:
-            continue
-        primary, aliases = _option_strings(fld)
-        if name in primary + aliases:
-            result.append(fld)
-    return result
-
-
 def _positional_candidates(gs: GroupState) -> list[LinearField]:
     """All eligible positional fields, in state-dict order (leftmost = first)."""
     return [fld for fld in gs.state if gs.eligible(fld) and fld.positional]
@@ -165,53 +150,6 @@ def _pick(candidates: list[LinearField], value: str | None = None) -> LinearFiel
 def _needs_value(fld: LinearField) -> bool:
     """Return True if the field must consume a value token (i.e. not a bool flag)."""
     return fld.type is not bool
-
-
-def _format_trigger(fld: LinearField) -> str:
-    """Format a single trigger field as a human-readable prerequisite."""
-    if fld.positional:
-        if fld.expected_value is not None:
-            return repr(fld.expected_value)
-        return fld.field.serialized_name.upper() if fld.field.serialized_name else "ARG"
-    primary, _ = _option_strings(fld)
-    opt = f"--{primary[0]}" if primary else fld.identifier
-    if fld.expected_value is not None:
-        return f"{opt}={fld.expected_value!r}"
-    return opt
-
-
-def _explain_unknown_named(gs: GroupState, name: str) -> str | None:
-    """If *name* matches a LATENT or UNAVAILABLE field, return an explanation string."""
-    latent_hints = []
-    unavailable_hints = []
-
-    for fld in gs.state:
-        fs = gs.state[fld]
-        if fld.positional:
-            continue
-        try:
-            primary, aliases = _option_strings(fld)
-        except Exception:
-            continue
-        if name not in primary + aliases:
-            continue
-
-        if fs.state == LinearState.LATENT:
-            triggers = gs.latent_triggers(fld)
-            if triggers:
-                prereqs = " or ".join(_format_trigger(t) for t in triggers)
-                latent_hints.append(f"--{name} requires {prereqs}")
-            else:
-                latent_hints.append(f"--{name} is not yet available")
-        elif fs.state == LinearState.UNAVAILABLE:
-            disabler = gs.disabled_by(fld)
-            if disabler is not None:
-                latent_hints.append(f"--{name} was disabled by {_format_trigger(disabler)}")
-            else:
-                unavailable_hints.append(f"--{name} is not available")
-
-    hints = latent_hints + unavailable_hints
-    return hints[0] if hints else None
 
 
 ##########
@@ -260,16 +198,43 @@ class CliParser:
         tok = queue.popleft()
         return tok.text, self._ploc(tok.loc)
 
+    @cached_property
+    def formatter(self):
+        from .fmt import ArgparseFormatter
+
+        return ArgparseFormatter(self)
+
+    # ── Options names ─────────────────────────────────────────────────────────-
+
+    @cache
+    def option_strings(self, fld: LinearField):
+        return _option_strings(fld)
+
+    @cache
+    def named_candidates(self, name: str) -> list[LinearField]:
+        """All eligible non-positional fields whose option strings include *name*.
+
+        Returned in state-dict order; the rightmost eligible match is last.
+        """
+        result = []
+        for fld in self.gs.state:
+            if not self.gs.eligible(fld) or fld.positional:
+                continue
+            primary, aliases = _option_strings(fld)
+            if name in primary + aliases:
+                result.append(fld)
+        return result
+
     # ── Token handlers ─────────────────────────────────────────────────────────
 
     def _handle_long(self, tok: LongOpt, queue: deque) -> None:
         name = tok.name
-        candidates = _named_candidates(self.gs, name)
+        candidates = self.named_candidates(name)
 
         if not candidates:
             # Support --no-X negation for plain bool fields
             if name.startswith("no-"):
-                neg_cands = _named_candidates(self.gs, name[3:])
+                neg_cands = self.named_candidates(name[3:])
                 plain_bool = [f for f in neg_cands if not _needs_value(f) and not f.unlock]
                 if plain_bool:
                     fld = plain_bool[-1]
@@ -285,7 +250,7 @@ class CliParser:
                     if concrete_id is not False:
                         self.result[concrete_id] = False
                     return
-            hint = _explain_unknown_named(self.gs, name)
+            hint = self.formatter.explain_unknown_named(name)
             msg = hint if hint else f"Unknown option: --{name}"
             self.errors.append((msg, self._ploc(tok.name_loc)))
             # Speculatively skip the next Value — likely this option's argument.
@@ -331,11 +296,11 @@ class CliParser:
         while i < len(chars):
             ch = chars[i]
             char_loc = self._ploc(Loc(argv, idx, base + i, base + i + 1))
-            candidates = _named_candidates(self.gs, ch)
+            candidates = self.named_candidates(ch)
 
             if not candidates:
                 full_loc = self._ploc(Loc(argv, idx, 0 if i == 0 else base + i, base + i + 1))
-                hint = _explain_unknown_named(self.gs, ch)
+                hint = self.formatter.explain_unknown_named(ch)
                 msg = hint if hint else f"Unknown option: -{ch}"
                 self.errors.append((msg, full_loc))
                 i += 1

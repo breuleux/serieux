@@ -1,9 +1,10 @@
 import inspect
 import sys
+from dataclasses import MISSING
 
-from serieux.linearize import LinearField, LinearState
-
-from .parse import GroupState, _cli_name, _option_strings
+from ...features.tagset import tag_field
+from ...linearize import LinearField, LinearState
+from .parse import CliParser, _cli_name
 
 
 def _type_metavar(tp: type) -> str:
@@ -26,8 +27,9 @@ def _class_doc(cls: type) -> str:
     return "" if doc.startswith(cls.__name__ + "(") else doc
 
 
-def format_help(gs: GroupState, prog: str, root_type: type, color: bool = None) -> str:
-    from dataclasses import MISSING
+def format_help(parser: CliParser, root_type: type, color: bool = None) -> str:
+    gs = parser.gs
+    prog = parser.prog
 
     if color is None:
         color = sys.stdout.isatty()
@@ -74,7 +76,7 @@ def format_help(gs: GroupState, prog: str, root_type: type, color: bool = None) 
             positionals.append(fld)
             continue
         try:
-            primary, aliases = _option_strings(fld)
+            primary, aliases = parser.option_strings(fld)
         except Exception:
             continue
         if not primary:
@@ -91,7 +93,7 @@ def format_help(gs: GroupState, prog: str, root_type: type, color: bool = None) 
         return f"-{name}" if len(name) == 1 else f"--{name}"
 
     def _entry(fields: list[LinearField]) -> dict:
-        primary, aliases = _option_strings(fields[0])
+        primary, aliases = parser.option_strings(fields[0])
         names = primary + aliases
         short = [n for n in names if "." not in n]
         display = sorted(short if short else names, key=lambda n: (len(n) > 1, n))
@@ -210,7 +212,7 @@ def format_help(gs: GroupState, prog: str, root_type: type, color: bool = None) 
             branch_entries = []
             for fld in fields:
                 try:
-                    primary, _ = _option_strings(fld)
+                    primary, _ = parser.option_strings(fld)
                 except Exception:
                     continue
                 if primary:
