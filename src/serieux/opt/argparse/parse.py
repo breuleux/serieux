@@ -123,12 +123,6 @@ def _cli_name(s: str) -> str:
     return ".".join(parts).replace("_", "-")
 
 
-def _eligible(gs: GroupState, fld: LinearField) -> bool:
-    """Return True if fld can be advanced (AVAILABLE or ADVANCE state)."""
-    fs = gs.state.get(fld)
-    return fs is not None and fs.state in (LinearState.AVAILABLE, LinearState.ADVANCE)
-
-
 def _named_candidates(gs: GroupState, name: str) -> list[LinearField]:
     """All eligible non-positional fields whose option strings include *name*.
 
@@ -136,7 +130,7 @@ def _named_candidates(gs: GroupState, name: str) -> list[LinearField]:
     """
     result = []
     for fld in gs.state:
-        if not _eligible(gs, fld) or fld.positional:
+        if not gs.eligible(fld) or fld.positional:
             continue
         primary, aliases = _option_strings(fld)
         if name in primary + aliases:
@@ -146,7 +140,7 @@ def _named_candidates(gs: GroupState, name: str) -> list[LinearField]:
 
 def _positional_candidates(gs: GroupState) -> list[LinearField]:
     """All eligible positional fields, in state-dict order (leftmost = first)."""
-    return [fld for fld in gs.state if _eligible(gs, fld) and fld.positional]
+    return [fld for fld in gs.state if gs.eligible(fld) and fld.positional]
 
 
 def _pick(candidates: list[LinearField], value: str | None = None) -> LinearField | None:

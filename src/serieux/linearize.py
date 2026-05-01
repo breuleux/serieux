@@ -469,6 +469,10 @@ class GroupState:
                             result.append(t)
         return result
 
+    def eligible(self, fld: LinearField) -> bool:
+        fs = self.state.get(fld)
+        return fs is not None and fs.state in (LinearState.AVAILABLE, LinearState.ADVANCE)
+
     def disabled_by(self, fld: LinearField) -> LinearField | None:
         """Return the field that disabled fld (UNAVAILABLE)."""
         return self._disabled_by.get(id(fld))
