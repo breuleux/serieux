@@ -79,48 +79,23 @@ def _option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
     # Walk up to find the nearest ancestor with a real serialized_name.
     # This handles both bare list elements (serialized_name=None) and
     # $class fields whose parent is a list element.
-    def _effective_parent(lf: LinearField) -> LinearField | None:
-        p = lf.parent
-        while p is not None and p.field.serialized_name is None:
+    def _effective_field(lf: LinearField) -> LinearField | None:
+        p = lf
+        while p.field.serialized_name is None or p.field.serialized_name == tag_field:
             p = p.parent
         return p
 
-    sn = fld.field.serialized_name
-    if sn is None or (
-        sn == tag_field and fld.parent is not None and fld.parent.field.serialized_name is None
-    ):
-        # Derive option name from nearest named ancestor
-        anc = _effective_parent(fld) if sn is None else _effective_parent(fld.parent)
-        if anc is None:
-            return [], []
-        long = _cli_name(anc.identifier)
-        short = _cli_name(anc.field.serialized_name)
-        primary = (
-            [dashify(long)] if (not long or long == short) else [dashify(long), dashify(short)]
-        )
-        aliases = fld.field.metadata.get("alias", [])
-        if isinstance(aliases, str):
-            aliases = [aliases]
-        return primary, [dashify(a.lstrip("-")) for a in aliases]
+    eff = _effective_field(fld)
+    meta = eff.field.metadata
 
-    f = fld.field
-    if f.serialized_name == tag_field and fld.parent is not None:
-        eff = fld.parent.identifier
-        short_sn = fld.parent.field.serialized_name
+    if opt := meta.get("option"):
+        long = short = opt.lstrip("-")
     else:
-        eff = fld.identifier
-        short_sn = f.serialized_name
+        long = _cli_name(eff.identifier)
+        short = _cli_name(eff.field.serialized_name)
 
-    if opt := f.metadata.get("option"):
-        primary = [dashify(opt.lstrip("-"))]
-    else:
-        long = _cli_name(eff)
-        short = _cli_name(short_sn)
-        primary = (
-            [dashify(long)] if (not short or long == short) else [dashify(long), dashify(short)]
-        )
-
-    aliases = f.metadata.get("alias", [])
+    primary = [dashify(long)] if (not short or long == short) else [dashify(long), dashify(short)]
+    aliases = meta.get("alias", [])
     if isinstance(aliases, str):
         aliases = [aliases]
     aliases = [dashify(a.lstrip("-")) for a in aliases]
@@ -261,8 +236,7 @@ class CliParser:
                     if concrete_id is not False:
                         self.result[concrete_id] = False
                     return
-            hint = self.formatter.explain_unknown_named(opt)
-            msg = hint if hint else f"Unknown option: {opt}"
+            msg = self.formatter.explain_unknown_named(opt)
             self.errors.append((msg, self._ploc(tok.name_loc)))
             # Speculatively skip the next Value — likely this option's argument.
             if tok.value is None and queue and isinstance(queue[0], Value):
@@ -313,8 +287,7 @@ class CliParser:
 
             if not candidates:
                 full_loc = self._ploc(Loc(argv, idx, 0 if i == 0 else base + i, base + i + 1))
-                hint = self.formatter.explain_unknown_named(opt)
-                msg = hint if hint else f"Unknown option: {opt}"
+                msg = self.formatter.explain_unknown_named(opt)
                 self.errors.append((msg, full_loc))
                 i += 1
                 continue

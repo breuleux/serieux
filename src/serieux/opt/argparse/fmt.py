@@ -52,4 +52,4 @@ class ArgparseFormatter:
                     unavailable_hints.append(f"{opt} is not available")
 
         hints = latent_hints + unavailable_hints
-        return hints[0] if hints else None
+        return hints[0] if hints else f"Unknown option: {opt}"
