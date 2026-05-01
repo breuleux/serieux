@@ -362,20 +362,17 @@ def test_compact_value_inline():
     check(Args(o="out.txt"), "-oout.txt")
 
 
-# def test_prog_name_in_error():
-#     try:
-#         parse(Person, ["--unknown"], prog="myprog")
-#     except ParseError as e:
-#         assert "myprog" in str(e)
+def test_prog_name_in_error():
+    with pytest.raises(Exception, match="myprog"):
+        serieux.deserialize(Person, CommandLineArguments(["--unknown"], prog="myprog"))
 
 
-# def test_undifferentiable_union_raises():
-#     @dataclass
-#     class ConflictingTypes:
-#         value: int | str
+def test_undifferentiable_union_raises():
+    @dataclass
+    class ConflictingTypes:
+        value: int | str
 
-#     with pytest.raises(Exception, match="differentiate"):
-#         parse(ConflictingTypes, [])
+    check(ConflictingTypes, "", error="differentiate")
 
 
 def test_string_modelizable():

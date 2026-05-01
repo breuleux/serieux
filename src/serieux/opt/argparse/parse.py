@@ -388,25 +388,6 @@ class CliParser:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def parse(
-    root_type: type,
-    argv: list[str] | None = None,
-    prog: str | None = None,
-) -> dict:
-    """Parse *argv* (defaults to ``sys.argv[1:]``) against *root_type*'s linearized schema."""
-    if argv is None:
-        argv = sys.argv[1:]
-    if prog is None:
-        prog = sys.argv[0]
-
-    tokens = tokenize(argv)
-    root_group = linearize(root_type)
-    gs = GroupState(root_group)
-    parser = CliParser(gs, prog=prog, argv=argv)
-    result = parser.run(tokens)
-    return unflatten(result, allow_lists=True)
-
-
 @dataclass(kw_only=True)
 class Control:
     # [alias: -h]
