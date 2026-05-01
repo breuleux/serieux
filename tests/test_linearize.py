@@ -9,14 +9,14 @@ from typing import Annotated, Optional, Union
 import pytest
 from ovld import ovld, recurse
 
-from serieux.features.linearize import (
+from serieux.features.tagset import TagDict, TaggedUnion
+from serieux.linearize import (
     GroupState,
     LinearField,
     LinearGroup,
     LinearState as LS,
     linearize,
 )
-from serieux.features.tagset import TagDict, TaggedUnion
 
 
 @ovld

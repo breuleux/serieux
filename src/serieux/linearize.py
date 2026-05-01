@@ -8,10 +8,10 @@ from typing import Any, Union, get_args
 
 from ovld import call_next, ovld, recurse
 
-from ..model import Field, FieldModelizable, ListModelizable, Model, StringModelizable, model
-from ..tell import Tell, tells as get_tells
-from ..utils import UnionAlias
-from .tagset import Tagged, TagSet, tag_field
+from .features.tagset import Tagged, TagSet, tag_field
+from .model import Field, FieldModelizable, ListModelizable, Model, StringModelizable, model
+from .tell import Tell, tells as get_tells
+from .utils import UnionAlias
 
 
 @dataclass(kw_only=True)
