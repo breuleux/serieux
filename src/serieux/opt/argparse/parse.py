@@ -18,9 +18,39 @@ from ...linearize import GroupState, LinearField, LinearState
 from .errors import ParseError
 from .tokenize import Loc, LongOpt, Separator, ShortOpt, Value
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Option naming
-# ═══════════════════════════════════════════════════════════════════════════════
+
+########
+# Misc #
+########
+
+
+class Word:
+    def __init__(self, word: str):
+        self.value = word
+
+
+@dataclass(kw_only=True)
+class Control:
+    # [alias: -h]
+    # Show this help message and exit
+    help: bool = False
+
+    def build(self, parser, vals):
+        from .help import format_help
+
+        if self.help:
+            print(format_help(parser.gs, parser.prog, parser.root_type, color=sys.stdout.isatty()))
+            sys.exit(0)
+
+        if parser.errors:
+            raise ParseError._from_items(parser.errors)
+
+        return vals
+
+
+#################
+# Option naming #
+#################
 
 
 def _option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
@@ -83,9 +113,9 @@ def _option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
     return primary, aliases
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Helpers
-# ═══════════════════════════════════════════════════════════════════════════════
+###########
+# Helpers #
+###########
 
 
 def _cli_name(s: str) -> str:
@@ -190,9 +220,9 @@ def _explain_unknown_named(gs: GroupState, name: str) -> str | None:
     return hints[0] if hints else None
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Parser
-# ═══════════════════════════════════════════════════════════════════════════════
+##########
+# Parser #
+##########
 
 
 class CliParser:
@@ -376,32 +406,3 @@ class CliParser:
                 self._handle_positional(tok)
 
         return self.result
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Public interface
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-@dataclass(kw_only=True)
-class Control:
-    # [alias: -h]
-    # Show this help message and exit
-    help: bool = False
-
-    def build(self, parser, vals):
-        from .help import format_help
-
-        if self.help:
-            print(format_help(parser.gs, parser.prog, parser.root_type, color=sys.stdout.isatty()))
-            sys.exit(0)
-
-        if parser.errors:
-            raise ParseError._from_items(parser.errors)
-
-        return vals
-
-
-class Word:
-    def __init__(self, word: str):
-        self.value = word
