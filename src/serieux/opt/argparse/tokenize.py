@@ -117,14 +117,14 @@ def tokenize(argv: list[str]) -> list[Token]:
                 name, val = body[:eq], body[eq + 1 :]
                 tokens.append(
                     LongOpt(
-                        name=name,
+                        name=f"--{name}",
                         name_loc=_loc(0, 2 + eq),
                         value=val,
                         value_loc=_loc(2 + eq + 1, len(arg)),
                     )
                 )
             else:
-                tokens.append(LongOpt(name=body, name_loc=_loc(0, len(arg))))
+                tokens.append(LongOpt(name=f"--{body}", name_loc=_loc(0, len(arg))))
             continue
 
         if arg.startswith("-") and len(arg) >= 2 and arg[1] != "-":
@@ -134,14 +134,14 @@ def tokenize(argv: list[str]) -> list[Token]:
                 chars, val = chars_raw[:eq], chars_raw[eq + 1 :]
                 tokens.append(
                     ShortOpt(
-                        chars=chars,
+                        chars=f"-{chars}",
                         chars_loc=_loc(1, 1 + eq),
                         value=val,
                         value_loc=_loc(1 + eq + 1, len(arg)),
                     )
                 )
             else:
-                tokens.append(ShortOpt(chars=chars_raw, chars_loc=_loc(1, len(arg))))
+                tokens.append(ShortOpt(chars=f"-{chars_raw}", chars_loc=_loc(1, len(arg))))
             continue
 
         tokens.append(Value(text=arg, loc=_loc(0, len(arg))))

@@ -60,10 +60,14 @@ def _cli_name(s: str) -> str:
     return ".".join(parts).replace("_", "-")
 
 
-def _option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
-    """Return ``(primary_names, alias_names)`` without leading ``--``.
+def dashify(name: str) -> str:
+    return f"-{name}" if len(name) == 1 else f"--{name}"
 
-    Primary names are ``[long, short]`` (e.g. ``['abc.def', 'def']``) or just
+
+def _option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
+    """Return ``(primary_names, alias_names)`` with leading dashes.
+
+    Primary names are ``[long, short]`` (e.g. ``['--abc.def', '--def']``) or just
     ``[long]`` when both are identical.  Aliases come from field metadata.
 
     For ``$class`` discriminator fields the parent field's identifier/name is
@@ -91,11 +95,13 @@ def _option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
             return [], []
         long = _cli_name(anc.identifier)
         short = _cli_name(anc.field.serialized_name)
-        primary = [long] if (not long or long == short) else [long, short]
+        primary = (
+            [dashify(long)] if (not long or long == short) else [dashify(long), dashify(short)]
+        )
         aliases = fld.field.metadata.get("alias", [])
         if isinstance(aliases, str):
             aliases = [aliases]
-        return primary, [a.lstrip("-") for a in aliases]
+        return primary, [dashify(a.lstrip("-")) for a in aliases]
 
     f = fld.field
     if f.serialized_name == tag_field and fld.parent is not None:
@@ -106,16 +112,18 @@ def _option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
         short_sn = f.serialized_name
 
     if opt := f.metadata.get("option"):
-        primary = [opt.lstrip("-")]
+        primary = [dashify(opt.lstrip("-"))]
     else:
         long = _cli_name(eff)
         short = _cli_name(short_sn)
-        primary = [long] if (not short or long == short) else [long, short]
+        primary = (
+            [dashify(long)] if (not short or long == short) else [dashify(long), dashify(short)]
+        )
 
     aliases = f.metadata.get("alias", [])
     if isinstance(aliases, str):
         aliases = [aliases]
-    aliases = [a.lstrip("-") for a in aliases]
+    aliases = [dashify(a.lstrip("-")) for a in aliases]
 
     return primary, aliases
 
@@ -231,20 +239,20 @@ class CliParser:
 
     @ovld
     def _handle(self, tok: LongOpt, queue: deque) -> None:
-        name = tok.name
-        candidates = self.named_candidates(name)
+        opt = tok.name
+        candidates = self.named_candidates(opt)
 
         if not candidates:
             # Support --no-X negation for plain bool fields
-            if name.startswith("no-"):
-                neg_cands = self.named_candidates(name[3:])
+            if opt.startswith("--no-"):
+                neg_cands = self.named_candidates(dashify(opt[5:]))
                 plain_bool = [f for f in neg_cands if not _needs_value(f) and not f.unlock]
                 if plain_bool:
                     fld = plain_bool[-1]
                     if tok.value is not None:
                         self.errors.append(
                             (
-                                f"--{name} is a flag and does not take a value",
+                                f"{opt} is a flag and does not take a value",
                                 self._ploc(tok.value_loc),
                             )
                         )
@@ -253,8 +261,8 @@ class CliParser:
                     if concrete_id is not False:
                         self.result[concrete_id] = False
                     return
-            hint = self.formatter.explain_unknown_named(name)
-            msg = hint if hint else f"Unknown option: --{name}"
+            hint = self.formatter.explain_unknown_named(opt)
+            msg = hint if hint else f"Unknown option: {opt}"
             self.errors.append((msg, self._ploc(tok.name_loc)))
             # Speculatively skip the next Value — likely this option's argument.
             if tok.value is None and queue and isinstance(queue[0], Value):
@@ -265,7 +273,7 @@ class CliParser:
         if all(not _needs_value(f) for f in candidates):
             if tok.value is not None:
                 self.errors.append(
-                    (f"--{name} is a flag and does not take a value", self._ploc(tok.value_loc))
+                    (f"{opt} is a flag and does not take a value", self._ploc(tok.value_loc))
                 )
                 return
             fld = _pick(candidates)
@@ -278,20 +286,20 @@ class CliParser:
         if tok.value is not None:
             value, value_loc = tok.value, self._ploc(tok.value_loc)
         else:
-            res = self._consume_value(self._ploc(tok.name_loc), queue, name=name)
+            res = self._consume_value(self._ploc(tok.name_loc), queue, name=opt)
             if res is None:
                 return
             value, value_loc = res
 
         fld = _pick(candidates, value)
         if fld is None:
-            self.errors.append((f"No matching option for --{name}={value!r}", value_loc))
+            self.errors.append((f"No matching option for {opt}={value!r}", value_loc))
             return
         self._advance(fld, value, value_loc)
 
     @ovld
     def _handle(self, tok: ShortOpt, queue: deque) -> None:
-        chars = tok.chars
+        chars = tok.chars[1:]
         argv = tok.chars_loc.argv
         idx = tok.chars_loc.arg_index
         base = tok.chars_loc.start
@@ -299,13 +307,14 @@ class CliParser:
         i = 0
         while i < len(chars):
             ch = chars[i]
+            opt = f"-{ch}"
             char_loc = self._ploc(Loc(argv, idx, base + i, base + i + 1))
-            candidates = self.named_candidates(ch)
+            candidates = self.named_candidates(opt)
 
             if not candidates:
                 full_loc = self._ploc(Loc(argv, idx, 0 if i == 0 else base + i, base + i + 1))
-                hint = self.formatter.explain_unknown_named(ch)
-                msg = hint if hint else f"Unknown option: -{ch}"
+                hint = self.formatter.explain_unknown_named(opt)
+                msg = hint if hint else f"Unknown option: {opt}"
                 self.errors.append((msg, full_loc))
                 i += 1
                 continue

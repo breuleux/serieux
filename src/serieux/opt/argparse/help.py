@@ -89,14 +89,11 @@ def format_help(parser: CliParser, root_type: type, color: bool = None) -> str:
 
     # ── Entry builders ─────────────────────────────────────────────────────────
 
-    def _opt_s(name: str) -> str:
-        return f"-{name}" if len(name) == 1 else f"--{name}"
-
     def _entry(fields: list[LinearField]) -> dict:
         primary, aliases = parser.option_strings(fields[0])
         names = primary + aliases
         short = [n for n in names if "." not in n]
-        display = sorted(short if short else names, key=lambda n: (len(n) > 1, n))
+        display = sorted(short if short else names, key=lambda n: (n.startswith("--"), n))
         if fields[0].field.serialized_name == tag_field:
             evs = [f.expected_value for f in fields if f.expected_value is not None]
             metavar = "{" + ",".join(evs) + "}" if evs else _type_metavar(fields[0].type)
@@ -117,10 +114,10 @@ def format_help(parser: CliParser, root_type: type, color: bool = None) -> str:
         if not entries:
             return []
         result_lines = []
-        opt_w = max(len(", ".join(_opt_s(n) for n in e["names"])) for e in entries)
+        opt_w = max(len(", ".join(e["names"])) for e in entries)
         mv_w = max(len(e["metavar"]) for e in entries)
         for e in entries:
-            raw = ", ".join(_opt_s(n) for n in e["names"])
+            raw = ", ".join(e["names"])
             mv_pad = f"{e['metavar']:<{mv_w}}" if mv_w else ""
             mv_str = f"  {c_meta(mv_pad)}" if mv_w else ""
             result_lines.append(
