@@ -31,15 +31,82 @@ def check(expected: Any, command: str):
     assert got == expected
 
 
-# ── fixture types ─────────────────────────────────────────────────────────────
+########
+# Flat #
+########
 
 
 @dataclass
 class Person:
+    """A person."""
+
     # Name of the person
+    # [alias: -n]
     name: str
     # Age of the person
+    # [alias: -a]
     age: int
+
+
+def test_flat_use():
+    check(Person(name="Alice", age=30), "--name Alice --age 30")
+    check(Person(name="Bob", age=25), "--name Bob --age 25")
+    check(Person(name="Charles", age=70), "--age 70 --name Charles")
+    check(Person(name="Alice", age=30), "-n Alice -a 30")
+
+
+def test_flat_errors():
+    check(Person, "xyz", error="Unexpected positional")
+    check(Person, "--unknown value", error="Unknown option")
+    check(Person, "--name David", error="Missing required field 'age'")
+    check(Person, "--age 888", error="Missing required field 'name'")
+    check(Person, "--name --age 3", error="Missing value for argument 'name'")
+    check(
+        Person,
+        "--name David --age blah",
+        error="Cannot deserialize string 'blah' into expected type 'int'",
+    )
+    check(Person, "", error="Missing required field 'name'")
+
+
+def test_flat_multiple_errors():
+    # All unexpected options should be mentioned
+    check(Person, "--foo --bar --name Alice --age 30", error=".*--foo.*--bar.*")
+
+
+#################
+# Boolean flags #
+#################
+
+
+@dataclass
+class TickTock:
+    # [alias: -i]
+    tick: bool = True
+    # [alias: -o]
+    tock: bool = False
+
+
+def test_boolean_flags():
+    check(TickTock(True, False), "")
+    check(TickTock(True, False), "--tick")
+    check(TickTock(True, True), "--tock")
+    check(TickTock(True, True), "--tick --tock")
+    check(TickTock(False, False), "--no-tick")
+    check(TickTock(True, False), "--no-tock")
+    check(TickTock(False, False), "--no-tick --no-tock")
+
+
+def test_boolean_flags_short():
+    check(TickTock(True, True), "-i -o")
+    check(TickTock(True, True), "-io")
+    check(TickTock(True, True), "-oi")
+    check(TickTock(False, False), "--no-i --no-o")
+
+
+##########
+# Nested #
+##########
 
 
 @dataclass
@@ -52,6 +119,22 @@ class Address:
 class Employee:
     person: Person
     address: Address
+
+
+def test_nested():
+    check(
+        Employee(Person("Alice", 40), Address("MainSt", "Paris")),
+        "--person.name Alice --person.age 40 --address.street MainSt --address.city Paris",
+    )
+    check(
+        Employee(Person("Alice", 40), Address("MainSt", "Paris")),
+        "--name Alice --age 40 --street MainSt --city Paris",
+    )
+
+
+###############
+# TaggedUnion #
+###############
 
 
 @dataclass
@@ -70,96 +153,81 @@ class Pet:
     name: str
 
 
-@dataclass
-class Menagerie:
-    # [positional]
-    pets: list[TaggedUnion[Cat, Dog]]
-
-
-@dataclass
-class Word:
-    # [positional]
-    word: str
-
-
-@dataclass
-class WithDate:
-    born: date
-    label: str
-
-
-@dataclass
-class WithBool:
-    verbose: bool = False
-    name: str = ""
-
-
-# ── flat struct ───────────────────────────────────────────────────────────────
-
-
-def test_flat():
-    check(Person(name="Alice", age=30), "--name Alice --age 30")
-
-
-def test_flat_short_value():
-    check(Person(name="Bob", age=25), "--name Bob --age 25")
-
-
-# ── nested flatten ────────────────────────────────────────────────────────────
-
-
-def test_nested_full_path():
-    check(
-        Employee(Person("Alice", 40), Address("MainSt", "Paris")),
-        "--person.name Alice --person.age 40 --address.street MainSt --address.city Paris",
-    )
-
-
-def test_nested_short_name():
-    # street and city are unambiguous short names; person.age is unambiguous as --age.
-    check(
-        Employee(Person("Alice", 40), Address("MainSt", "Paris")),
-        "--person.name Alice --age 40 --street MainSt --city Paris",
-    )
-
-
-# ── tagged union (option-style) ───────────────────────────────────────────────
-# TaggedUnion linearizes a $class discriminator field; the option name is the
-# field name (e.g. --animal), and the value is the tag ("cat" / "dog").
-# Once selected, the branch-specific fields become available.
-
-
-def test_tagged_option():
+def test_tagged_union():
     check(Pet(Cat(indoor=True), "Whiskers"), "--animal cat --indoor --name Whiskers")
-
-
-def test_tagged_option_dog():
     check(Pet(Dog("Labrador"), "Rex"), "--animal dog --breed Labrador --name Rex")
+    check(Pet(Dog("Labrador"), "Rex"), "--name Rex --animal dog --breed Labrador")
+    check(Pet(Dog("Labrador"), "Rex"), "--animal dog --name Rex --breed Labrador")
 
 
-# ── tagged union (positional selector) ───────────────────────────────────────
-# When the union field is [positional], the $class discriminator is also
-# positional: the user supplies the tag ("cat" / "dog") as a bare argument.
+def test_tagged_union_errors():
+    check(Pet, "--breed Retriever", error="requires --animal='dog'")
+
+
+##########################
+# Positional TaggedUnion #
+##########################
 
 
 @dataclass
-class Command:
+class Pet2:
     # [positional]
-    subcommand: TaggedUnion[Cat, Dog]
+    animal: TaggedUnion[Cat, Dog]
     owner: str
 
 
-def test_tagged_positional():
-    check(Command(Cat(indoor=True), "Alice"), "cat --indoor --owner Alice")
+def test_tagged_union_positional():
+    check(Pet2(Cat(indoor=True), "Alice"), "cat --indoor --owner Alice")
+    check(Pet2(Dog("Poodle"), "Bob"), "dog --breed Poodle --owner Bob")
+    check(Pet2(Dog("Poodle"), "Bob"), "--owner Bob dog --breed Poodle")
+    check(Pet2(Dog("Poodle"), "Bob"), "dog --owner Bob --breed Poodle")
 
 
-def test_tagged_positional_dog():
-    check(Command(Dog("Poodle"), "Bob"), "dog --breed Poodle --owner Bob")
+def test_tagged_union_positional_errors():
+    check(Pet2, "--breed Retriever", error="requires 'dog'")
 
 
-# ── plain union — structural discrimination ───────────────────────────────────
-# Alpha | Beta (no tags): distinguished by unique fields (score vs rank).
-# The discriminating field must come before shared latent fields.
+#########
+# Union #
+#########
+
+
+@dataclass
+class NameParts:
+    first: str
+    last: str
+
+
+@dataclass
+class Fullname:
+    name: str
+
+
+@dataclass
+class IdNumber:
+    id: int
+
+
+@dataclass
+class Worker:
+    worker: NameParts | Fullname | IdNumber
+
+
+def test_union():
+    check(Worker(NameParts("Alice", "Rheault")), "--last Rheault --first Alice")
+    check(Worker(NameParts("Alice", "Rheault")), "--first Alice --last Rheault")
+    check(Worker(Fullname("AliceRheault")), "--name AliceRheault")
+    check(Worker(IdNumber(333)), "--id 333")
+
+
+def test_union_errors():
+    check(Worker, "--name BobBob --id 123", error="--id was disabled by --worker.name")
+    check(Worker, "--id 234 --name BobBob", error="--name was disabled by --worker.id")
+
+
+######################
+# Union with overlap #
+######################
 
 
 @dataclass
@@ -179,204 +247,37 @@ class Contest:
     entry: Alpha | Beta
 
 
-def test_discriminator_unlocks_shared_field():
-    # 'score' is unique to Alpha; once provided, 'name' (shared/latent) becomes available.
+def test_union_with_overlap():
     check(Contest(Alpha("Alice", 10)), "--score 10 --name Alice")
-
-
-def test_discriminator_unlocks_shared_field_beta():
     check(Contest(Beta("Bob", 3)), "--rank 3 --name Bob")
 
 
-# ── single-letter options use one dash ───────────────────────────────────────
+def test_union_with_overlap_errors():
+    check(Contest, "--name Charles", error="requires --entry.score")
 
 
-@dataclass
-class Flags:
-    x: float
-    y: float
-    verbose: bool = False
+##############
+# Positional #
+##############
 
 
-def test_single_letter_option():
-    check(Flags(x=1.5, y=2.5), "-x 1.5 -y 2.5")
-
-
-def test_single_letter_mixed_with_long():
-    check(Flags(x=3.0, y=4.0, verbose=True), "-x 3.0 -y 4.0 --verbose")
-
-
-def test_compact_bool_flags():
+def test_positional():
     @dataclass
-    class Multi:
-        a: bool = False
-        b: bool = False
-        n: str = ""
+    class Word:
+        # [positional]
+        word: str
 
-    check(Multi(a=True, b=True), "-ab")
-
-
-def test_compact_bool_then_value():
-    @dataclass
-    class Multi:
-        v: bool = False
-        o: str = ""
-
-    check(Multi(v=True, o="out.txt"), "-vo out.txt")
-
-
-def test_compact_value_inline():
-    @dataclass
-    class Multi:
-        o: str = ""
-
-    check(Multi(o="out.txt"), "-oout.txt")
-
-
-# ── positional field ──────────────────────────────────────────────────────────
-
-
-def test_positional_field():
     check(Word(word="hello"), "hello")
 
 
-def test_positional_unexpected():
-    check(Person, "unknown_positional", error="Unexpected positional")
-
-
-# ── unknown option ────────────────────────────────────────────────────────────
-
-
-def test_unknown_option():
-    check(Person, "--unknown value", error="Unknown option")
-
-
-def test_unknown_options_all_reported():
-    check(Person, "--foo --bar --name Alice --age 30", error=".*--foo.*--bar.*")
-
-
-def test_prog_name_in_error():
-    try:
-        parse(Person, ["--unknown"], prog="myprog")
-    except ParseError as e:
-        assert "myprog" in str(e)
-
-
-# ── bool fields ───────────────────────────────────────────────────────────────
-
-
-def test_bool_flag_true():
-    check(WithBool(verbose=True), "--verbose")
-
-
-def test_bool_flag_no():
-    check(WithBool(verbose=False), "--no-verbose")
-
-
-# ── StringModelizable leaf (date) ─────────────────────────────────────────────
-
-
-def test_string_modelizable():
-    check(WithDate(born=date(2000, 1, 15), label="bday"), "--born 2000-01-15 --label bday")
-
-
-# ── full round-trip via deserialize ──────────────────────────────────────────
-
-
-def test_roundtrip_tagged():
-    check(Pet(Dog("Husky"), "Bolt"), "--animal dog --breed Husky --name Bolt")
-
-
-def test_roundtrip_nested():
-    flat = parse(
-        Employee,
-        [
-            "--person.name",
-            "Carol",
-            "--person.age",
-            "35",
-            "--address.street",
-            "Oak Ave",
-            "--address.city",
-            "Lyon",
-        ],
-    )
-    result = serieux.deserialize(Employee, flat)
-    assert result == Employee(Person("Carol", 35), Address("Oak Ave", "Lyon"))
-
-
-# ── plain union (Cat2 | Dog2) — discriminated by unique field presence ────────
-
-
-@dataclass
-class Cat2:
-    indoor: bool = True
-    age: int = 5
-
-
-@dataclass
-class Dog2:
-    breed: str = "unknown"
-    age: int = 3
-
-
-@dataclass
-class PetUnion:
-    animal: Cat2 | Dog2
-
-
-def test_choice_cat_branch():
-    # --indoor discriminates Cat2; fires as a bool flag.
-    check(PetUnion(Cat2(indoor=True, age=3)), "--indoor --age 3")
-
-
-def test_choice_dog_branch():
-    check(PetUnion(Dog2(breed="Poodle", age=5)), "--breed Poodle --age 5")
-
-
-def test_choice_age_available_after_unlock():
-    # 'age' is shared and becomes available only after a branch is selected.
-    check(PetUnion(Cat2(indoor=True, age=7)), "--indoor --age 7")
-    check(PetUnion(Dog2(breed="Lab", age=2)), "--breed Lab --age 2")
-
-
-def test_branch_locks_out_sibling():
-    # Once Cat2 is selected via --indoor, --breed is disabled and the error says so.
-    with pytest.raises(ParseError, match="disabled by"):
-        parse(PetUnion, ["--indoor", "--breed", "Poodle"])
-
-
-def test_latent_option_hints_at_prereq():
-    # --breed on a TaggedUnion[Cat, Dog] is latent until --animal selects the branch.
-    with pytest.raises(ParseError, match="requires"):
-        parse(Pet, ["--breed", "Poodle"])
-
-
-# ── undifferentiable union raises at linearize time ──────────────────────────
-
-
-@dataclass
-class ConflictingTypes:
-    value: int | str
-
-
-def test_undifferentiable_union_raises():
-    with pytest.raises(Exception, match="differentiate"):
-        parse(ConflictingTypes, [])
-
-
-# ── multiple positional fields ────────────────────────────────────────────────
-
-
-@dataclass
-class Copy:
-    # [positional]
-    src: str
-    # [positional]
-    dst: str
-
-
 def test_two_positionals():
+    @dataclass
+    class Copy:
+        # [positional]
+        src: str
+        # [positional]
+        dst: str
+
     check(Copy(src="hello", dst="world"), "hello world")
 
 
@@ -389,68 +290,111 @@ def test_two_positionals_with_option():
         dst: str
         verbose: bool = False
 
-    flat = parse(Move, ["a.txt", "--verbose", "b.txt"])
-    got = serieux.deserialize(Move, flat)
-    assert got == Move(src="a.txt", dst="b.txt", verbose=True)
+    check(
+        Move(src="a.txt", dst="b.txt", verbose=True),
+        "a.txt --verbose b.txt",
+    )
 
 
 def test_positional_tagged_union_then_positional():
-    # Calculator: positional tag selects operation, then positional args fill the branch.
-    # Add has positional x and y; the outer 'other' positional follows.
     from tests.features.test_linearize import Add, Calculator, Div
 
-    r = parse(Calculator, ["add", "3.0", "4.5"])
-    got = serieux.deserialize(Calculator, r)
-    assert got == Calculator(operation=Add(x=3.0, y=4.5), other=0.0)
-
-    r = parse(Calculator, ["div", "--num", "10.0", "--denom", "2.0"])
-    got = serieux.deserialize(Calculator, r)
-    assert got == Calculator(operation=Div(num=10.0, denom=2.0), other=0.0)
+    check(Calculator(operation=Add(x=3.0, y=4.5), other=0.0), "add 3.0 4.5")
+    check(Calculator(operation=Div(num=10.0, denom=2.0), other=0.0), "div --num 10.0 --denom 2.0")
 
 
-# ── list fields ───────────────────────────────────────────────────────────────
-
-
-@dataclass
-class Tags:
-    words: list[str]
+#########
+# Lists #
+#########
 
 
 def test_list_str_repeated_option():
+    @dataclass
+    class Tags:
+        words: list[str]
+
     check(Tags(words=["hello", "world", "foo"]), "--words hello --words world --words foo")
-
-
-def test_list_str_single():
     check(Tags(words=["only"]), "--words only")
 
 
 def test_list_tagged_union():
     @dataclass
-    class Menagerie2:
+    class Menagerie:
         # not positional
         pets: list[TaggedUnion[Cat, Dog]]
 
-    flat = parse(
-        Menagerie2,
-        ["--pets", "cat", "--indoor", "--pets", "dog", "--breed", "Husky"],
+    check(
+        Menagerie(pets=[Cat(indoor=True), Dog(breed="Husky")]),
+        "--pets cat --indoor --pets dog --breed Husky",
     )
-    got = serieux.deserialize(Menagerie2, flat)
-    assert got == Menagerie2(pets=[Cat(indoor=True), Dog(breed="Husky")])
 
 
 def test_list_tagged_union_positional():
-    flat = parse(
-        Menagerie,
-        ["cat", "--indoor", "dog", "--breed", "Husky"],
+    @dataclass
+    class Menagerie:
+        # [positional]
+        pets: list[TaggedUnion[Cat, Dog]]
+
+    check(
+        Menagerie(pets=[Cat(indoor=True), Dog(breed="Husky")]),
+        "cat --indoor dog --breed Husky",
     )
-    got = serieux.deserialize(Menagerie, flat)
-    assert got == Menagerie(pets=[Cat(indoor=True), Dog(breed="Husky")])
 
 
-###############
-# Test errors #
-###############
+#################
+# Miscellaneous #
+#################
 
 
-def test_wrong_branch():
-    check(Menagerie, "cat --breed Siamese", error="--breed requires 'dog'")
+def test_compact_bool_then_value():
+    @dataclass
+    class Args:
+        v: bool = False
+        o: str = ""
+
+    check(Args(v=True, o="out.txt"), "-vo out.txt")
+
+
+def test_compact_value_inline():
+    @dataclass
+    class Args:
+        o: str = ""
+
+    check(Args(o="out.txt"), "-oout.txt")
+
+
+def test_prog_name_in_error():
+    try:
+        parse(Person, ["--unknown"], prog="myprog")
+    except ParseError as e:
+        assert "myprog" in str(e)
+
+
+def test_undifferentiable_union_raises():
+    @dataclass
+    class ConflictingTypes:
+        value: int | str
+
+    with pytest.raises(Exception, match="differentiate"):
+        parse(ConflictingTypes, [])
+
+
+def test_string_modelizable():
+    @dataclass
+    class WithDate:
+        born: date
+        label: str
+
+    check(WithDate(born=date(2000, 1, 15), label="bday"), "--born 2000-01-15 --label bday")
+
+
+def test_option_override():
+    @dataclass
+    class WithOption:
+        # [option: -o]
+        output: str
+        verbose: bool = False
+
+    # -o is the only valid name; --output and --with-option.output are not.
+    check(WithOption(output="out.txt"), "-o out.txt")
+    check(WithOption, "--output x", error="Unknown option")
