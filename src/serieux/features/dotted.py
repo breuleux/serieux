@@ -21,7 +21,7 @@ def unflatten(d: dict, allow_lists=False):
 @ovld
 def _convert_lists(obj: dict):
     obj = {k: recurse(v) for k, v in obj.items()}
-    if all(k.isdigit() for k in obj.keys()):
+    if obj and all(k.isdigit() for k in obj.keys()):
         indices = sorted(int(k) for k in obj.keys())
         if indices != list(range(len(indices))):
             raise ValueError(f"List indices have gaps: {indices}")
