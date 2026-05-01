@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from functools import cache, cached_property
 from typing import Any
 
+from ovld import ovld
+
 from ...features.tagset import tag_field
 from ...linearize import GroupState, LinearField
 from .errors import ParseError
@@ -227,7 +229,8 @@ class CliParser:
 
     # ── Token handlers ─────────────────────────────────────────────────────────
 
-    def _handle_long(self, tok: LongOpt, queue: deque) -> None:
+    @ovld
+    def _handle(self, tok: LongOpt, queue: deque) -> None:
         name = tok.name
         candidates = self.named_candidates(name)
 
@@ -286,7 +289,8 @@ class CliParser:
             return
         self._advance(fld, value, value_loc)
 
-    def _handle_short(self, tok: ShortOpt, queue: deque) -> None:
+    @ovld
+    def _handle(self, tok: ShortOpt, queue: deque) -> None:
         chars = tok.chars
         argv = tok.chars_loc.argv
         idx = tok.chars_loc.arg_index
@@ -334,7 +338,8 @@ class CliParser:
             self._advance(fld, value, value_loc)
             break  # value consumed — remaining chars were the value
 
-    def _handle_positional(self, tok: Value) -> None:
+    @ovld
+    def _handle(self, tok: Value, queue: deque) -> None:
         candidates = _positional_candidates(self.gs)
         # For positionals, prefer leftmost (declaration order); specific expected_value first.
         fld = None
@@ -349,19 +354,14 @@ class CliParser:
             return
         self._advance(fld, tok.text, self._ploc(tok.loc))
 
+    @ovld
+    def _handle(self, tok: Separator, queue: deque) -> None:
+        pass
+
     # ── Main loop ──────────────────────────────────────────────────────────────
 
     def run(self, tokens: list) -> dict[str, Any]:
         queue: deque = deque(tokens)
         while queue:
-            tok = queue.popleft()
-            if isinstance(tok, Separator):
-                continue
-            elif isinstance(tok, LongOpt):
-                self._handle_long(tok, queue)
-            elif isinstance(tok, ShortOpt):
-                self._handle_short(tok, queue)
-            else:
-                self._handle_positional(tok)
-
+            self._handle(queue.popleft(), queue)
         return self.result
