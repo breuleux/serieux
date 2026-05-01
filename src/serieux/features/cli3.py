@@ -213,9 +213,12 @@ class Cli3Parser:
             return
         self.result[concrete_id] = _coerce(fld.type, value)
 
-    def _consume_value(self, key_loc: Loc, queue: deque) -> tuple[str, Loc] | None:
+    def _consume_value(
+        self, key_loc: Loc, queue: deque, name: str | None = None
+    ) -> tuple[str, Loc] | None:
         if not queue or not isinstance(queue[0], Value):
-            self.errors.append(("Expected a value", key_loc))
+            msg = f"Missing value for argument '{name}'" if name else "Expected a value"
+            self.errors.append((msg, key_loc))
             return None
         tok = queue.popleft()
         return tok.text, self._ploc(tok.loc)
@@ -270,7 +273,7 @@ class Cli3Parser:
         if tok.value is not None:
             value, value_loc = tok.value, self._ploc(tok.value_loc)
         else:
-            res = self._consume_value(self._ploc(tok.name_loc), queue)
+            res = self._consume_value(self._ploc(tok.name_loc), queue, name=name)
             if res is None:
                 return
             value, value_loc = res
@@ -317,7 +320,7 @@ class Cli3Parser:
             elif tok.value is not None:
                 value, value_loc = tok.value, self._ploc(tok.value_loc)
             else:
-                res = self._consume_value(char_loc, queue)
+                res = self._consume_value(char_loc, queue, name=ch)
                 if res is None:
                     break
                 value, value_loc = res

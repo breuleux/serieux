@@ -431,8 +431,20 @@ class GroupState:
 
             for other_fld in self.state:
                 if other_fld is not fld and any(u.group is ul.group for u in other_fld.unlock):
-                    self.state[other_fld] = FieldState(state=sibling_state)
-                    if sibling_state == LinearState.UNAVAILABLE:
+                    # Don't overwrite already-committed fields
+                    if self.state[other_fld].state in (LinearState.FILLED, LinearState.ADVANCE):
+                        continue
+                    # Co-tells (same choice_id) should become AVAILABLE, not UNAVAILABLE,
+                    # since they are additional tells for the same branch.
+                    same_choice = any(
+                        u.group is ul.group and u.choice_id == choice_id for u in other_fld.unlock
+                    )
+                    if same_choice and sibling_state == LinearState.UNAVAILABLE:
+                        effective = LinearState.AVAILABLE
+                    else:
+                        effective = sibling_state
+                    self.state[other_fld] = FieldState(state=effective)
+                    if effective == LinearState.UNAVAILABLE:
                         self._disabled_by[id(other_fld)] = fld
 
             for i, subgroup in enumerate(self._option_groups.get(group_id, [])):
