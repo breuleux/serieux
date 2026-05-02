@@ -74,7 +74,7 @@ class Option:
         return self.field.type is not bool
 
     def specificity(self, value) -> int:
-        if self.field.expected_value:
+        if self.field.expected_value and value is not None:
             return 2 if value == self.field.expected_value else 0
         else:
             return 1
@@ -82,6 +82,39 @@ class Option:
     @property
     def unlock(self):
         return self.field.unlock
+
+    def act(self, parser, key, value=None):
+        value = parser.deserialize(self.field.type, Word(value))
+        parser.result[key] = value
+
+
+@dataclass
+class BooleanOption(Option):
+    value: bool
+
+    def act(self, parser, key, value=None):
+        if value is None:
+            parser.result[key] = self.value
+        elif value.lower() in ("0", "false", "no"):
+            parser.result[key] = not self.value
+        elif value.lower() in ("1", "true", "yes"):
+            parser.result[key] = self.value
+        else:
+            raise ValueError(f"Invalid flag value for {self.key}: {value!r}")
+
+
+@ovld
+def generate_options(t: type[bool], names: list[str], fld: LinearField):
+    def noify(x):
+        return f"--no-{x.lstrip('-')}"
+
+    yield from [BooleanOption(name, fld, True) for name in names]
+    yield from [BooleanOption(noify(name), fld, False) for name in names]
+
+
+@ovld
+def generate_options(t: Any, names: list[str], fld: LinearField):
+    yield from [Option(name, fld) for name in names]
 
 
 def _options(fld: LinearField) -> list[str]:
@@ -121,7 +154,7 @@ def _options(fld: LinearField) -> list[str]:
     aliases = [dashify(a.lstrip("-")) for a in aliases]
 
     names = primary + aliases
-    return [Option(name, fld) for name in names]
+    yield from generate_options(fld.field.type, names, fld)
 
 
 ###########
@@ -167,36 +200,31 @@ class CliParser:
         self.option_map = defaultdict(list)
         self.populate_options()
 
-    def _ploc(self, loc: Loc) -> Loc:
-        if self.prog and loc.prog != self.prog:
-            from dataclasses import replace
-
-            return replace(loc, prog=self.prog)
-        return loc
-
     def _advance(self, opt: Option, value: Any, loc: Loc) -> None:
         fld = opt.field
         concrete_id = self.gs.advance(fld)
         if concrete_id is False:
-            self.errors.append((f"Cannot assign field {fld.identifier!r}", loc))
+            self.error(f"Cannot assign field {fld.identifier!r}", loc)
             return
-        self.result[concrete_id] = self.deserialize(fld.type, Word(value))
+        opt.act(self, concrete_id, value)
 
     def _consume_value(
         self, key_loc: Loc, queue: deque, name: str | None = None
     ) -> tuple[str, Loc] | None:
         if not queue or not isinstance(queue[0], Value):
             msg = f"Missing value for argument '{name}'" if name else "Expected a value"
-            self.errors.append((msg, key_loc))
+            self.error(msg, key_loc)
             return None
-        tok = queue.popleft()
-        return tok.text, self._ploc(tok.loc)
+        return queue.popleft()
 
     @cached_property
     def formatter(self):
         from .fmt import ArgparseFormatter
 
         return ArgparseFormatter(self)
+
+    def error(self, message, loc):
+        self.errors.append((message, loc))
 
     # ── Options names ─────────────────────────────────────────────────────────-
 
@@ -228,57 +256,29 @@ class CliParser:
         candidates = self.candidates(opt)
 
         if not candidates:
-            # Support --no-X negation for plain bool fields
-            if opt.startswith("--no-"):
-                neg_cands = self.candidates(dashify(opt[5:]))
-                plain_bool = [o for o in neg_cands if not o.needs_value() and not o.unlock]
-                if plain_bool:
-                    fld = plain_bool[-1].field
-                    if tok.value is not None:
-                        self.errors.append(
-                            (
-                                f"{opt} is a flag and does not take a value",
-                                self._ploc(tok.value_loc),
-                            )
-                        )
-                        return
-                    concrete_id = self.gs.advance(fld)
-                    if concrete_id is not False:
-                        self.result[concrete_id] = False
-                    return
             msg = self.formatter.explain_unknown_named(opt)
-            self.errors.append((msg, self._ploc(tok.name_loc)))
+            self.error(msg, tok.name_loc)
             # Speculatively skip the next Value — likely this option's argument.
             if tok.value is None and queue and isinstance(queue[0], Value):
                 queue.popleft()
             return
 
-        # All bool flags?
-        if all(not o.needs_value() for o in candidates):
-            if tok.value is not None:
-                self.errors.append(
-                    (f"{opt} is a flag and does not take a value", self._ploc(tok.value_loc))
-                )
-                return
-            best = _pick(candidates)
-            concrete_id = self.gs.advance(best.field)
-            if concrete_id is not False:
-                self.result[concrete_id] = True
-            return
-
-        # Needs a value
-        if tok.value is not None:
-            value, value_loc = tok.value, self._ploc(tok.value_loc)
-        else:
-            res = self._consume_value(self._ploc(tok.name_loc), queue, name=opt)
-            if res is None:
-                return
-            value, value_loc = res
-
+        value, value_loc = tok.value, tok.value_loc
         best = _pick(candidates, value)
+        if best.needs_value() and value is None:
+            vtok = self._consume_value(tok.name_loc, queue, name=opt)
+            if vtok is None:
+                self.error(f"{opt} requires a value", tok.name_loc)
+                return
+            value = vtok.text
+            value_loc = vtok.loc
+            # Recompute best using the newly discovered value
+            best = _pick(candidates, value)
+
         if best is None:
-            self.errors.append((f"No matching option for {opt}={value!r}", value_loc))
+            self.error(f"No matching option for {opt}={value!r}", value_loc)
             return
+
         self._advance(best, value, value_loc)
 
     @ovld
@@ -292,13 +292,13 @@ class CliParser:
         while i < len(chars):
             ch = chars[i]
             opt = f"-{ch}"
-            char_loc = self._ploc(Loc(argv, idx, base + i, base + i + 1))
+            char_loc = Loc(argv, idx, base + i, base + i + 1, prog=self.prog)
             candidates = self.candidates(opt)
 
             if not candidates:
-                full_loc = self._ploc(Loc(argv, idx, 0 if i == 0 else base + i, base + i + 1))
+                full_loc = Loc(argv, idx, 0 if i == 0 else base + i, base + i + 1, prog=self.prog)
                 msg = self.formatter.explain_unknown_named(opt)
-                self.errors.append((msg, full_loc))
+                self.error(msg, full_loc)
                 i += 1
                 continue
 
@@ -313,19 +313,20 @@ class CliParser:
             # Needs a value: rest of chars cluster, then inline =val, then next token
             rest = chars[i + 1 :]
             if rest:
-                rest_loc = self._ploc(Loc(argv, idx, base + i + 1, tok.chars_loc.end))
+                rest_loc = Loc(argv, idx, base + i + 1, tok.chars_loc.end, prog=self.prog)
                 value, value_loc = rest, rest_loc
             elif tok.value is not None:
-                value, value_loc = tok.value, self._ploc(tok.value_loc)
+                value, value_loc = tok.value, tok.value_loc
             else:
-                res = self._consume_value(char_loc, queue, name=ch)
-                if res is None:
-                    break
-                value, value_loc = res
+                vtok = self._consume_value(char_loc, queue, name=ch)
+                if vtok is None:
+                    return
+                value = vtok.text
+                value_loc = vtok.loc
 
             best = _pick(candidates, value)
             if best is None:
-                self.errors.append((f"Unknown option: -{ch}", char_loc))
+                self.error(f"Unknown option: -{ch}", char_loc)
                 break
             self._advance(best, value, value_loc)
             break  # value consumed — remaining chars were the value
@@ -335,11 +336,9 @@ class CliParser:
         candidates = self.candidates("*")
         best = _pick(candidates, tok.text)
         if best is None:
-            self.errors.append(
-                (f"Unexpected positional argument: {tok.text!r}", self._ploc(tok.loc))
-            )
+            self.error(f"Unexpected positional argument: {tok.text!r}", tok.loc)
             return
-        self._advance(best, tok.text, self._ploc(tok.loc))
+        self._advance(best, tok.text, tok.loc)
 
     @ovld
     def _handle(self, tok: Separator, queue: deque) -> None:

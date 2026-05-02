@@ -55,7 +55,7 @@ class FromArguments(Medley):
             ],
         )
 
-        tokens = tokenize(obj.arguments)
+        tokens = tokenize(obj.arguments, prog=obj.prog)
         root_group = linearize(augmented_type)
         gs = GroupState(root_group)
         parser = CliParser(

@@ -82,7 +82,7 @@ class Separator:
 Token = LongOpt | ShortOpt | Value | Separator
 
 
-def tokenize(argv: list[str]) -> list[Token]:
+def tokenize(argv: list[str], prog: str = None) -> list[Token]:
     """Convert an argv list into a sequence of typed tokens with source locations.
 
     * ``--``        → :class:`Separator`; all following args become :class:`Value`.
@@ -99,7 +99,7 @@ def tokenize(argv: list[str]) -> list[Token]:
     for idx, arg in enumerate(argv):
 
         def _loc(start: int, end: int, _i: int = idx) -> Loc:
-            return Loc(argv, _i, start, end)
+            return Loc(argv, _i, start, end, prog=prog)
 
         if past_separator:
             tokens.append(Value(text=arg, loc=_loc(0, len(arg))))
