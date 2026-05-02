@@ -90,8 +90,7 @@ def format_help(parser: CliParser, root_type: type, color: bool = None) -> str:
     # ── Entry builders ─────────────────────────────────────────────────────────
 
     def _entry(fields: list[LinearField]) -> dict:
-        primary, aliases = parser.option_strings(fields[0])
-        names = primary + aliases
+        names = parser.option_strings(fields[0])
         short = [n for n in names if "." not in n]
         display = sorted(short if short else names, key=lambda n: (n.startswith("--"), n))
         if fields[0].field.serialized_name == tag_field:
@@ -209,10 +208,10 @@ def format_help(parser: CliParser, root_type: type, color: bool = None) -> str:
             branch_entries = []
             for fld in fields:
                 try:
-                    primary, _ = parser.option_strings(fld)
+                    names = parser.option_strings(fld)
                 except Exception:
                     continue
-                if primary:
+                if names:
                     branch_entries.append(_entry([fld]))
             out.extend(_render_entries(branch_entries, indent))
         out.append("")

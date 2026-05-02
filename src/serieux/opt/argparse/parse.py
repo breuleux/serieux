@@ -64,7 +64,27 @@ def dashify(name: str) -> str:
     return f"-{name}" if len(name) == 1 else f"--{name}"
 
 
-def _option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
+@dataclass
+class Option:
+    key: str
+    field: LinearField
+
+    def needs_value(self) -> bool:
+        """Return True if the field must consume a value token (i.e. not a bool flag)."""
+        return self.field.type is not bool
+
+    def specificity(self, value) -> int:
+        if self.field.expected_value:
+            return 2 if value == self.field.expected_value else 0
+        else:
+            return 1
+
+    @property
+    def unlock(self):
+        return self.field.unlock
+
+
+def _options(fld: LinearField) -> list[str]:
     """Return ``(primary_names, alias_names)`` with leading dashes.
 
     Primary names are ``[long, short]`` (e.g. ``['--abc.def', '--def']``) or just
@@ -100,7 +120,8 @@ def _option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
         aliases = [aliases]
     aliases = [dashify(a.lstrip("-")) for a in aliases]
 
-    return primary, aliases
+    names = primary + aliases
+    return [Option(name, fld) for name in names]
 
 
 ###########
@@ -108,28 +129,18 @@ def _option_strings(fld: LinearField) -> tuple[list[str], list[str]]:
 ###########
 
 
-def _pick(candidates: list[LinearField], value: str | None = None) -> LinearField | None:
+def _pick(candidates: list[Option], value: str | None = None) -> Option | None:
     """Pick the rightmost candidate (for named options).
 
     When *value* is known, prefer fields whose ``expected_value`` matches it;
     fall back to fields with no ``expected_value`` constraint; finally take
     the rightmost candidate regardless.
     """
-    if not candidates:
-        return None
-    if value is not None:
-        specific = [
-            f for f in candidates if f.expected_value is not None and f.expected_value == value
-        ]
-        if specific:
-            return specific[-1]
-    generic = [f for f in candidates if f.expected_value is None]
-    return (generic or candidates)[-1]
-
-
-def _needs_value(fld: LinearField) -> bool:
-    """Return True if the field must consume a value token (i.e. not a bool flag)."""
-    return fld.type is not bool
+    candidates = [
+        (spc, c) for c in candidates if (spc := (c.specificity(value) if value is not None else 1))
+    ]
+    candidates.sort(key=lambda c: c[0])
+    return candidates[-1][1] if candidates else None
 
 
 ##########
@@ -163,7 +174,8 @@ class CliParser:
             return replace(loc, prog=self.prog)
         return loc
 
-    def _advance(self, fld: LinearField, value: Any, loc: Loc) -> None:
+    def _advance(self, opt: Option, value: Any, loc: Loc) -> None:
+        fld = opt.field
         concrete_id = self.gs.advance(fld)
         if concrete_id is False:
             self.errors.append((f"Cannot assign field {fld.identifier!r}", loc))
@@ -191,22 +203,22 @@ class CliParser:
     def populate_options(self):
         for fld in self.gs.state:
             if fld.positional:
-                primary, aliases = ["*"], []
+                opts = [Option("*", fld)]
             else:
-                primary, aliases = self.option_strings(fld)
-            for name in primary + aliases:
-                self.option_map[name].append(fld)
+                opts = _options(fld)
+            for opt in opts:
+                self.option_map[opt.key].append(opt)
 
     @cache
     def option_strings(self, fld: LinearField):
-        return _option_strings(fld)
+        return [opt.key for opt in _options(fld)]
 
     def candidates(self, key: str) -> list[LinearField]:
         """All eligible fields, key being an option or '*' if positional.
 
         Returned in state-dict order; the rightmost eligible match is last.
         """
-        return [fld for fld in self.option_map[key] if self.gs.eligible(fld)]
+        return [opt for opt in self.option_map[key] if self.gs.eligible(opt.field)]
 
     # ── Token handlers ─────────────────────────────────────────────────────────
 
@@ -219,9 +231,9 @@ class CliParser:
             # Support --no-X negation for plain bool fields
             if opt.startswith("--no-"):
                 neg_cands = self.candidates(dashify(opt[5:]))
-                plain_bool = [f for f in neg_cands if not _needs_value(f) and not f.unlock]
+                plain_bool = [o for o in neg_cands if not o.needs_value() and not o.unlock]
                 if plain_bool:
-                    fld = plain_bool[-1]
+                    fld = plain_bool[-1].field
                     if tok.value is not None:
                         self.errors.append(
                             (
@@ -242,14 +254,14 @@ class CliParser:
             return
 
         # All bool flags?
-        if all(not _needs_value(f) for f in candidates):
+        if all(not o.needs_value() for o in candidates):
             if tok.value is not None:
                 self.errors.append(
                     (f"{opt} is a flag and does not take a value", self._ploc(tok.value_loc))
                 )
                 return
-            fld = _pick(candidates)
-            concrete_id = self.gs.advance(fld)
+            best = _pick(candidates)
+            concrete_id = self.gs.advance(best.field)
             if concrete_id is not False:
                 self.result[concrete_id] = True
             return
@@ -263,11 +275,11 @@ class CliParser:
                 return
             value, value_loc = res
 
-        fld = _pick(candidates, value)
-        if fld is None:
+        best = _pick(candidates, value)
+        if best is None:
             self.errors.append((f"No matching option for {opt}={value!r}", value_loc))
             return
-        self._advance(fld, value, value_loc)
+        self._advance(best, value, value_loc)
 
     @ovld
     def _handle(self, tok: ShortOpt, queue: deque) -> None:
@@ -290,9 +302,9 @@ class CliParser:
                 i += 1
                 continue
 
-            if all(not _needs_value(f) for f in candidates):
-                fld = _pick(candidates)
-                concrete_id = self.gs.advance(fld)
+            if all(not o.needs_value() for o in candidates):
+                best = _pick(candidates)
+                concrete_id = self.gs.advance(best.field)
                 if concrete_id is not False:
                     self.result[concrete_id] = True
                 i += 1
@@ -311,28 +323,23 @@ class CliParser:
                     break
                 value, value_loc = res
 
-            fld = _pick(candidates, value)
-            if fld is None:
+            best = _pick(candidates, value)
+            if best is None:
                 self.errors.append((f"Unknown option: -{ch}", char_loc))
                 break
-            self._advance(fld, value, value_loc)
+            self._advance(best, value, value_loc)
             break  # value consumed — remaining chars were the value
 
     @ovld
     def _handle(self, tok: Value, queue: deque) -> None:
         candidates = self.candidates("*")
-        # For positionals, prefer leftmost (declaration order); specific expected_value first.
-        fld = None
-        if candidates:
-            specific = [f for f in candidates if f.expected_value == tok.text]
-            generic = [f for f in candidates if f.expected_value is None]
-            fld = (specific or generic or candidates)[0]
-        if fld is None:
+        best = _pick(candidates, tok.text)
+        if best is None:
             self.errors.append(
                 (f"Unexpected positional argument: {tok.text!r}", self._ploc(tok.loc))
             )
             return
-        self._advance(fld, tok.text, self._ploc(tok.loc))
+        self._advance(best, tok.text, self._ploc(tok.loc))
 
     @ovld
     def _handle(self, tok: Separator, queue: deque) -> None:

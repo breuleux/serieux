@@ -14,8 +14,8 @@ class ArgparseFormatter:
             if fld.expected_value is not None:
                 return repr(fld.expected_value)
             return fld.field.serialized_name.upper() if fld.field.serialized_name else "ARG"
-        primary, _ = self.parser.option_strings(fld)
-        opt = primary[0] if primary else fld.identifier
+        opts = self.parser.option_strings(fld)
+        opt = opts[0] if opts else fld.identifier
         if fld.expected_value is not None:
             return f"{opt}={fld.expected_value!r}"
         return opt
@@ -31,10 +31,10 @@ class ArgparseFormatter:
             if fld.positional:
                 continue
             try:
-                primary, aliases = self.parser.option_strings(fld)
+                opts = self.parser.option_strings(fld)
             except Exception:
                 continue
-            if opt not in primary + aliases:
+            if opt not in opts:
                 continue
 
             if fs.state == LinearState.LATENT:
