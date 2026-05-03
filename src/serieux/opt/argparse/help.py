@@ -46,9 +46,6 @@ def format_help(parser: CliParser, root_type: type, color: bool = None) -> str:
     c_dim = lambda s: f"{dim}{s}{reset}"  # noqa: E731
     c_prog = lambda s: f"{bold}{s}{reset}"  # noqa: E731
 
-    def _is_control(fld: LinearField) -> bool:
-        return any(isinstance(s, str) and s.startswith("__control") for s in fld.signature)
-
     # ── Build group_field_map: gid → union LinearField ─────────────────────────
     group_field_map: dict[str, LinearField] = {}
     for fld in gs.state:
@@ -60,32 +57,27 @@ def format_help(parser: CliParser, root_type: type, color: bool = None) -> str:
     latent_by_group: dict[str, dict[int, list[LinearField]]] = {}
     for gid, subgroups in gs._option_groups.items():
         for cid, subgroup in enumerate(subgroups):
-            branch_fields = [f for f in subgroup.fields if not _is_control(f)]
-            if branch_fields:
-                latent_by_group.setdefault(gid, {})[cid] = branch_fields
+            if subgroup.fields:
+                latent_by_group.setdefault(gid, {})[cid] = subgroup.fields
 
     # ── Collect active fields ──────────────────────────────────────────────────
     positionals: list[LinearField] = []
     active_opts: dict[str, list[LinearField]] = {}
-    ctrl_opts: dict[str, list[LinearField]] = {}
 
-    for fld, fs in gs.state.items():
-        if fs.state not in (LinearState.AVAILABLE, LinearState.ADVANCE):
+    for fld, initial_state in gs._initial_state.items():
+        if initial_state not in (LinearState.AVAILABLE, LinearState.ADVANCE):
             continue
         if fld.positional:
             positionals.append(fld)
             continue
         try:
-            primary, aliases = parser.option_strings(fld)
+            names = parser.option_strings(fld)
         except Exception:
             continue
-        if not primary:
+        if not names:
             continue
-        key = primary[0]
-        if _is_control(fld):
-            ctrl_opts.setdefault(key, []).append(fld)
-        else:
-            active_opts.setdefault(key, []).append(fld)
+        key = names[0]
+        active_opts.setdefault(key, []).append(fld)
 
     # ── Entry builders ─────────────────────────────────────────────────────────
 
@@ -215,11 +207,5 @@ def format_help(parser: CliParser, root_type: type, color: bool = None) -> str:
                     branch_entries.append(_entry([fld]))
             out.extend(_render_entries(branch_entries, indent))
         out.append("")
-
-    # Global options
-    ctrl_entries = [_entry(v) for v in ctrl_opts.values()]
-    if ctrl_entries:
-        out.append(c_header("Global options:"))
-        out.extend(_render_entries(ctrl_entries))
 
     return "\n".join(out).rstrip()

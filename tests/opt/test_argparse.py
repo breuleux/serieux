@@ -52,6 +52,8 @@ def test_flat_use():
     check(Person(name="Bob", age=25), "--name Bob --age 25")
     check(Person(name="Charles", age=70), "--age 70 --name Charles")
     check(Person(name="Alice", age=30), "-n Alice -a 30")
+    check(Person(name="Bob", age=25), "--name=Bob --age=25")
+    check(Person(name="Alice", age=30), "-n=Alice -a=30")
 
 
 def test_flat_errors():
@@ -59,7 +61,7 @@ def test_flat_errors():
     check(Person, "--unknown value", error="Unknown option")
     check(Person, "--name David", error="Missing required field 'age'")
     check(Person, "--age 888", error="Missing required field 'name'")
-    check(Person, "--name --age 3", error="Missing value for argument 'name'")
+    check(Person, "--name --age 3", error="Missing value for argument '--name'")
     check(
         Person,
         "--name David --age blah",
@@ -94,6 +96,8 @@ def test_boolean_flags():
     check(TickTock(False, False), "--no-tick")
     check(TickTock(True, False), "--no-tock")
     check(TickTock(False, False), "--no-tick --no-tock")
+    check(TickTock(False, False), "--tick=0")
+    check(TickTock(True, True), "--no-tock=false")
 
 
 def test_boolean_flags_short():
@@ -101,6 +105,10 @@ def test_boolean_flags_short():
     check(TickTock(True, True), "-io")
     check(TickTock(True, True), "-oi")
     check(TickTock(False, False), "--no-i --no-o")
+
+
+def test_boolean_flags_errors():
+    check(TickTock, "--tick=what", error="Invalid flag value for --tick: 'what'")
 
 
 ##########
@@ -116,7 +124,12 @@ class Address:
 
 @dataclass
 class Employee:
+    """Employee information."""
+
+    # Employee details
     person: Person
+
+    # Employee address
     address: Address
 
 
