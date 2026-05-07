@@ -86,6 +86,9 @@ class Option:
     def unlock(self):
         return self.field.unlock
 
+    def advance(self, gs):
+        return gs.advance(self.field)
+
     def act(self, parser, key, value=None):
         value = parser.deserialize(self.field.type, Word(value))
         parser.result[key] = value
@@ -104,6 +107,18 @@ class BooleanOption(Option):
             parser.result[key] = self.value
         else:
             raise ValueError(f"Invalid flag value for {self.key}: {value!r}")
+
+
+@dataclass
+class CountOption(Option):
+    def needs_value(self) -> bool:
+        return False
+
+    def advance(self, gs):
+        return gs.concrete_id(self.field)
+
+    def act(self, parser, key, value=None):
+        parser.result[key] = parser.result.get(key, 0) + 1
 
 
 @dataclass
@@ -134,7 +149,10 @@ def generate_options(t: type[bool], names: list[str], fld: LinearField):
 
 @ovld
 def generate_options(t: Any, names: list[str], fld: LinearField):
-    yield from [Option(name, fld) for name in names]
+    if fld.metadata.get("count"):
+        yield from [CountOption(name, fld) for name in names]
+    else:
+        yield from [Option(name, fld) for name in names]
 
 
 def _options(fld: LinearField) -> list[str]:
@@ -225,7 +243,7 @@ class CliParser:
         if fld is None:
             concrete_id = None
         else:
-            concrete_id = self.gs.advance(fld)
+            concrete_id = opt.advance(self.gs)
             if concrete_id is False:
                 self.error(f"Cannot assign field {fld.identifier!r}", loc)
                 return
@@ -349,9 +367,7 @@ class CliParser:
 
             if all(not o.needs_value() for o in candidates):
                 best = _pick(candidates)
-                concrete_id = self.gs.advance(best.field)
-                if concrete_id is not False:
-                    self.result[concrete_id] = True
+                self._advance(best, None, char_loc)
                 i += 1
                 continue
 

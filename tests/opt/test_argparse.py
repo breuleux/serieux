@@ -75,6 +75,27 @@ def test_flat_multiple_errors():
     check(Person, "--foo --bar --name Alice --age 30", error=".*--foo.*--bar.*")
 
 
+##################
+# Count options  #
+##################
+
+
+@dataclass
+class Verbosity:
+    # [alias: -v]
+    # [count]
+    verbose: int = 0
+
+
+def test_count_option():
+    check(Verbosity(verbose=0), "")
+    check(Verbosity(verbose=1), "--verbose")
+    check(Verbosity(verbose=3), "--verbose --verbose --verbose")
+    check(Verbosity(verbose=2), "-v -v")
+    check(Verbosity(verbose=4), "-vvvv")
+    check(Verbosity(verbose=3), "-v --verbose -v")
+
+
 #################
 # Boolean flags #
 #################

@@ -413,7 +413,7 @@ class GroupState:
             for subgroup in subgroups:
                 self._collect_option_groups(subgroup)
 
-    def _concrete_id(self, fld: LinearField) -> str:
+    def concrete_id(self, fld: LinearField) -> str:
         """Return the field identifier with Range placeholders replaced by current indices."""
         seq_iter = iter(reversed(_sequence_chain(fld)))  # outermost first
         parts = []
@@ -507,7 +507,7 @@ class GroupState:
                 else:
                     sibling_state = LinearState.UNAVAILABLE
                 self._apply_unlock(fld, sibling_state)
-            return self._concrete_id(fld)
+            return self.concrete_id(fld)
 
         elif fs.state == LinearState.ADVANCE:
             for i, seq in enumerate(chain):  # innermost first
@@ -542,7 +542,7 @@ class GroupState:
                 self.state[fld] = FieldState(state=LinearState.ADVANCE)
                 if fld.unlock:
                     self._apply_unlock(fld, LinearState.ADVANCE)
-                return self._concrete_id(fld)
+                return self.concrete_id(fld)
             return False
 
         else:
