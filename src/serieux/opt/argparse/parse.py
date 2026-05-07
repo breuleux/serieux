@@ -12,14 +12,14 @@ import sys
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from functools import cache, cached_property
-from typing import Any
+from typing import Any, Iterable
 
 from ovld import ovld
 
 from ...features.tagset import tag_field
 from ...linearize import GroupState, LinearField, flatten_group
 from .errors import ParseError
-from .tokenize import Loc, LongOpt, Separator, ShortOpt, Value
+from .tokenize import Loc, LongOpt, Separator, ShortOpt, ShortOptValue, Value
 
 ########
 # Misc #
@@ -72,10 +72,6 @@ class Option:
     key: str
     field: LinearField
 
-    def needs_value(self) -> bool:
-        """Return True if the field must consume a value token (i.e. not a bool flag)."""
-        return self.field.type is not bool
-
     def specificity(self, value) -> int:
         if self.field is not None and self.field.expected_value and value is not None:
             return 2 if value == self.field.expected_value else 0
@@ -89,6 +85,14 @@ class Option:
     def advance(self, gs):
         return gs.advance(self.field)
 
+    def consume(self, parser, key_loc, inline_value, queue):
+        if inline_value is not None:
+            return [inline_value.text], [inline_value.loc]
+        vtok = parser._consume_value(key_loc, queue, self.key)
+        if vtok is None:
+            return [], []
+        return [vtok.text], [vtok.loc]
+
     def act(self, parser, key, value=None):
         value = parser.deserialize(self.field.type, Word(value))
         parser.result[key] = value
@@ -97,6 +101,12 @@ class Option:
 @dataclass
 class BooleanOption(Option):
     value: bool
+
+    def consume(self, parser, key_loc, inline_value, queue):
+        # Only honour explicit =val; ignore cluster-tail ShortOptValue
+        if isinstance(inline_value, Value):
+            return [inline_value.text], [inline_value.loc]
+        return [], []
 
     def act(self, parser, key, value=None):
         if value is None:
@@ -111,14 +121,38 @@ class BooleanOption(Option):
 
 @dataclass
 class CountOption(Option):
-    def needs_value(self) -> bool:
-        return False
-
     def advance(self, gs):
         return gs.concrete_id(self.field)
 
+    def consume(self, parser, key_loc, inline_value, queue):
+        return [], []
+
     def act(self, parser, key, value=None):
         parser.result[key] = parser.result.get(key, 0) + 1
+
+
+@dataclass
+class NargsOption(Option):
+    nargs: int | str  # int N or '*'
+
+    def consume(self, parser, key_loc, inline_value, queue):
+        values, locs = [], []
+        if inline_value is not None:
+            values.append(inline_value.text)
+            locs.append(inline_value.loc)
+        if self.nargs == "*":
+            while queue and isinstance(queue[0], Value):
+                vtok = queue.popleft()
+                values.append(vtok.text)
+                locs.append(vtok.loc)
+        else:
+            for _ in range(self.nargs - len(values)):
+                vtok = parser._consume_value(key_loc, queue, self.key)
+                if vtok is None:
+                    break
+                values.append(vtok.text)
+                locs.append(vtok.loc)
+        return values, locs
 
 
 @dataclass
@@ -126,11 +160,8 @@ class AmbiguousOption(Option):
     alternatives: list[str]
     original_options: list[Option]
 
-    def needs_value(self) -> bool:
-        """Return True if the field must consume a value token (i.e. not a bool flag)."""
-        print(self.original_options)
-        print([o.needs_value() for o in self.original_options])
-        return self.original_options[0].needs_value()
+    def consume(self, parser, key_loc, inline_value, queue):
+        return self.original_options[0].consume(parser, key_loc, inline_value, queue)
 
     def act(self, parser, key, value=None):
         alts = " or ".join(self.alternatives)
@@ -151,11 +182,14 @@ def generate_options(t: type[bool], names: list[str], fld: LinearField):
 def generate_options(t: Any, names: list[str], fld: LinearField):
     if fld.metadata.get("count"):
         yield from [CountOption(name, fld) for name in names]
+    elif (nargs := fld.metadata.get("nargs")) is not None:
+        n = "*" if nargs == "*" else int(nargs)
+        yield from [NargsOption(name, fld, n) for name in names]
     else:
         yield from [Option(name, fld) for name in names]
 
 
-def _options(fld: LinearField) -> list[str]:
+def _options(fld: LinearField) -> Iterable[str]:
     """Return ``(primary_names, alias_names)`` with leading dashes.
 
     Primary names are ``[long, short]`` (e.g. ``['--abc.def', '--def']``) or just
@@ -238,15 +272,35 @@ class CliParser:
         self.option_map = defaultdict(list)
         self.populate_options()
 
-    def _advance(self, opt: Option, value: Any, loc: Loc) -> None:
+    def _advance(self, opt: Option, values: list, locs: list, key_loc: Loc) -> None:
         fld = opt.field
         if fld is None:
-            concrete_id = None
-        else:
-            concrete_id = opt.advance(self.gs)
-            if concrete_id is False:
-                self.error(f"Cannot assign field {fld.identifier!r}", loc)
-                return
+            value = values[0] if values else None
+            loc = locs[0] if locs else key_loc
+            try:
+                opt.act(self, None, value)
+            except Exception as exc:
+                self.error(str(exc), loc)
+            return
+
+        if fld.sequence and len(values) > 1:
+            for v, l in zip(values, locs):
+                concrete_id = opt.advance(self.gs)
+                if concrete_id is False:
+                    self.error(f"Cannot assign field {fld.identifier!r}", l)
+                    return
+                try:
+                    opt.act(self, concrete_id, v)
+                except Exception as exc:
+                    self.error(str(exc), l)
+            return
+
+        concrete_id = opt.advance(self.gs)
+        if concrete_id is False:
+            self.error(f"Cannot assign field {fld.identifier!r}", key_loc)
+            return
+        value = " ".join(values) if values else None
+        loc = locs[0] if locs else key_loc
         try:
             opt.act(self, concrete_id, value)
         except Exception as exc:
@@ -315,34 +369,30 @@ class CliParser:
 
     @ovld
     def _handle(self, tok: LongOpt, queue: deque) -> None:
-        opt = tok.name
-        candidates = self.candidates(opt)
+        opt_name = tok.name
+        candidates = self.candidates(opt_name)
 
         if not candidates:
-            msg = self.formatter.explain_unknown_named(opt)
+            msg = self.formatter.explain_unknown_named(opt_name)
             self.error(msg, tok.name_loc)
             # Speculatively skip the next Value — likely this option's argument.
             if tok.value is None and queue and isinstance(queue[0], Value):
                 queue.popleft()
             return
 
-        value, value_loc = tok.value, tok.value_loc
-        best = _pick(candidates, value)
-        if best.needs_value() and value is None:
-            vtok = self._consume_value(tok.name_loc, queue, name=opt)
-            if vtok is None:
-                self.error(f"{opt} requires a value", tok.name_loc)
-                return
-            value = vtok.text
-            value_loc = vtok.loc
-            # Recompute best using the newly discovered value
-            best = _pick(candidates, value)
+        inline = Value(tok.value, tok.value_loc) if tok.value is not None else None
+        best = _pick(candidates, tok.value)
+        values, locs = best.consume(self, tok.name_loc, inline, queue)
 
+        # Recompute best using the first consumed value (matters for union discrimination)
+        first_val = values[0] if values else None
+        best = _pick(candidates, first_val)
         if best is None:
-            self.error(f"No matching option for {opt}={value!r}", value_loc)
+            loc = locs[0] if locs else tok.name_loc
+            self.error(f"No matching option for {opt_name}={first_val!r}", loc)
             return
 
-        self._advance(best, value, value_loc)
+        self._advance(best, values, locs, tok.name_loc)
 
     @ovld
     def _handle(self, tok: ShortOpt, queue: deque) -> None:
@@ -365,32 +415,27 @@ class CliParser:
                 i += 1
                 continue
 
-            if all(not o.needs_value() for o in candidates):
-                best = _pick(candidates)
-                self._advance(best, None, char_loc)
-                i += 1
-                continue
-
-            # Needs a value: rest of chars cluster, then inline =val, then next token
-            rest = chars[i + 1 :]
+            rest = chars[i + 1:]
             if rest:
                 rest_loc = Loc(argv, idx, base + i + 1, tok.chars_loc.end, prog=self.prog)
-                value, value_loc = rest, rest_loc
+                inline = ShortOptValue(rest, rest_loc)
             elif tok.value is not None:
-                value, value_loc = tok.value, tok.value_loc
+                inline = Value(tok.value, tok.value_loc)
             else:
-                vtok = self._consume_value(char_loc, queue, name=ch)
-                if vtok is None:
-                    return
-                value = vtok.text
-                value_loc = vtok.loc
+                inline = None
 
-            best = _pick(candidates, value)
+            best = _pick(candidates, inline.text if inline else None)
+            values, locs = best.consume(self, char_loc, inline, queue)
+
+            first_val = values[0] if values else None
+            best = _pick(candidates, first_val)
             if best is None:
                 self.error(f"Unknown option: -{ch}", char_loc)
                 break
-            self._advance(best, value, value_loc)
-            break  # value consumed — remaining chars were the value
+            self._advance(best, values, locs, char_loc)
+            if values:
+                break  # value consumed — remaining chars were the value
+            i += 1
 
     @ovld
     def _handle(self, tok: Value, queue: deque) -> None:
@@ -399,7 +444,7 @@ class CliParser:
         if best is None:
             self.error(f"Unexpected positional argument: {tok.text!r}", tok.loc)
             return
-        self._advance(best, tok.text, tok.loc)
+        self._advance(best, [tok.text], [tok.loc], tok.loc)
 
     @ovld
     def _handle(self, tok: Separator, queue: deque) -> None:

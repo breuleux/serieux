@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
@@ -94,6 +95,36 @@ def test_count_option():
     check(Verbosity(verbose=2), "-v -v")
     check(Verbosity(verbose=4), "-vvvv")
     check(Verbosity(verbose=3), "-v --verbose -v")
+
+
+#########
+# nargs #
+#########
+
+
+@dataclass
+class Coords:
+    # [nargs: 3]
+    # [alias: -c]
+    pos: str = ""
+
+
+@dataclass
+class Tagged:
+    # [nargs: *]
+    tags: list[str] = field(default_factory=list)
+
+
+def test_nargs_fixed():
+    check(Coords(pos="1 2 3"), "--pos 1 2 3")
+    check(Coords(pos="1 2 3"), "-c 1 2 3")
+    check(Coords(pos="x y z"), "--pos=x y z")
+
+
+def test_nargs_star():
+    check(Tagged(tags=[]), "")
+    check(Tagged(tags=["a"]), "--tags a")
+    check(Tagged(tags=["a", "b", "c"]), "--tags a b c")
 
 
 #################

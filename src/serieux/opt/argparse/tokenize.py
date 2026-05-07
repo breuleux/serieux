@@ -73,6 +73,19 @@ class Value:
 
 
 @dataclass
+class ShortOptValue:
+    """Tail of a short-option cluster used as a value (e.g. 'Alice' from '-nAlice').
+
+    Distinct from Value so that option consumers can tell whether an inline
+    value came from an explicit ``=val`` (Value) or from the remainder of a
+    cluster (ShortOptValue).
+    """
+
+    text: str
+    loc: Loc
+
+
+@dataclass
 class Separator:
     """The ``--`` end-of-options sentinel."""
 
