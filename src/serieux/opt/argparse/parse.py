@@ -33,7 +33,10 @@ class Word:
 
 @dataclass(kw_only=True)
 class Control:
+    """Global options"""
+
     # [alias: -h]
+    # [no-no]
     # Show this help message and exit
     help: bool = False
 
@@ -125,7 +128,8 @@ def generate_options(t: type[bool], names: list[str], fld: LinearField):
         return f"--no-{x.lstrip('-')}"
 
     yield from [BooleanOption(name, fld, True) for name in names]
-    yield from [BooleanOption(noify(name), fld, False) for name in names]
+    if not fld.metadata.get("no-no", False):
+        yield from [BooleanOption(noify(name), fld, False) for name in names]
 
 
 @ovld
