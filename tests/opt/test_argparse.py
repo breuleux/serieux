@@ -127,6 +127,19 @@ def test_nargs_star():
     check(Tagged(tags=["a", "b", "c"]), "--tags a b c")
 
 
+@dataclass
+class PassThrough:
+    subcmd: str
+    # [nargs: ...]
+    args: list[str] = field(default_factory=list)
+
+
+def test_nargs_remainder():
+    check(PassThrough(subcmd="run", args=[]), "--subcmd run")
+    check(PassThrough(subcmd="run", args=["--foo", "bar"]), "--subcmd run --args --foo bar")
+    check(PassThrough(subcmd="run", args=["--a", "--b=c"]), "--subcmd run --args --a --b=c")
+
+
 #################
 # Boolean flags #
 #################

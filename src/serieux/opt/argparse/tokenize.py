@@ -48,6 +48,10 @@ class LongOpt:
     value: str | None = None
     value_loc: Loc | None = None
 
+    @property
+    def loc(self) -> Loc:
+        return self.name_loc
+
 
 @dataclass
 class ShortOpt:
@@ -62,6 +66,10 @@ class ShortOpt:
     chars_loc: Loc
     value: str | None = None
     value_loc: Loc | None = None
+
+    @property
+    def loc(self) -> Loc:
+        return self.chars_loc
 
 
 @dataclass

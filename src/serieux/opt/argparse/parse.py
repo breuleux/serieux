@@ -133,14 +133,20 @@ class CountOption(Option):
 
 @dataclass
 class NargsOption(Option):
-    nargs: int | str  # int N or '*'
+    # Description of the number of args: int N or '*' or '...'
+    nargs: int | str
 
     def consume(self, parser, key_loc, inline_value, queue):
         values, locs = [], []
         if inline_value is not None:
             values.append(inline_value.text)
             locs.append(inline_value.loc)
-        if self.nargs == "*":
+        if self.nargs == "...":
+            while queue:
+                tok = queue.popleft()
+                values.append(tok.loc.argv[tok.loc.arg_index])
+                locs.append(tok.loc)
+        elif self.nargs == "*":
             while queue and isinstance(queue[0], Value):
                 vtok = queue.popleft()
                 values.append(vtok.text)
@@ -183,7 +189,7 @@ def generate_options(t: Any, names: list[str], fld: LinearField):
     if fld.metadata.get("count"):
         yield from [CountOption(name, fld) for name in names]
     elif (nargs := fld.metadata.get("nargs")) is not None:
-        n = "*" if nargs == "*" else int(nargs)
+        n = nargs if nargs in ("*", "...") else int(nargs)
         yield from [NargsOption(name, fld, n) for name in names]
     else:
         yield from [Option(name, fld) for name in names]
@@ -415,7 +421,7 @@ class CliParser:
                 i += 1
                 continue
 
-            rest = chars[i + 1:]
+            rest = chars[i + 1 :]
             if rest:
                 rest_loc = Loc(argv, idx, base + i + 1, tok.chars_loc.end, prog=self.prog)
                 inline = ShortOptValue(rest, rest_loc)
