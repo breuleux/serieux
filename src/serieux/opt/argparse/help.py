@@ -60,9 +60,12 @@ def format_help(parser: CliParser, root_type: type, color: bool = None) -> str:
             if subgroup.fields:
                 latent_by_group.setdefault(gid, {})[cid] = subgroup.fields
 
-    # ── Collect active fields ──────────────────────────────────────────────────
+    # ── Collect active fields ─────────────────────────────────────────────────
     positionals: list[LinearField] = []
-    active_opts: dict[str, list[LinearField]] = {}
+    # parent LinearField → {option-key → [LinearField]}; insertion order = section order
+    opt_groups: dict[LinearField, dict[str, list[LinearField]]] = {}
+    # gid → {cid → [trigger LinearField]} for union-discriminating option fields
+    union_triggers: dict[str, dict[int, list[LinearField]]] = {}
 
     for fld, initial_state in gs._initial_state.items():
         if initial_state not in (LinearState.AVAILABLE, LinearState.ADVANCE):
@@ -77,7 +80,15 @@ def format_help(parser: CliParser, root_type: type, color: bool = None) -> str:
         if not names:
             continue
         key = names[0]
-        active_opts.setdefault(key, []).append(fld)
+        if fld.unlock:
+            gid = fld.unlock[0].group.identifier
+            cid = fld.unlock[0].choice_id
+            union_triggers.setdefault(gid, {}).setdefault(cid, []).append(fld)
+        else:
+            parent = fld.parent
+            if parent not in opt_groups:
+                opt_groups[parent] = {}
+            opt_groups[parent].setdefault(key, []).append(fld)
 
     # ── Entry builders ─────────────────────────────────────────────────────────
 
@@ -165,26 +176,24 @@ def format_help(parser: CliParser, root_type: type, color: bool = None) -> str:
             out.append(f"  {c_meta(f'{display:<{w}}')}  {fld.doc or ''}".rstrip())
         out.append("")
 
-    # Options
-    opt_entries = [_entry(v) for v in active_opts.values()]
-    if opt_entries:
-        out.append(c_header("Options:"))
-        out.extend(_render_entries(opt_entries))
-        out.append("")
+    def _section_label(parent: LinearField) -> str:
+        tp = parent.field.type if parent is not None else root_type
+        label = parent.doc or getattr(tp, "__name__", "Options")
+        return label.rstrip(".")
 
-    # Union branches
-    for gid, cid_map in latent_by_group.items():
-        if not cid_map:
-            continue
-        group_fld = group_field_map.get(gid)
-        label = (group_fld.doc if group_fld and group_fld.doc else None) or _cli_name(
-            gid.split(".")[-1]
-        )
-        out.append(c_header(label + ":"))
-        subgroups = gs._option_groups.get(gid, [])
-        multi = len(cid_map) > 1
+    def _render_opt_groups(groups):
+        for parent, opts_dict in groups:
+            entries = [_entry(v) for v in opts_dict.values()]
+            if not entries:
+                continue
+            out.append(c_header(_section_label(parent) + ":"))
+            out.extend(_render_entries(entries))
+            out.append("")
+
+    def _render_branches(cid_field_map, subgroups):
+        multi = len(cid_field_map) > 1
         first = True
-        for cid, fields in sorted(cid_map.items()):
+        for cid, fields in sorted(cid_field_map.items()):
             if not first:
                 out.append("")
             first = False
@@ -206,6 +215,56 @@ def format_help(parser: CliParser, root_type: type, color: bool = None) -> str:
                 if names:
                     branch_entries.append(_entry([fld]))
             out.extend(_render_entries(branch_entries, indent))
+
+    def _trigger_name(fld: LinearField) -> str:
+        names = parser.option_strings(fld)
+        short = [n for n in names if "." not in n]
+        return (short or names)[0]
+
+    # Separate meta (Control) groups from regular groups
+    regular_groups = [
+        (p, d) for p, d in opt_groups.items() if p.field.serialized_name != "__control"
+    ]
+    meta_groups = [(p, d) for p, d in opt_groups.items() if p.field.serialized_name == "__control"]
+
+    # Regular options
+    _render_opt_groups(regular_groups)
+
+    # Union sections (option-triggered): summary line + expanded branches
+    for gid, cid_map in union_triggers.items():
+        group_fld = group_field_map.get(gid)
+        label = (group_fld.doc if group_fld and group_fld.doc else None) or _cli_name(
+            gid.split(".")[-1]
+        )
+        out.append(c_header(label.rstrip(".") + ":"))
+        # Summary: "--a/--b | --c | --d"
+        summary = " | ".join(
+            "/".join(_trigger_name(f) for f in cid_map[cid]) for cid in sorted(cid_map)
+        )
+        out.append(f"  {summary}")
         out.append("")
+        # Expanded branches: triggers + latent fields per choice
+        subgroups = gs._option_groups.get(gid, [])
+        branch_fields = {
+            cid: cid_map[cid] + (subgroups[cid].fields if cid < len(subgroups) else [])
+            for cid in sorted(cid_map)
+        }
+        _render_branches(branch_fields, subgroups)
+        out.append("")
+
+    # Latent-only sections (positional-triggered unions, old format)
+    for gid, cid_map in latent_by_group.items():
+        if gid in union_triggers or not cid_map:
+            continue
+        group_fld = group_field_map.get(gid)
+        label = (group_fld.doc if group_fld and group_fld.doc else None) or _cli_name(
+            gid.split(".")[-1]
+        )
+        out.append(c_header(label + ":"))
+        _render_branches(cid_map, gs._option_groups.get(gid, []))
+        out.append("")
+
+    # Meta-options (Control)
+    _render_opt_groups(meta_groups)
 
     return "\n".join(out).rstrip()

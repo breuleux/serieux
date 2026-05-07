@@ -50,8 +50,8 @@ class FromArguments(Medley):
             cls_name=f"Args_{clsstring(t)}",
             bases=(),
             fields=[
-                ("__value", t, field()),
-                ("__control", Control, field()),
+                ("__value", t, field(metadata={"description": "Options"})),
+                ("__control", Control, field(metadata={"description": "Meta-options"})),
             ],
         )
 
