@@ -81,7 +81,7 @@ class LinearField:
     def identifier(self):
         return ".".join("#" if isinstance(s, Range) else s for s in self.signature if s)
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         return f"<LinearField {self.identifier}>"
 
     __repr__ = __str__
@@ -342,9 +342,9 @@ class FieldState:
 
 
 @ovld
-def _flatten(group: LinearGroup, state: str = LinearState.AVAILABLE):
+def flatten_group(group: LinearGroup, state: str = LinearState.AVAILABLE):
     for fld in group.fields:
-        yield (fld, FieldState(state=state))
+        yield (group, fld, FieldState(state=state))
     for _, subgroups in group.option_groups.items():
         for subgroup in subgroups:
             yield from recurse(subgroup, LinearState.LATENT)
@@ -385,7 +385,7 @@ class GroupState:
     sequences: dict[LinearField, int] = None
 
     def __post_init__(self):
-        raw = dict(_flatten(self.initial))
+        raw = {f: st for _, f, st in flatten_group(self.initial)}
         self.state = raw
         self._initial_state = {fld: fs.state for fld, fs in raw.items()}
         self.sequences = {}
@@ -479,8 +479,7 @@ class GroupState:
 
     def advance(self, fld: LinearField) -> bool:
         fs = self.state.get(fld)
-        if fs is None:
-            return False
+        assert fs is not None
 
         chain = _sequence_chain(fld)  # innermost first
         in_sequence = bool(chain)

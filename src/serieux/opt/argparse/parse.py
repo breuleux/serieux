@@ -17,7 +17,7 @@ from typing import Any
 from ovld import ovld
 
 from ...features.tagset import tag_field
-from ...linearize import GroupState, LinearField
+from ...linearize import GroupState, LinearField, flatten_group
 from .errors import ParseError
 from .tokenize import Loc, LongOpt, Separator, ShortOpt, Value
 
@@ -74,7 +74,7 @@ class Option:
         return self.field.type is not bool
 
     def specificity(self, value) -> int:
-        if self.field.expected_value and value is not None:
+        if self.field is not None and self.field.expected_value and value is not None:
             return 2 if value == self.field.expected_value else 0
         else:
             return 1
@@ -101,6 +101,22 @@ class BooleanOption(Option):
             parser.result[key] = self.value
         else:
             raise ValueError(f"Invalid flag value for {self.key}: {value!r}")
+
+
+@dataclass
+class AmbiguousOption(Option):
+    alternatives: list[str]
+    original_options: list[Option]
+
+    def needs_value(self) -> bool:
+        """Return True if the field must consume a value token (i.e. not a bool flag)."""
+        print(self.original_options)
+        print([o.needs_value() for o in self.original_options])
+        return self.original_options[0].needs_value()
+
+    def act(self, parser, key, value=None):
+        alts = " or ".join(self.alternatives)
+        raise ValueError(f"{self.key} is ambiguous. Use {alts} instead.")
 
 
 @ovld
@@ -202,11 +218,17 @@ class CliParser:
 
     def _advance(self, opt: Option, value: Any, loc: Loc) -> None:
         fld = opt.field
-        concrete_id = self.gs.advance(fld)
-        if concrete_id is False:
-            self.error(f"Cannot assign field {fld.identifier!r}", loc)
-            return
-        opt.act(self, concrete_id, value)
+        if fld is None:
+            concrete_id = None
+        else:
+            concrete_id = self.gs.advance(fld)
+            if concrete_id is False:
+                self.error(f"Cannot assign field {fld.identifier!r}", loc)
+                return
+        try:
+            opt.act(self, concrete_id, value)
+        except Exception as exc:
+            self.error(str(exc), loc)
 
     def _consume_value(
         self, key_loc: Loc, queue: deque, name: str | None = None
@@ -229,13 +251,30 @@ class CliParser:
     # ── Options names ─────────────────────────────────────────────────────────-
 
     def populate_options(self):
-        for fld in self.gs.state:
+        group_key_opts: dict[tuple, list[Option]] = defaultdict(list)
+
+        for group, fld, _ in flatten_group(self.gs.initial):
             if fld.positional:
-                opts = [Option("*", fld)]
+                self.option_map["*"].append(Option("*", fld))
             else:
-                opts = _options(fld)
-            for opt in opts:
-                self.option_map[opt.key].append(opt)
+                for opt in _options(fld):
+                    ulid = tuple((id(u.group), u.choice_id) for u in fld.unlock)
+                    group_key_opts[(id(group), ulid, opt.key)].append(opt)
+
+        for (_, _, key), opts in group_key_opts.items():
+            if len(opts) > 1:
+                alternatives = [next(iter(_options(o.field))).key for o in opts]
+                self.option_map[key].append(
+                    AmbiguousOption(
+                        key=key,
+                        field=None,
+                        alternatives=alternatives,
+                        original_options=opts,
+                    )
+                )
+            else:
+                for opt in opts:
+                    self.option_map[key].append(opt)
 
     @cache
     def option_strings(self, fld: LinearField):
@@ -246,7 +285,9 @@ class CliParser:
 
         Returned in state-dict order; the rightmost eligible match is last.
         """
-        return [opt for opt in self.option_map[key] if self.gs.eligible(opt.field)]
+        return [
+            opt for opt in self.option_map[key] if opt.field is None or self.gs.eligible(opt.field)
+        ]
 
     # ── Token handlers ─────────────────────────────────────────────────────────
 

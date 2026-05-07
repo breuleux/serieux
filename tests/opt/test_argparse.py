@@ -358,6 +358,32 @@ def test_list_tagged_union_positional():
 #################
 
 
+def test_double_group():
+    @dataclass
+    class Family:
+        mother: Person
+        father: Person
+
+    check(
+        Family(mother=Person(name="Alice", age=35), father=Person(name="Bob", age=32)),
+        "--mother.name Alice --mother.age 35 --father.name Bob --father.age 32",
+    )
+
+    nerr = "--name is ambiguous. Use --mother.name or --father.name instead."
+    aerr = "--age is ambiguous. Use --mother.age or --father.age instead."
+
+    check(
+        Family,
+        "--name Alice --age 35 --father.name Bob --father.age 32",
+        error=f"{nerr}.*\n.*{aerr}",
+    )
+    check(
+        Family,
+        "--mother.name Alice --mother.age 35 --name Bob --age 32",
+        error=f"{nerr}.*\n.*{aerr}",
+    )
+
+
 def test_compact_bool_then_value():
     @dataclass
     class Args:
