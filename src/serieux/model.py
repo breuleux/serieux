@@ -50,7 +50,7 @@ def ListModelizable(t):
     return isinstance(m := model(t), Model) and m.element_field is not None
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, eq=False)
 class Field:
     name: str = None
     type: type
@@ -99,12 +99,15 @@ class Model:
     regexp: re.Pattern = None
     string_description: str = None
     allow_extras: bool = False
+    description: str = None
 
     def __post_init__(self):
         if isinstance(self.regexp, str):
             self.regexp = re.compile(self.regexp)
         if self.element_field is not None and self.from_list is None:  # pragma: no cover
             self.from_list = self.constructor
+        if self.description is None:
+            self.description = getattr(strip(self.original_type), "__doc__", None)
 
     def accepts(self, other):
         ot = strip(self.original_type)
