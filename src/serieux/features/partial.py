@@ -65,7 +65,10 @@ def partialize(t: type[FieldModelizable]):
         (
             f.name,
             Partial[f.type],
-            field(default=NOT_GIVEN, metadata={"description": f.description, **f.metadata}),
+            field(
+                default=NOT_GIVEN,
+                metadata={"description": f.description, "omit_default": True, **f.metadata},
+            ),
         )
         for f in m.fields
     ]
@@ -86,7 +89,7 @@ def partialize(t: type[FieldModelizable]):
 
 
 @dataclass
-class PartialListModelizable:
+class PartialListModelizable(PartialBase):
     elements: list
 
 
@@ -104,6 +107,7 @@ def partialize(t: type[ListModelizable]):
                 original_type=cls,
                 element_field=replace(ef, type=Partial[ef.type]),
                 from_list=PLM,
+                to_list=lambda x: x.elements,
             )
 
     return PLM

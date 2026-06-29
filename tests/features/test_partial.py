@@ -18,9 +18,12 @@ from serieux.features.partial import (
 )
 
 from ..common import validation_errors
-from ..definitions import Defaults, Elf, Player, Point
+from ..definitions import Defaults, Elf, Player, Point, Team
 
-load = (Serieux + PartialBuilding)().load
+srx = (Serieux + PartialBuilding)()
+deserialize = srx.deserialize
+serialize = srx.serialize
+load = srx.load
 
 
 def test_partial():
@@ -251,3 +254,23 @@ def test_merge_override_left():
 
     result = load(RGB, Sources(base, new))
     assert result == RGB(100, 0, 0)
+
+
+def test_partial_serialization():
+    x = deserialize(Partial[Point], {"x": 7})
+    assert serialize(Partial[Point], x) == {"x": 7}
+
+
+def test_partial_serialization_with_list():
+    x = deserialize(
+        Partial[Team], {"players": [{"first": "Lloyd", "last": "Hitz", "batting": 0.9}]}
+    )
+    assert serialize(Partial[Team], x) == {
+        "players": [{"first": "Lloyd", "last": "Hitz", "batting": 0.9}]
+    }
+
+    x = deserialize(Partial[Team], {"players": []})
+    assert serialize(Partial[Team], x) == {"players": []}
+
+    x = deserialize(Partial[Team], {"name": "Lightning"})
+    assert serialize(Partial[Team], x) == {"name": "Lightning"}

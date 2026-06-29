@@ -379,6 +379,9 @@ class BaseImplementation(Medley):
         stmts = ["__RET = {}"]
         follow = hasattr(ctx, "follow")
         for f in t.fields:
+            if f.metavar is not None:
+                # We don't actually serialize these
+                continue
             if f.property_name is None:
                 raise SchemaError(
                     f"Cannot serialize '{clsstring(t)}' because its model does not specify how to serialize property '{f.name}'"
@@ -395,7 +398,7 @@ class BaseImplementation(Medley):
                     "serialize", f.type, Code(f"$obj.{f.property_name}"), ctx, ctx_expr=ctx_expr
                 ),
             )
-            if issubclass(ctx, OmitDefaults):
+            if issubclass(ctx, OmitDefaults) or f.metadata.get("omit_default", False):
                 if f.default is not MISSING:
                     test = Code(f"$obj.{f.property_name} != $dflt", dflt=f.default)
                 elif f.default_factory is not MISSING:
