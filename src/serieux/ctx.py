@@ -103,7 +103,7 @@ class Sourced(WorkingDirectory):
             self.directory = self.origin.parent
 
     def compute_location(self, trail=None):
-        if isinstance(self, Trail):
+        if self.format and isinstance(self, Trail):
             trail = self.trail
             pfx = len(self.source_trail)
             if trail[:pfx] != self.source_trail:  # pragma: no cover
