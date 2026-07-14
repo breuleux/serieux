@@ -184,7 +184,7 @@ class Patch(FileOperation):
 
 
 @dataclass(kw_only=True)
-class Run:
+class Call:
     """Run a function or class."""
 
     # Reference to the function or class to run
@@ -208,7 +208,7 @@ class SerieuxCommand:
     """Do things with serieux configurations."""
 
     # The command to run
-    command: TaggedUnion[Schema, Dump, Check, Patch, Run]
+    command: TaggedUnion[Schema, Dump, Check, Patch, Call]
 
     def __call__(self):  # pragma: no cover
         self.command()

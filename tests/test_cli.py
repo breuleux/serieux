@@ -4,10 +4,10 @@ import cryptography
 import pytest
 
 from serieux.__main__ import (
+    Call,
     Check,
     Dump,
     Patch,
-    Run,
     Schema,
     model_at,
     value_at,
@@ -201,8 +201,8 @@ def addnums(x: int, y: int, /):
     return x + y
 
 
-def test_run_command(capsys):
-    runner = Run(
+def test_call_command(capsys):
+    runner = Call(
         func=addnums,
         args=["6", "7"],
     )
@@ -220,8 +220,8 @@ class Multiplier:
         return self.left * self.right
 
 
-def test_run_command_dataclass(capsys):
-    runner = Run(
+def test_call_command_dataclass(capsys):
+    runner = Call(
         func=Multiplier,
         args=["--left", "6", "--right", "7"],
     )
