@@ -1,0 +1,3 @@
+$class: tests.test_cli:Multiplier
+left: 7
+right: 10

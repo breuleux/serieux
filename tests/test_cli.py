@@ -8,6 +8,7 @@ from serieux.__main__ import (
     Check,
     Dump,
     Patch,
+    Run,
     Schema,
     model_at,
     value_at,
@@ -228,3 +229,8 @@ def test_call_command_dataclass(capsys):
     runner()
     captured = capsys.readouterr()
     assert captured.out.strip() == "42"
+
+
+def test_run_command(datapath):
+    runner = Run(file=datapath / "mult.yaml")
+    assert runner() == 70

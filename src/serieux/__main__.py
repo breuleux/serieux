@@ -203,15 +203,50 @@ class Call:
             print(result)
 
 
+@dataclass(kw_only=True)
+class Run:
+    """Run an object defined in a configuration."""
+
+    # Definition of the object to run
+    # [positional]
+    file: Path
+
+    def __call__(self):
+        obj = deserialize(TaggedSubclass[object], self.file)
+        return obj()
+
+
+@dataclass(kw_only=True)
+class Interact:
+    """Interact with an object defined in a configuration."""
+
+    # Definition of the object to interact with
+    # [positional]
+    file: Path
+
+    def __call__(self):  # pragma: no cover
+        import code
+
+        print("=" * 30)
+        print(self.file.read_text().rstrip("\n"))
+        print("=" * 30)
+        obj = deserialize(TaggedSubclass[object], self.file)
+        print(">>> obj")
+        print(obj)
+        code.interact(local={"obj": obj}, banner="")
+
+
 @dataclass
 class SerieuxCommand:
     """Do things with serieux configurations."""
 
     # The command to run
-    command: TaggedUnion[Schema, Dump, Check, Patch, Call]
+    command: TaggedUnion[Schema, Dump, Check, Patch, Call, Run, Interact]
 
     def __call__(self):  # pragma: no cover
-        self.command()
+        result = self.command()
+        if result is not None:
+            print(result)
 
 
 def main(argv=None):  # pragma: no cover
