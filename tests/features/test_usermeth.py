@@ -8,7 +8,7 @@ from ovld.dependent import Regexp
 
 from serieux import deserialize, schema, serialize
 from serieux.features.clargs import CommandLineArguments
-from serieux.model import Field, Model
+from serieux.model import Field, Model, NumberModelizable
 
 
 def _rgb_from_string(obj, cls):
@@ -260,3 +260,144 @@ def test_serieux_from_string_and_to_string():
 
     sch = schema(RGBS2).compile(root=False)
     assert sch == {"type": "string"}
+
+
+####################
+# NumberModelizable #
+####################
+
+
+class TemperatureM:
+    def __init__(self, celsius):
+        self.celsius = celsius
+
+    @classmethod
+    def serieux_model(cls, call_next):
+        return Model(
+            original_type=cls,
+            fields=[Field(name="celsius", type=float, serialized_name="celsius")],
+            constructor=cls,
+            from_number=Lambda("$t($obj)"),
+            to_number=Lambda("$obj.celsius"),
+        )
+
+
+def test_custom_deserialize_number_m():
+    obj = deserialize(TemperatureM, {"celsius": 36.6})
+    assert isinstance(obj, TemperatureM)
+    assert obj.celsius == 36.6
+
+
+def test_custom_deserialize_number_m_from_number():
+    obj = deserialize(TemperatureM, 36.6)
+    assert isinstance(obj, TemperatureM)
+    assert obj.celsius == 36.6
+
+
+def test_custom_serialize_number_m():
+    assert serialize(TemperatureM, TemperatureM(36.6)) == 36.6
+
+
+def test_custom_number_m_schema():
+    assert schema(TemperatureM).compile(root=False) == {
+        "oneOf": [
+            {
+                "type": "object",
+                "title": "TemperatureM",
+                "properties": {"celsius": {"type": "number"}},
+                "required": ["celsius"],
+                "additionalProperties": False,
+            },
+            {"type": "number"},
+        ]
+    }
+
+
+@dataclass
+class TemperatureD:
+    celsius: float
+
+    @classmethod
+    def serieux_from_number(cls, obj):
+        return cls(celsius=obj)
+
+    @classmethod
+    def serieux_to_number(cls, obj):
+        return obj.celsius
+
+
+def test_serieux_from_number_and_to_number_dataclass():
+    t = deserialize(TemperatureD, 36.6)
+    assert t == TemperatureD(celsius=36.6)
+
+    n = serialize(TemperatureD, t)
+    assert n == 36.6
+
+    sch = schema(TemperatureD).compile(root=False)
+    assert sch == {
+        "oneOf": [
+            {
+                "type": "object",
+                "title": "TemperatureD",
+                "properties": {"celsius": {"type": "number"}},
+                "required": ["celsius"],
+                "additionalProperties": False,
+            },
+            {"type": "number"},
+        ]
+    }
+
+
+class TemperatureS:
+    def __init__(self, celsius: float):
+        self.celsius = celsius
+
+    @classmethod
+    def serieux_from_number(cls, obj):
+        return cls(celsius=obj)
+
+    @classmethod
+    def serieux_to_number(cls, obj):
+        return obj.celsius
+
+
+def test_serieux_from_number_and_to_number():
+    t = deserialize(TemperatureS, 36.6)
+    assert isinstance(t, TemperatureS)
+    assert t.celsius == 36.6
+
+    n = serialize(TemperatureS, t)
+    assert n == 36.6
+
+    sch = schema(TemperatureS).compile(root=False)
+    assert sch == {"type": "number"}
+
+
+def test_number_modelizable_from_bool():
+    # bool is a subclass of int, so it dispatches through the same from_number/to_number path
+    t = deserialize(TemperatureS, True)
+    assert isinstance(t, TemperatureS)
+    assert t.celsius is True
+
+    n = serialize(TemperatureS, t)
+    assert n is True
+
+
+def test_number_modelizable_class_check():
+    assert issubclass(TemperatureS, NumberModelizable)
+    assert not issubclass(RGBS, NumberModelizable)
+
+
+@dataclass
+class HasTemperature:
+    temperature: TemperatureS
+
+
+def test_clargs_number_modelizable():
+    clargs = CommandLineArguments(
+        arguments=["--temperature", "36.6"],
+        mapping={"": {"auto": True}},
+    )
+    obj = deserialize(HasTemperature, clargs)
+    assert isinstance(obj.temperature, TemperatureS)
+    assert obj.temperature.celsius == 36.6

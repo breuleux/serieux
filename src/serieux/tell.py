@@ -7,7 +7,7 @@ from typing import Annotated, Any
 from ovld import Code, ovld, recurse
 
 from .instructions import pushdown
-from .model import FieldModelizable, ListModelizable, StringModelizable, model
+from .model import FieldModelizable, ListModelizable, NumberModelizable, StringModelizable, model
 from .priority import LO1, LO2
 
 
@@ -64,6 +64,11 @@ def tells(expected: type[bool], given: type[bool]):
 
 @ovld
 def tells(expected: type[float], given: type[float]):
+    return set()
+
+
+@ovld
+def tells(expected: type[NumberModelizable], given: type[int] | type[float]):
     return set()
 
 

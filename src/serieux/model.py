@@ -14,7 +14,7 @@ from typing import (
 )
 from zoneinfo import ZoneInfo
 
-from ovld import Dataclass, Lambda, call_next, class_check, ovld, recurse, subclasscheck
+from ovld import Code, Dataclass, Lambda, call_next, class_check, ovld, recurse, subclasscheck
 
 from .docstrings import VariableDoc, get_attribute_docstrings
 from .exc import ValidationError
@@ -38,6 +38,11 @@ def Modelizable(t):
 @class_check
 def StringModelizable(t):
     return isinstance(m := model(t), Model) and m.from_string is not None
+
+
+@class_check
+def NumberModelizable(t):
+    return isinstance(m := model(t), Model) and m.from_number is not None
 
 
 @class_check
@@ -93,11 +98,13 @@ class Model:
     element_field: Field = None
     constructor: Callable = None
     from_list: Callable = None
-    to_list: Callable = list
+    to_list: Callable = None
     from_string: Callable = None
     to_string: Callable = None
     regexp: re.Pattern = None
     string_description: str = None
+    from_number: Callable = None
+    to_number: Callable = None
     allow_extras: bool = False
     description: str = None
 
@@ -284,6 +291,9 @@ def model(t: type[date] | type[datetime]):
         original_type=t,
         from_string=Lambda("$t.fromisoformat($obj)"),
         to_string=Lambda("$t.isoformat($obj)"),
+        from_number=Lambda(Code("$fromtimestamp($obj)", fromtimestamp=datetime.fromtimestamp))
+        if t is datetime
+        else None,
     )
 
 

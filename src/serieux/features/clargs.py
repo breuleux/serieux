@@ -11,7 +11,15 @@ from ovld import Medley, ovld, recurse
 
 from ..ctx import Context
 from ..instructions import pushdown, strip
-from ..model import Field, FieldModelizable, ListModelizable, StringModelizable, field_at, model
+from ..model import (
+    Field,
+    FieldModelizable,
+    ListModelizable,
+    NumberModelizable,
+    StringModelizable,
+    field_at,
+    model,
+)
 from ..utils import IsLiteral, UnionAlias, clsstring
 from .dotted import unflatten
 from .partial import Sources
@@ -34,6 +42,16 @@ def _soft_conversion(t):
             return x
 
     return filter
+
+
+def _soft_number_conversion(x):
+    try:
+        return int(x)
+    except (ValueError, TypeError):
+        try:
+            return float(x)
+        except (ValueError, TypeError):  # pragma: no cover
+            return x
 
 
 @dataclass
@@ -119,6 +137,11 @@ def regex_checker(pattern, descr):
 def make_argument(t: type[StringModelizable], partial: dict, model_field: Field):
     m = model(t)
     return {**partial, "type": regex_checker(m.regexp, m.string_description) if m.regexp else str}
+
+
+@ovld
+def make_argument(t: type[NumberModelizable], partial: dict, model_field: Field):
+    return {**partial, "type": _soft_number_conversion}
 
 
 @ovld(priority=-2)

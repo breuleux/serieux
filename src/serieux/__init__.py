@@ -35,6 +35,7 @@ from .model import (
     ListModelizable,
     Model,
     Modelizable,
+    NumberModelizable,
     StringModelizable,
     model,
 )
@@ -182,6 +183,7 @@ __all__ = [
     "Model",
     "FieldModelizable",
     "Modelizable",
+    "NumberModelizable",
     "Instruction",
     "parse_cli",
     "Partial",

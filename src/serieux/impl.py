@@ -30,7 +30,14 @@ from .auto import Auto
 from .ctx import Context, ModifyContext, OmitDefaults, Sourced, WorkingDirectory, empty
 from .exc import MissingFieldError, SchemaError, UnrecognizedFieldError, ValidationError
 from .instructions import pushdown
-from .model import FieldModelizable, ListModelizable, Modelizable, StringModelizable, model
+from .model import (
+    FieldModelizable,
+    ListModelizable,
+    Modelizable,
+    NumberModelizable,
+    StringModelizable,
+    model,
+)
 from .priority import HI2, LO4, LO5, LOW, MAX, MIN, STD, STD2, STD3
 from .schema import AnnotatedSchema, Schema
 from .tell import tells as get_tells
@@ -88,6 +95,8 @@ class BaseImplementation(Medley):
             func = self.deserialize.resolve(type[t], list, type(ctx))
         elif issubclass(t, StringModelizable):
             func = self.deserialize.resolve(type[t], str, type(ctx))
+        elif issubclass(t, NumberModelizable):
+            func = self.deserialize.resolve(type[t], int, type(ctx))
         else:
             func = type(self).deserialize
         return lambda obj: func(self, t, obj, ctx)
@@ -555,6 +564,30 @@ class BaseImplementation(Medley):
         else:
             return Lambda("$from_string($obj)", from_string=m.from_string)
 
+    ######################################
+    # Implementations: NumberModelizable #
+    ######################################
+
+    @code_generator(priority=STD2)
+    def serialize(self, t: type[NumberModelizable], obj: Any, ctx: Context, /):
+        (t,) = get_args(t)
+        m = model(t)
+        if not m.accepts(obj) or m.to_number is None:
+            return None
+        if isinstance(m.to_number, Function):
+            return m.to_number
+        else:
+            return Lambda("$to_number($obj)", to_number=m.to_number)
+
+    @code_generator(priority=STD2)
+    def deserialize(self, t: type[NumberModelizable], obj: int | float, ctx: Context, /):
+        (t,) = get_args(t)
+        m = model(t)
+        if isinstance(m.from_number, Function):
+            return m.from_number
+        else:
+            return Lambda("$from_number($obj)", from_number=m.from_number)
+
     ####################################
     # Implementations: ListModelizable #
     ####################################
@@ -605,7 +638,7 @@ class BaseImplementation(Medley):
     def schema(self, t: type[Modelizable], ctx: Context, /):
         m = model(t)
 
-        f_schema = s_schema = l_schema = None
+        f_schema = s_schema = n_schema = l_schema = None
         follow = hasattr(ctx, "follow")
 
         if m.fields is not None:
@@ -638,6 +671,9 @@ class BaseImplementation(Medley):
             if m.regexp:
                 s_schema["pattern"] = m.regexp.pattern
 
+        if m.from_number is not None:
+            n_schema = {"type": "number"}
+
         if m.element_field is not None:
             fctx = ctx.follow(t, None, "*") if follow else ctx
             l_schema = {
@@ -645,8 +681,8 @@ class BaseImplementation(Medley):
                 "items": recurse(m.element_field.type, fctx),
             }
 
-        assert f_schema or s_schema or l_schema
-        possibilities = [x for x in [f_schema, s_schema, l_schema] if x]
+        assert f_schema or s_schema or n_schema or l_schema
+        possibilities = [x for x in [f_schema, s_schema, n_schema, l_schema] if x]
         match possibilities:
             case [sch]:
                 return sch
@@ -788,10 +824,6 @@ class BaseImplementation(Medley):
     ##########################
     # Implementations: Dates #
     ##########################
-
-    @code_generator(priority=STD)
-    def deserialize(cls, t: type[datetime], obj: int | float, ctx: Context, /):
-        return Lambda(Code("$fromtimestamp($obj)", fromtimestamp=datetime.fromtimestamp))
 
     # We specify schemas explicitly because they have special formats
     # The serialization/deserializable is taken care of by their model()

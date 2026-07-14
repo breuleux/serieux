@@ -64,7 +64,12 @@ def _(t: type[HasMethod["serieux_model"]]):  # noqa: F821
 
 
 @model.register(priority=2)
-def _(t: type[HasMethod["serieux_to_string"]] | type[HasMethod["serieux_from_string"]]):  # noqa: F821
+def _(
+    t: type[HasMethod["serieux_to_string"]]  # noqa: F821
+    | type[HasMethod["serieux_from_string"]]  # noqa: F821
+    | type[HasMethod["serieux_to_number"]]  # noqa: F821
+    | type[HasMethod["serieux_from_number"]],  # noqa: F821
+):
     m = call_next(t)
     if not m:
         m = Model(t, fields=None)
@@ -72,4 +77,8 @@ def _(t: type[HasMethod["serieux_to_string"]] | type[HasMethod["serieux_from_str
         m = replace(m, to_string=t.serieux_to_string)
     if hasattr(t, "serieux_from_string"):
         m = replace(m, from_string=t.serieux_from_string)
+    if hasattr(t, "serieux_to_number"):
+        m = replace(m, to_number=t.serieux_to_number)
+    if hasattr(t, "serieux_from_number"):
+        m = replace(m, from_number=t.serieux_from_number)
     return m
