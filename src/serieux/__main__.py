@@ -6,13 +6,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from . import CommandLineArguments, TaggedSubclass, TaggedUnion, deserialize, schema, serieux
+from . import deserialize, schema, serieux
 from .auto import Auto
 from .ctx import Patcher, empty
+from .features.clargs import CommandLineArguments
 from .features.encrypt import EncryptionKey
 from .features.fromfile import IncludeFile
 from .features.prompt import Promptable
 from .features.registered import Referenced
+from .features.tagset import TagDict, TaggedSubclass, TaggedUnion, tag_field
 from .formats import FileSource
 from .model import field_at
 
@@ -41,16 +43,33 @@ def model_at(model, path):
 class Schema:
     """Dump the JSON schema of a class."""
 
-    # A module:symbol reference for the schema
+    # Example file
     # [positional]
-    model: Referenced[Any]
+    file: Path = None
+
+    # A module:symbol reference for the schema
+    # [alias: -m]
+    model: Referenced[Any] = None
 
     # Output file
     # [option: -o]
     out: Path = None
 
     def __call__(self):
-        sch = schema(self.model).compile()
+        model = self.model
+
+        if model is None and self.file is None:  # pragma: no cover
+            sys.exit("Must provide either file or model")
+        elif model is None:
+            self.file = FileSource(self.file)
+            data = self.file.load()
+            if tag_field not in data:
+                sys.exit(f"Model file should define a {tag_field} field")
+            tag = data[tag_field]
+            raw_model = deserialize(Referenced[Any], tag)
+            model = raw_model @ TagDict({tag: raw_model})
+
+        sch = schema(model).compile()
         txt = json.dumps(sch, indent=4)
         if self.out:
             self.out.write_text(txt)

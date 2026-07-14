@@ -1,0 +1,27 @@
+{
+    "type": "object",
+    "title": "Player",
+    "properties": {
+        "first": {
+            "type": "string"
+        },
+        "last": {
+            "type": "string"
+        },
+        "batting": {
+            "type": "number"
+        },
+        "$class": {
+            "description": "Reference to the class to instantiate",
+            "const": "tests.definitions:Player"
+        }
+    },
+    "required": [
+        "first",
+        "last",
+        "batting",
+        "$class"
+    ],
+    "additionalProperties": false,
+    "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

@@ -1,0 +1,4 @@
+$class: tests.definitions:Player
+first: Hector
+last: Liechtenstein
+batting: 0.3

@@ -131,6 +131,19 @@ def test_schema_command(capsys, file_regression):
     file_regression.check(captured.out)
 
 
+def test_schema_command_from_file(datapath, capsys, file_regression):
+    schema_cmd = Schema(file=datapath / "hector.yaml")
+    schema_cmd()
+    captured = capsys.readouterr()
+    file_regression.check(captured.out)
+
+
+def test_schema_command_from_file_untagged(datapath):
+    schema_cmd = Schema(file=datapath / "olivier.yaml")
+    with pytest.raises(SystemExit, match="Model file should define a .* field"):
+        schema_cmd()
+
+
 def test_schema_command_out(tmp_path, file_regression):
     out_file = tmp_path / "schema.json"
     schema_cmd = Schema(model=World, out=out_file)
