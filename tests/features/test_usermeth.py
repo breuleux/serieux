@@ -8,7 +8,7 @@ from ovld.dependent import Regexp
 
 from serieux import deserialize, schema, serialize
 from serieux.features.clargs import CommandLineArguments
-from serieux.model import Field, Model, NumberModelizable
+from serieux.model import Field, ListModelizable, Model, NumberModelizable, model
 
 
 def _rgb_from_string(obj, cls):
@@ -401,3 +401,51 @@ def test_clargs_number_modelizable():
     obj = deserialize(HasTemperature, clargs)
     assert isinstance(obj.temperature, TemperatureS)
     assert obj.temperature.celsius == 36.6
+
+
+##################
+# ListModelizable #
+##################
+
+
+class VectorS:
+    def __init__(self, components):
+        self.components = list(components)
+
+    def __eq__(self, other):
+        return isinstance(other, VectorS) and self.components == other.components
+
+    @classmethod
+    def serieux_from_list(cls, items: list[float]):
+        return cls(items)
+
+    @classmethod
+    def serieux_to_list(cls, obj):
+        return obj.components
+
+
+def test_serieux_from_list_and_to_list():
+    v = deserialize(VectorS, [1.0, 2.0, 3.0])
+    assert v == VectorS([1.0, 2.0, 3.0])
+
+    lst = serialize(VectorS, v)
+    assert lst == [1.0, 2.0, 3.0]
+
+    sch = schema(VectorS).compile(root=False)
+    assert sch == {"type": "array", "items": {"type": "number"}}
+
+
+def test_list_modelizable_class_check():
+    assert issubclass(VectorS, ListModelizable)
+    assert not issubclass(TemperatureS, ListModelizable)
+
+
+class BadFromList:
+    @classmethod
+    def serieux_from_list(cls, items: int):
+        return cls()
+
+
+def test_serieux_from_list_requires_list_annotation():
+    with pytest.raises(TypeError):
+        model(BadFromList)

@@ -1,12 +1,13 @@
+import inspect
 from dataclasses import replace
-from typing import Any
+from typing import Any, get_args, get_origin, get_type_hints
 
 from ovld import Medley, call_next, ovld, recurse
 from ovld.types import HasMethod
 from ovld.utils import ResolutionError
 
 from ..ctx import Context
-from ..model import Model, model
+from ..model import Field, Model, model
 from ..priority import STD4
 
 PRIO = STD4.next()
@@ -68,7 +69,9 @@ def _(
     t: type[HasMethod["serieux_to_string"]]  # noqa: F821
     | type[HasMethod["serieux_from_string"]]  # noqa: F821
     | type[HasMethod["serieux_to_number"]]  # noqa: F821
-    | type[HasMethod["serieux_from_number"]],  # noqa: F821
+    | type[HasMethod["serieux_from_number"]]  # noqa: F821
+    | type[HasMethod["serieux_to_list"]]  # noqa: F821
+    | type[HasMethod["serieux_from_list"]],  # noqa: F821
 ):
     m = call_next(t)
     if not m:
@@ -81,4 +84,18 @@ def _(
         m = replace(m, to_number=t.serieux_to_number)
     if hasattr(t, "serieux_from_number"):
         m = replace(m, from_number=t.serieux_from_number)
+    if hasattr(t, "serieux_from_list"):
+        fn = t.serieux_from_list
+        (param_name, *_) = inspect.signature(fn).parameters
+        hints = get_type_hints(fn)
+        ann = hints.get(param_name)
+        if get_origin(ann) is not list:
+            raise TypeError(
+                f"{t}.serieux_from_list's first argument must be annotated as list[T],"
+                f" where T is the element type, but it is annotated as {ann!r}"
+            )
+        (element_type,) = get_args(ann)
+        m = replace(m, from_list=fn, element_field=Field(type=element_type))
+    if hasattr(t, "serieux_to_list"):
+        m = replace(m, to_list=t.serieux_to_list)
     return m
