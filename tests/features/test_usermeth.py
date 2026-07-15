@@ -7,8 +7,17 @@ from ovld import Dataclass, Dependent, Lambda, ovld
 from ovld.dependent import Regexp
 
 from serieux import deserialize, schema, serialize
+from serieux.ctx import Trail, empty
 from serieux.features.clargs import CommandLineArguments
-from serieux.model import Field, ListModelizable, Model, NumberModelizable, model
+from serieux.model import (
+    DictModelizable,
+    Field,
+    ListModelizable,
+    Model,
+    NumberModelizable,
+    field_at,
+    model,
+)
 
 
 def _rgb_from_string(obj, cls):
@@ -449,3 +458,69 @@ class BadFromList:
 def test_serieux_from_list_requires_list_annotation():
     with pytest.raises(TypeError):
         model(BadFromList)
+
+
+###################
+# DictModelizable #
+###################
+
+
+class BagS:
+    def __init__(self, entries):
+        self.entries = dict(entries)
+
+    def __eq__(self, other):
+        return isinstance(other, BagS) and self.entries == other.entries
+
+    @classmethod
+    def serieux_from_dict(cls, entries: dict[str, int]):
+        return cls(entries)
+
+    @classmethod
+    def serieux_to_dict(cls, obj):
+        return obj.entries
+
+
+@pytest.mark.parametrize("ctx", (Trail(), empty))
+def test_serieux_from_dict_and_to_dict(ctx):
+    b = deserialize(BagS, {"a": 1, "b": 2}, ctx)
+    assert b == BagS({"a": 1, "b": 2})
+
+    d = serialize(BagS, b, ctx)
+    assert d == {"a": 1, "b": 2}
+
+    sch = schema(BagS).compile(root=False)
+    assert sch == {"type": "object", "additionalProperties": {"type": "integer"}}
+
+
+def test_dict_modelizable_class_check():
+    assert issubclass(BagS, DictModelizable)
+    assert not issubclass(VectorS, DictModelizable)
+    assert not issubclass(TemperatureS, DictModelizable)
+
+
+def test_dict_modelizable_field_at():
+    fld = field_at(BagS, ["a"])
+    assert fld.type is int
+
+
+class BadFromDict:
+    @classmethod
+    def serieux_from_dict(cls, entries: list):
+        return cls()
+
+
+def test_serieux_from_dict_requires_dict_annotation():
+    with pytest.raises(TypeError):
+        model(BadFromDict)
+
+
+class BadFromDictKey:
+    @classmethod
+    def serieux_from_dict(cls, entries: dict[int, str]):
+        return cls()
+
+
+def test_serieux_from_dict_requires_string_keys():
+    with pytest.raises(TypeError):
+        model(BadFromDictKey)

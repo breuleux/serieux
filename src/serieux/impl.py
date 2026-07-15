@@ -31,6 +31,7 @@ from .ctx import Context, ModifyContext, OmitDefaults, Sourced, WorkingDirectory
 from .exc import MissingFieldError, SchemaError, UnrecognizedFieldError, ValidationError
 from .instructions import pushdown
 from .model import (
+    DictModelizable,
     FieldModelizable,
     ListModelizable,
     Modelizable,
@@ -97,6 +98,8 @@ class BaseImplementation(Medley):
             func = self.deserialize.resolve(type[t], str, type(ctx))
         elif issubclass(t, NumberModelizable):
             func = self.deserialize.resolve(type[t], int, type(ctx))
+        elif issubclass(t, DictModelizable):
+            func = self.deserialize.resolve(type[t], dict, type(ctx))
         else:
             func = type(self).deserialize
         return lambda obj: func(self, t, obj, ctx)
@@ -630,6 +633,46 @@ class BaseImplementation(Medley):
         m = model(t)
         return cls.__generic_codegen_list("deserialize", m, obj, ctx)
 
+    ####################################
+    # Implementations: DictModelizable #
+    ####################################
+
+    @classmethod
+    def __generic_codegen_dictmodel(cls, method, m, obj, ctx):
+        builder = dict if method == "serialize" else m.from_dict
+        extractor = m.to_dict if method == "serialize" else None
+        vt = m.element_field.type
+        if extractor is None:
+            comp = "K: $vbody for K, V in $obj.items()"
+        else:
+            comp = "K: $vbody for K, V in $extractor($obj).items()"
+        if builder is dict:
+            code = f"{{{comp}}}"
+        else:
+            code = f"$builder({{{comp}}})"
+        if hasattr(ctx, "follow"):
+            ctx_expr = Code("$ctx.follow($objt, $obj, K)", objt=m.original_type)
+        else:
+            ctx_expr = Code("$ctx")
+        return Lambda(
+            code,
+            vbody=cls.subcode(method, vt, "V", ctx, ctx_expr=ctx_expr),
+            builder=builder,
+            extractor=extractor,
+        )
+
+    @code_generator(priority=STD2)
+    def serialize(cls, t: type[DictModelizable], obj: Any, ctx: Context, /):
+        (t,) = get_args(t)
+        m = model(t)
+        return cls.__generic_codegen_dictmodel("serialize", m, obj, ctx)
+
+    @code_generator(priority=STD2)
+    def deserialize(cls, t: type[DictModelizable], obj: dict, ctx: Context, /):
+        (t,) = get_args(t)
+        m = model(t)
+        return cls.__generic_codegen_dictmodel("deserialize", m, obj, ctx)
+
     ################################
     # Implementations: Modelizable #
     ################################
@@ -638,7 +681,7 @@ class BaseImplementation(Medley):
     def schema(self, t: type[Modelizable], ctx: Context, /):
         m = model(t)
 
-        f_schema = s_schema = n_schema = l_schema = None
+        f_schema = s_schema = n_schema = l_schema = d_schema = None
         follow = hasattr(ctx, "follow")
 
         if m.fields is not None:
@@ -674,15 +717,22 @@ class BaseImplementation(Medley):
         if m.from_number is not None:
             n_schema = {"type": "number"}
 
-        if m.element_field is not None:
+        if m.from_list is not None:
             fctx = ctx.follow(t, None, "*") if follow else ctx
             l_schema = {
                 "type": "array",
                 "items": recurse(m.element_field.type, fctx),
             }
 
-        assert f_schema or s_schema or n_schema or l_schema
-        possibilities = [x for x in [f_schema, s_schema, n_schema, l_schema] if x]
+        if m.from_dict is not None:
+            fctx = ctx.follow(t, None, "*") if follow else ctx
+            d_schema = {
+                "type": "object",
+                "additionalProperties": recurse(m.element_field.type, fctx),
+            }
+
+        assert f_schema or s_schema or n_schema or l_schema or d_schema
+        possibilities = [x for x in [f_schema, s_schema, n_schema, l_schema, d_schema] if x]
         match possibilities:
             case [sch]:
                 return sch

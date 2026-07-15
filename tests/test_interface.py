@@ -89,3 +89,32 @@ def test_deserializer_for():
     assert get_deserializer(list[Point])([{"x": 1, "y": 2}]) == [Point(1, 2)]
     assert get_deserializer(int)(42) == 42
     assert get_deserializer(date)("2025-12-01") == date(2025, 12, 1)
+
+
+class Kelvin:
+    def __init__(self, value):
+        self.value = value
+
+    def __eq__(self, other):
+        return isinstance(other, Kelvin) and self.value == other.value
+
+    @classmethod
+    def serieux_from_number(cls, obj):
+        return cls(obj)
+
+
+class Crate:
+    def __init__(self, entries):
+        self.entries = dict(entries)
+
+    def __eq__(self, other):
+        return isinstance(other, Crate) and self.entries == other.entries
+
+    @classmethod
+    def serieux_from_dict(cls, entries: dict[str, int]):
+        return cls(entries)
+
+
+def test_deserializer_for_number_and_dict_modelizable():
+    assert get_deserializer(Kelvin)(273) == Kelvin(273)
+    assert get_deserializer(Crate)({"a": 1}) == Crate({"a": 1})

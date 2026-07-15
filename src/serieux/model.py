@@ -52,7 +52,12 @@ def FieldModelizable(t):
 
 @class_check
 def ListModelizable(t):
-    return isinstance(m := model(t), Model) and m.element_field is not None
+    return isinstance(m := model(t), Model) and m.from_list is not None
+
+
+@class_check
+def DictModelizable(t):
+    return isinstance(m := model(t), Model) and m.from_dict is not None
 
 
 @dataclass(kw_only=True, eq=False)
@@ -99,6 +104,8 @@ class Model:
     constructor: Callable = None
     from_list: Callable = None
     to_list: Callable = None
+    from_dict: Callable = None
+    to_dict: Callable = None
     from_string: Callable = None
     to_string: Callable = None
     regexp: re.Pattern = None
@@ -111,7 +118,8 @@ class Model:
     def __post_init__(self):
         if isinstance(self.regexp, str):
             self.regexp = re.compile(self.regexp)
-        if self.element_field is not None and self.from_list is None:  # pragma: no cover
+        no_container = self.from_list is None and self.from_dict is None
+        if self.element_field is not None and no_container:  # pragma: no cover
             self.from_list = self.constructor
         if self.description is None:
             self.description = getattr(strip(self.original_type), "__doc__", None)
@@ -409,6 +417,13 @@ def field_at(t: type[ListModelizable], path: list, f: Field):
         int(curr)
     except ValueError:
         return None
+    return recurse(m.element_field.type, rest, m.element_field)
+
+
+@ovld(priority=1)
+def field_at(t: type[DictModelizable], path: list, f: Field):
+    m = model(t)
+    _, *rest = path
     return recurse(m.element_field.type, rest, m.element_field)
 
 

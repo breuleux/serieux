@@ -30,3 +30,18 @@ def test_tells_number_modelizable():
     assert tells(Celsius, int) == set()
     assert tells(Celsius, float) == set()
     assert tells(Celsius, str) is None
+
+
+class Bag:
+    @classmethod
+    def serieux_from_dict(cls, entries: dict[str, int]):  # pragma: no cover
+        return cls()
+
+    @classmethod
+    def serieux_to_dict(cls, obj):  # pragma: no cover
+        return {}
+
+
+def test_tells_dict_modelizable():
+    assert tells(Bag, dict) == set()
+    assert tells(Bag, str) is None

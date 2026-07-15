@@ -30,6 +30,7 @@ from .impl import BaseImplementation
 from .instructions import Instruction
 from .model import (
     AllowExtras,
+    DictModelizable,
     Field,
     FieldModelizable,
     ListModelizable,
@@ -166,6 +167,7 @@ __all__ = [
     "Context",
     "DeepLazy",
     "deserialize",
+    "DictModelizable",
     "display_context_information",
     "DottedNotation",
     "dump",
