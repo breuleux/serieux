@@ -34,7 +34,7 @@ class EncryptionKey(Context):
         return f"~CRYPT~{encrypted}"
 
     def decrypt(self, encrypted: str):
-        return json.loads(self.key.decrypt(encrypted.lstrip("~CRYPT~")))
+        return json.loads(self.key.decrypt(encrypted.removeprefix("~CRYPT~")))
 
 
 @Serieux.extend

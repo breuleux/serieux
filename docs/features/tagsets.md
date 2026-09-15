@@ -102,6 +102,7 @@ Use this template to define your own tagging systems.
 ```python
 from serieux.features.tagset import TagSet
 
+
 @dataclass(frozen=True)
 class FromEntryPoint(TagSet):
     # Define some fields here

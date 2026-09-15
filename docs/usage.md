@@ -16,12 +16,14 @@ The first argument to `serialize` and `deserialize` is always the *intended* typ
 ```python
 from serieux import serialize
 
+
 @dataclass
 class Person:
     # Name of the person
     name: str
     # Age of the person
     age: int
+
 
 serialize(Person, Person("Bob", 40))
 # => {"name": "Bob", "age": 40}
@@ -70,7 +72,7 @@ deserialize(
     Sources(
         {"liv": {"name": "Olivia"}, "kev": {"name": "Kevin"}},
         {"liv": {"age": 30}, "kev": {"age": 25}},
-    )
+    ),
 )
 # => {
 #      "liv": Person(name="Olivia", age=30),
@@ -87,7 +89,7 @@ deserialize(
         Path("defaults.yaml"),
         Path("config.yaml"),
         Path("overrides.yaml"),
-    )
+    ),
 )
 ```
 
@@ -100,18 +102,20 @@ Variable interpolation is not a default feature. You need to pass `Environment()
 ```python
 from serieux import Environment
 
+
 @dataclass
 class Court:
     king: Person
     jester: Person
 
+
 deserialize(
     Court,
     {
         "king": {"name": "Archibald", "age": 50},
-        "jester": {"name": "Funnier than ${king.name}", "age": 23}
+        "jester": {"name": "Funnier than ${king.name}", "age": 23},
     },
-    Environment()
+    Environment(),
 )
 # => Court(
 #      king=Person(name="Archibald", age=50),
@@ -127,11 +131,7 @@ deserialize(
 Insert environment variables with the `${env:VAR}` interpolation.
 
 ```python
-deserialize(
-    Person,
-    {"name": "${env:PERSON_NAME}", "age": "${env:PERSON_AGE}"},
-    Environment()
-)
+deserialize(Person, {"name": "${env:PERSON_NAME}", "age": "${env:PERSON_AGE}"}, Environment())
 ```
 
 
@@ -154,6 +154,7 @@ class Point:
     x: int
     y: int
 
+
 print(deserialize(Person | Point, {"x": 1, "y": 2}))
 # => Point(x=1, y=2)
 
@@ -171,6 +172,7 @@ Serieux also supports differentiating union members through the special `$class`
 class Monster:
     name: str
     age: int
+
 
 PoM = TaggedUnion[Person, Monster]
 

@@ -13,12 +13,14 @@ description: Use serieux for serialization/deserialization in Python. Trigger wh
 from dataclasses import dataclass
 from serieux import serialize, deserialize
 
+
 @dataclass
 class Person:
     # Name of the person
     name: str
     # Age of the person
     age: int
+
 
 serialize(Person, Person("Bob", 40))
 # => {"name": "Bob", "age": 40}
@@ -73,9 +75,11 @@ from serieux import Environment
 
 deserialize(
     Court,
-    {"king": {"name": "Archibald", "age": 50},
-     "jester": {"name": "Funnier than ${king.name}", "age": 23}},
-    Environment()
+    {
+        "king": {"name": "Archibald", "age": 50},
+        "jester": {"name": "Funnier than ${king.name}", "age": 23},
+    },
+    Environment(),
 )
 ```
 
@@ -100,7 +104,7 @@ Use `Auto[func]` to deserialize into a callable partial, or `Call[func]` to call
 Serieux differentiates union members by their fields or serialized type:
 
 ```python
-deserialize(Person | Point, {"x": 1, "y": 2})   # => Point(x=1, y=2)
+deserialize(Person | Point, {"x": 1, "y": 2})  # => Point(x=1, y=2)
 deserialize(Person | Point, {"name": "Alice", "age": 30})  # => Person(...)
 ```
 
@@ -164,7 +168,7 @@ class RGB:
     @classmethod
     def serieux_from_string(cls, s):
         h = s.lstrip("#")
-        return cls(int(h[0:2],16), int(h[2:4],16), int(h[4:6],16))
+        return cls(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 
     # Full control (optional):
     @classmethod
@@ -179,7 +183,9 @@ class RGB:
 
     @classmethod
     def serieux_schema(cls, ctx, call_next):
-        return {"oneOf": [{"type": "string", "pattern": r"^#[0-9a-fA-F]{6}$"}, call_next(cls, ctx)]}
+        return {
+            "oneOf": [{"type": "string", "pattern": r"^#[0-9a-fA-F]{6}$"}, call_next(cls, ctx)]
+        }
 ```
 
 For rich field-based models, implement `serieux_model` returning a `Model`:
@@ -187,14 +193,21 @@ For rich field-based models, implement `serieux_model` returning a `Model`:
 ```python
 from serieux import Field, Model
 
+
 @classmethod
 def serieux_model(cls, call_next):
     return Model(
         original_type=cls,
         constructor=cls,
         fields=[
-            Field(name="red", type=int, description="Red level",
-                  serialized_name="R", argument_name="reddie", property_name="red"),
+            Field(
+                name="red",
+                type=int,
+                description="Red level",
+                serialized_name="R",
+                argument_name="reddie",
+                property_name="red",
+            ),
             # ...
         ],
         from_string=rgb_from_string,
@@ -255,10 +268,10 @@ m = model(Person)
 ```python
 from serieux import Modelizable, StringModelizable, FieldModelizable, ListModelizable
 
-Modelizable(Person)       # True — has a Model
+Modelizable(Person)  # True — has a Model
 FieldModelizable(Person)  # True — Model has .fields
-StringModelizable(date)   # True — Model has .from_string
-ListModelizable(list[int])# True — Model has .element_field
+StringModelizable(date)  # True — Model has .from_string
+ListModelizable(list[int])  # True — Model has .element_field
 ```
 
 These are `ovld` class-checks, usable as type annotations in dispatch signatures.
@@ -270,6 +283,7 @@ Register new overloads of `model` exactly like any other `ovld` function:
 ```python
 from ovld import ovld
 from serieux import model, Model, Field
+
 
 @ovld
 def model(t: type[MyClass]):
@@ -305,12 +319,14 @@ To silently ignore unknown keys on a dataclass, set `allow_extras` on an inner `
 from serieux import AllowExtras
 from typing import Annotated
 
+
 @dataclass
 class Flexible:
     name: str
 
     class SerieuxConfig:
         allow_extras = True
+
 
 # or via annotation:
 deserialize(Annotated[Flexible, AllowExtras], {"name": "Bob", "extra": "ignored"})
@@ -371,10 +387,11 @@ When the instruction needs to carry configuration use a frozen dataclass subclas
 from dataclasses import dataclass
 from serieux.instructions import BaseInstruction
 
+
 @dataclass(frozen=True)
 class Encrypted(BaseInstruction):
     algorithm: str = "fernet"
-    inherit: bool = False   # whether to push down into fields
+    inherit: bool = False  # whether to push down into fields
 ```
 
 Usage: `Annotated[str, Encrypted(algorithm="aes")]` or `str @ Encrypted()`.
@@ -384,12 +401,13 @@ Usage: `Annotated[str, Encrypted(algorithm="aes")]` or `str @ Encrypted()`.
 ```python
 from typing import Any
 from ovld import ovld
-from serieux.instructions import strip   # remove instruction from type
+from serieux.instructions import strip  # remove instruction from type
+
 
 class MyFeature(Medley):
     @ovld(priority=HIGH)
     def deserialize(self, t: type[Any @ MyFlag], obj: object, ctx: Context):
-        base_type = MyFlag.strip(t)   # the type without the annotation
+        base_type = MyFlag.strip(t)  # the type without the annotation
         ...
         return recurse(base_type, obj, ctx)
 ```
@@ -419,10 +437,11 @@ If your instruction changes how a type maps to a Model, register on `model` dire
 from serieux import model, Model
 from serieux.instructions import strip
 
+
 @model.register
 def _(t: type[Any @ MyFlag]):
     base = strip(t, MyFlag)
-    m = call_next(base)   # get the normal model
+    m = call_next(base)  # get the normal model
     # ... modify m ...
     return m
 ```
@@ -439,6 +458,7 @@ from ovld.dependent import Regexp
 from serieux import serieux, Context, ValidationError
 from serieux.priority import LOW
 
+
 class EvalFeature(Medley):
     @ovld(priority=LOW)
     def deserialize(self, t: type[object], obj: Regexp["^="], ctx: Context):
@@ -447,8 +467,9 @@ class EvalFeature(Medley):
             raise ValidationError("Wrong type")
         return value
 
+
 eserieux = serieux + EvalFeature()
-eserieux.deserialize(int, "=3*2")   # => 6
+eserieux.deserialize(int, "=3*2")  # => 6
 ```
 
 Key rules:
@@ -466,14 +487,13 @@ Medleys can subclass each other to layer behaviour. `IncludeFile` extends `FromF
 ```python
 class BaseFeature(Medley):
     @ovld(priority=STD)
-    def deserialize(self, t: Any, obj: MyType, ctx: Context):
-        ...
+    def deserialize(self, t: Any, obj: MyType, ctx: Context): ...
+
 
 class ExtendedFeature(BaseFeature):
     # Inherits all rules from BaseFeature and adds new ones
     @ovld(priority=HIGH)
-    def deserialize(self, t: Any, obj: MyType, ctx: SpecialContext):
-        ...
+    def deserialize(self, t: Any, obj: MyType, ctx: SpecialContext): ...
 ```
 
 ### Combining Instructions + Medley (full pattern)
@@ -485,10 +505,12 @@ from dataclasses import dataclass
 from serieux.instructions import BaseInstruction
 from serieux.priority import HI3
 
+
 @dataclass(frozen=True)
 class Validated(BaseInstruction):
     min_length: int = 0
     inherit: bool = False
+
 
 class ValidationFeature(Medley):
     @ovld(priority=HI3)
@@ -498,6 +520,7 @@ class ValidationFeature(Medley):
         if len(result) < instr.min_length:
             raise ValidationError(f"Too short (min {instr.min_length})")
         return result
+
 
 # Usage in a dataclass field:
 @dataclass
@@ -519,8 +542,10 @@ from serieux import Context
 from serieux.priority import HIGH
 from ovld import Medley, ovld
 
+
 class Verbose(Context):
     pass  # marker — no fields needed
+
 
 class VerboseFeature(Medley):
     @ovld(priority=HIGH)
@@ -528,8 +553,9 @@ class VerboseFeature(Medley):
         print(f"deserializing {t} from {obj!r}")
         return call_next(t, obj, ctx)
 
+
 vserieux = serieux + VerboseFeature()
-vserieux.deserialize(int, 42, Verbose())   # prints, then returns 42
+vserieux.deserialize(int, 42, Verbose())  # prints, then returns 42
 ```
 
 The method only fires when `Verbose` is part of the context; without it the method is invisible to dispatch.
@@ -541,6 +567,7 @@ Use dataclass-style fields (same as Medley fields) to pass configuration:
 ```python
 from dataclasses import dataclass, field
 from serieux import Context
+
 
 class EncryptionKey(Context):
     password: str = None
@@ -556,15 +583,17 @@ Context objects are **not mutated** (they behave like frozen dataclasses by defa
 from dataclasses import dataclass, field
 from serieux import Context
 
+
 class Collector(Context):
     # mutable dict — shared across the whole traversal
     seen: dict = field(default_factory=dict)
+
 
 class CollectFeature(Medley):
     @ovld(priority=HIGH)
     def deserialize(self, t: type[object], obj: object, ctx: Collector):
         result = call_next(t, obj, ctx)
-        ctx.seen[ctx.trail] = result   # mutate the shared dict
+        ctx.seen[ctx.trail] = result  # mutate the shared dict
         return result
 ```
 
@@ -681,25 +710,64 @@ MIN  = -100     # last-resort error fallback
 ```python
 from serieux import (
     # Core
-    serialize, deserialize, schema, load, dump,
-    get_serializer, get_deserializer,
+    serialize,
+    deserialize,
+    schema,
+    load,
+    dump,
+    get_serializer,
+    get_deserializer,
     # Registration decorators
-    serializer, deserializer, schema_definition,
+    serializer,
+    deserializer,
+    schema_definition,
     # Model / field
-    model, field_at, Model, Field, FieldModelizable, ListModelizable, Modelizable, StringModelizable,
+    model,
+    field_at,
+    Model,
+    Field,
+    FieldModelizable,
+    ListModelizable,
+    Modelizable,
+    StringModelizable,
     # Features / context
-    Context, Auto, Lazy, DeepLazy, LazyProxy, Partial, Sources,
-    Environment, CommandLineArguments, CLIDefinition, parse_cli,
+    Context,
+    Auto,
+    Lazy,
+    DeepLazy,
+    LazyProxy,
+    Partial,
+    Sources,
+    Environment,
+    CommandLineArguments,
+    CLIDefinition,
+    parse_cli,
     # Tagging
-    Tagged, TaggedUnion, TaggedSubclass, ReferencedClass, Referenced, AutoRegistered,
+    Tagged,
+    TaggedUnion,
+    TaggedSubclass,
+    ReferencedClass,
+    Referenced,
+    AutoRegistered,
     # File / config
-    IncludeFile, AllowExtras, DottedNotation, WorkingDirectory, Patch, Patcher,
+    IncludeFile,
+    AllowExtras,
+    DottedNotation,
+    WorkingDirectory,
+    Patch,
+    Patcher,
     # Schema
-    RefPolicy, Schema, Trail,
+    RefPolicy,
+    Schema,
+    Trail,
     # Comments
-    Comment, CommentRec,
+    Comment,
+    CommentRec,
     # Errors
-    BaseSerieuxError, SerieuxError, ValidationError, SerieuxExceptionGroup,
+    BaseSerieuxError,
+    SerieuxError,
+    ValidationError,
+    SerieuxExceptionGroup,
     # The global serieux instance (extend with +)
     serieux,
 )

@@ -1,9 +1,9 @@
 import inspect
 import math
 from dataclasses import MISSING, is_dataclass
-from functools import partial
 from datetime import date, datetime
 from enum import Enum
+from functools import partial
 from itertools import pairwise
 from pathlib import Path
 from types import NoneType, UnionType, WrapperDescriptorType
@@ -541,9 +541,7 @@ class BaseImplementation(Medley):
                 if f.required:
                     raise MissingFieldError(m.original_type, f.name, ctx=ctx)
                 continue
-            ctx_expr = (
-                ctx.follow(m.original_type, obj, f.name) if follow else ctx
-            )
+            ctx_expr = ctx.follow(m.original_type, obj, f.name) if follow else ctx
             rval[f.serialized_name] = recurse(f.type, bound.arguments[f.name], ctx_expr)
         return rval
 

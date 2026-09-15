@@ -67,7 +67,7 @@ class EncryptionKey(Context):
 
     def decrypt(self, encrypted: str):
         ek = self.get_encryption_key()
-        return json.loads(ek.decrypt(encrypted.lstrip(crypt_prefix)))
+        return json.loads(ek.decrypt(encrypted.removeprefix(crypt_prefix)))
 
 
 ##################

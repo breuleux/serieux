@@ -7,18 +7,20 @@ The default interpolation syntax is `${xyz}`.
 ```python
 from serieux import Environment
 
+
 @dataclass
 class Court:
     king: Person
     jester: Person
 
+
 deserialize(
     Court,
     {
         "king": {"name": "Archibald", "age": 50},
-        "jester": {"name": "Funnier than ${king.name}", "age": 23}
+        "jester": {"name": "Funnier than ${king.name}", "age": 23},
     },
-    Environment()
+    Environment(),
 )
 # => Court(
 #      king=Person(name="Archibald", age=50),
@@ -50,11 +52,7 @@ import os
 os.environ["PERSON_NAME"] = "Olivia"
 os.environ["PERSON_AGE"] = "31"
 
-deserialize(
-    Person,
-    {"name": "${env:PERSON_NAME}", "age": "${env:PERSON_AGE}"},
-    Environment()
-)
+deserialize(Person, {"name": "${env:PERSON_NAME}", "age": "${env:PERSON_AGE}"}, Environment())
 # => Person(name="Olivia", age=31)
 ```
 
@@ -76,9 +74,11 @@ You can subclass `Environment` to add custom resolvers. Note that implementation
 ```python
 from typing import Any, Literal
 
+
 class EvalEnvironment(Environment):
     def resolve_variable(self, t: Any, method: Literal["eval"], expr: str, /):
         return eval(expr)
+
 
 deserialize(int, "${eval:2 + 2}", EvalEnvironment())
 # => 4
