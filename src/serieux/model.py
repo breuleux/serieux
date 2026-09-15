@@ -1,6 +1,6 @@
 import re
 from dataclasses import MISSING, dataclass, field, fields, is_dataclass, replace
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
@@ -299,7 +299,9 @@ def model(t: type[date] | type[datetime]):
         original_type=t,
         from_string=Lambda("$t.fromisoformat($obj)"),
         to_string=Lambda("$t.isoformat($obj)"),
-        from_number=Lambda(Code("$fromtimestamp($obj)", fromtimestamp=datetime.fromtimestamp))
+        from_number=Lambda(
+            Code("$fromtimestamp($obj,tz=$utc)", fromtimestamp=datetime.fromtimestamp, utc=UTC)
+        )
         if t is datetime
         else None,
     )

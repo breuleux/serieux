@@ -1,7 +1,7 @@
 import sys
 import warnings
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -109,7 +109,7 @@ def test_deserialize_union():
 
 def test_deserialize_optional():
     ts = 1763667454
-    dt = datetime.fromtimestamp(ts)
+    dt = datetime.fromtimestamp(ts, tz=UTC)
     assert deserialize(datetime | None, ts) == dt
     assert deserialize(Partial[datetime | None], ts) == dt
 

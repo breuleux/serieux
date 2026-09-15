@@ -1,5 +1,5 @@
 import re
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -72,7 +72,7 @@ def test_deserialize_datetime():
 
 
 def test_deserialize_datetime_timestamp():
-    assert deserialize(datetime, 1746471553) == datetime.fromtimestamp(1746471553)
+    assert deserialize(datetime, 1746471553) == datetime.fromtimestamp(1746471553, tz=UTC)
 
 
 def test_schema_datetime():
@@ -185,6 +185,41 @@ def test_schema_zoneinfo():
 
 def test_tells_zoneinfo():
     assert tells(ZoneInfo, str) == set()
+
+
+#################################
+# Test timezone-aware datetimes #
+#################################
+
+
+def test_serialize_datetime_with_timezone():
+    dt = datetime(2023, 5, 15, 12, 30, 45, tzinfo=ZoneInfo("America/New_York"))
+    assert serialize(datetime, dt) == "2023-05-15T12:30:45-04:00"
+    dt_utc = datetime(2023, 5, 15, 12, 30, 45, tzinfo=UTC)
+    assert serialize(datetime, dt_utc) == "2023-05-15T12:30:45+00:00"
+    dt_kolkata = datetime(2023, 5, 15, 12, 30, 45, tzinfo=ZoneInfo("Asia/Kolkata"))
+    assert serialize(datetime, dt_kolkata) == "2023-05-15T12:30:45+05:30"
+
+
+def test_deserialize_datetime_with_timezone():
+    ny = datetime(2023, 5, 15, 12, 30, 45, tzinfo=ZoneInfo("America/New_York"))
+    assert deserialize(datetime, "2023-05-15T12:30:45-04:00") == ny
+    assert deserialize(datetime, "2023-05-15T16:30:45+00:00") == ny
+    assert deserialize(datetime, "2023-05-15T16:30:45Z") == ny
+    assert deserialize(list[datetime], ["2023-05-15T16:30:45Z"]) == [ny]
+
+
+def test_datetime_timezone_roundtrip():
+    for tz in ("America/New_York", "UTC", "Asia/Kolkata", "Europe/Paris"):
+        dt = datetime(2023, 11, 5, 3, 30, tzinfo=ZoneInfo(tz))
+        assert deserialize(datetime, serialize(datetime, dt)) == dt
+
+
+def test_datetime_timezone_conversion():
+    # Same moment in two different zones compares equal
+    ny = deserialize(datetime, "2023-05-15T12:30:45-04:00")
+    kolkata = deserialize(datetime, "2023-05-15T22:00:45+05:30")
+    assert ny == kolkata
 
 
 ###################
