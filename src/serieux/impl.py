@@ -1,5 +1,7 @@
+import inspect
 import math
 from dataclasses import MISSING, is_dataclass
+from functools import partial
 from datetime import date, datetime
 from enum import Enum
 from itertools import pairwise
@@ -29,7 +31,7 @@ from . import formats
 from .auto import Auto
 from .ctx import Context, ModifyContext, OmitDefaults, Sourced, WorkingDirectory, empty
 from .exc import MissingFieldError, SchemaError, UnrecognizedFieldError, ValidationError
-from .instructions import pushdown
+from .instructions import pushdown, strip
 from .model import (
     DictModelizable,
     FieldModelizable,
@@ -517,6 +519,33 @@ class BaseImplementation(Medley):
         )
         stmts.append(final)
         return Def(stmts, VE=ValidationError)
+
+    @ovld(priority=STD)
+    def serialize(self, t: type[FieldModelizable], obj: partial, ctx: Context, /):
+        m = model(t)
+        _, aut = Auto.decompose(t)
+        if (
+            isinstance(m.original_type, type)
+            or (aut is not None and aut.call)
+            or obj.func is not strip(m.original_type)
+        ):
+            return call_next(t, obj, ctx)
+
+        bound = inspect.signature(obj.func).bind_partial(*obj.args, **obj.keywords)
+        follow = hasattr(ctx, "follow")
+        rval = {}
+        for f in m.fields:
+            if f.metavar is not None:  # pragma: no cover
+                continue
+            if f.name not in bound.arguments:
+                if f.required:
+                    raise MissingFieldError(m.original_type, f.name, ctx=ctx)
+                continue
+            ctx_expr = (
+                ctx.follow(m.original_type, obj, f.name) if follow else ctx
+            )
+            rval[f.serialized_name] = recurse(f.type, bound.arguments[f.name], ctx_expr)
+        return rval
 
     ######################################
     # Implementations: StringModelizable #

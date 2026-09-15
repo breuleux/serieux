@@ -1,11 +1,12 @@
 from dataclasses import dataclass
+from functools import partial
 from typing import Annotated
 
 import pytest
 
 from serieux import deserialize, serialize
 from serieux.auto import Auto, Call, MeldedCall
-from serieux.exc import SchemaError, ValidationError
+from serieux.exc import MissingFieldError, SchemaError, ValidationError
 from serieux.features.tagset import TaggedUnion, tag_field
 from serieux.model import constructed_type
 
@@ -49,6 +50,44 @@ def test_call_on_type():
 def test_auto_not_serializable():
     with pytest.raises(SchemaError, match="does not specify how to serialize"):
         serialize(Auto[Funky], Funky(x=3, y=True))
+
+
+def test_auto_serialize_partial():
+    assert serialize(Auto[funky], partial(funky, x=3, y=True)) == {"x": 3, "y": True}
+
+
+def test_auto_serialize_partial_positional():
+    assert serialize(Auto[funky], partial(funky, 3, True)) == {"x": 3, "y": True}
+
+
+def test_auto_serialize_partial_missing_required():
+    with pytest.raises(MissingFieldError, match="'y'"):
+        serialize(Auto[funky], partial(funky, x=3))
+
+
+def test_auto_serialize_partial_skips_defaults():
+    def g(x: int, z: int = 5) -> int:
+        return x + z
+
+    assert serialize(Auto[g], partial(g, x=3)) == {"x": 3}
+
+
+def test_auto_serialize_partial_wrong_func():
+    def other(x: int, y: bool) -> str:
+        return ""
+
+    with pytest.raises(ValidationError, match="Cannot serialize"):
+        serialize(Auto[funky], partial(other, x=3, y=True))
+
+
+def test_call_not_serializable_as_partial():
+    with pytest.raises(ValidationError, match="Cannot serialize"):
+        serialize(Call[funky], partial(funky, x=3, y=True))
+
+
+def test_auto_class_not_serializable_as_partial():
+    with pytest.raises(ValidationError, match="Cannot serialize"):
+        serialize(Auto[Point], partial(Point, 1, 2))
 
 
 def test_auto_no_interference():
