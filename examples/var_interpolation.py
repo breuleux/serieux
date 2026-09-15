@@ -27,7 +27,7 @@ def evaluate(expr, ctx):
         except NameError:
             pass
         if not current:
-            raise Exception(f"Failed to evaluate expression: {expr}")
+            raise Exception(f"Failed to evaluate expression: {expr}")  # noqa
         current = current[:-1]
 
 

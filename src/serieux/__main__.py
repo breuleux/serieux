@@ -2,9 +2,10 @@ import getpass
 import json
 import os
 import sys
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from . import deserialize, schema, serieux
 from .auto import Auto
@@ -149,14 +150,14 @@ class Check(SelectableFileOperation):
             data = self.load()
         except (AttributeError, ValueError, KeyError):
             print("nonexistent")
-            exit(2)
+            sys.exit(2)
 
         if data:
             print("true")
-            exit(0)
+            sys.exit(0)
         elif not data:
             print("false")
-            exit(1)
+            sys.exit(1)
 
 
 @dataclass(kw_only=True)

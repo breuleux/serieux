@@ -73,6 +73,6 @@ def test_not_json():
     assert not isinstance({"a": NotJson()}, JSON)
     assert not isinstance([1, 2, NotJson(), 3], JSON)
     assert not isinstance(NotJson(), JSON)
-    assert not isinstance(set([1, 2, 3]), JSON)
+    assert not isinstance({1, 2, 3}, JSON)
     assert not isinstance((1, 2, 3), JSON)
     assert not isinstance(object(), JSON)

@@ -81,7 +81,7 @@ class Person:
     shirt: RGB
 
 
-def main(argv=["--name", "Travis", "--shirt", "#ff0010"]):
+def main(argv=("--name", "Travis", "--shirt", "#ff0010")):
     defaults = {"name": "Guy", "age": 0, "shirt": "#ffffff"}
     overrides = {"shirt": {"blue": 128}}
     person = deserialize(Person, Sources(defaults, CommandLineArguments(argv), overrides))

@@ -57,9 +57,23 @@ line-length = 99
 
 [tool.ruff.lint]
 extend-select = ["I"]
-ignore = ["F811", "F722"]
+ignore = [
+    "B015",     # because of lazy tests
+    "B018",     # because of lazy tests
+    "DTZ001",   # require tzinfo arg to datetime, not appropriate for our tests
+    "F811",     # repeated defs, ovld basically requires disabling this
+    "PLW0120",  # else:return -> return; I don't like this rule
+    "RET501",   # return None -> return; I don't like this rule
+    "S102",     # use of exec is fine
+    "SIM102",   # combine if statements; I don't like this rule
+    "UP007",    # Union[] vs |
+    "UP045",    # Optional[] vs |None
+
+    "PYI041",   # int | float = float; need to fix this
+]
+
 # ruff complains it's using illegal syntax under 3.11, but that's fine, it's a 3.12 test
-exclude = ["tests/definitions_py312.py"]
+exclude = ["tests/definitions_py312.py", "examples/"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true

@@ -31,8 +31,8 @@ def schema(t, root=False, ref_policy="norepeat"):
 def test_schema_hashable():
     sch1 = Schema(int)
     sch2 = Schema(int)
-    assert sch1 == sch1
-    assert not (sch1 == sch2)
+    assert sch1 == sch1  # noqa
+    assert sch1 != sch2
     assert {sch1: 1, sch2: 2} == {sch1: 1, sch2: 2}
 
 

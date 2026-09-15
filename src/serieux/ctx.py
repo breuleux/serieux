@@ -2,10 +2,11 @@ import hashlib
 import logging
 import uuid
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from ovld.medley import ChainAll, KeepLast, Medley
 
@@ -74,7 +75,13 @@ class WorkingDirectory(Context):
         return pth
 
     def save_to_file(
-        self, data: str | bytes = None, suffix=None, *, name=None, callback=None, entropy=None
+        self,
+        data: str | bytes | None = None,
+        suffix=None,
+        *,
+        name=None,
+        callback=None,
+        entropy=None,
     ):
         dest = self.make_path_for(entropy=entropy or data, suffix=suffix, name=name)
         dest.parent.mkdir(parents=True, exist_ok=True)

@@ -21,8 +21,8 @@ def unflatten(d: dict, allow_lists=False):
 @ovld
 def _convert_lists(obj: dict):
     obj = {k: recurse(v) for k, v in obj.items()}
-    if obj and all(k.isdigit() for k in obj.keys()):
-        indices = sorted(int(k) for k in obj.keys())
+    if obj and all(k.isdigit() for k in obj):
+        indices = sorted(int(k) for k in obj)
         if indices != list(range(len(indices))):
             raise ValueError(f"List indices have gaps: {indices}")
         return [obj[str(i)] for i in range(len(indices))]
@@ -37,6 +37,6 @@ def _convert_lists(obj: object):
 class DottedNotation(Medley):
     @ovld(priority=HI2)
     def deserialize(self, t: Any, obj: dict, ctx: Context):
-        if issubclass(t, FieldModelizable) and any("." in k for k in obj.keys()):
+        if issubclass(t, FieldModelizable) and any("." in k for k in obj):
             return call_next(t, unflatten(obj), ctx)
         return call_next(t, obj, ctx)

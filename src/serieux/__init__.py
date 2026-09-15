@@ -58,7 +58,7 @@ def _default_features():
             # Some features may be dependent on what packages are installed.
             # That is fine.
             continue
-        except Exception:  # pragma: no cover
+        except Exception:  # pragma: no cover # noqa
             logger.warning(
                 "Default serieux feature %r (%s) failed to load:\n%s",
                 ep.name,
@@ -86,7 +86,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
     class Serieux(metaclass=_MC):
         def dump(
-            self, t: type[T], obj: object, ctx: Context = None, *, dest: Path = None
+            self, t: type[T], obj: object, ctx: Context = None, *, dest: Path | None = None
         ) -> JSON | None: ...
 
         def load(self, t: type[T], obj: object, ctx: Context = None) -> T: ...
@@ -152,12 +152,11 @@ if sys.excepthook is sys.__excepthook__ and not os.getenv("SERIEUX_DISABLE_EXCEP
 
 
 __all__ = [
-    "__version__",
-    "AllowExtras",
+    "JSON",
     "AllTrails",
+    "AllowExtras",
     "Auto",
     "AutoRegistered",
-    "auto_singleton",
     "BaseImplementation",
     "BaseSerieuxError",
     "CLIDefinition",
@@ -166,28 +165,19 @@ __all__ = [
     "CommentRec",
     "Context",
     "DeepLazy",
-    "deserialize",
     "DictModelizable",
-    "display_context_information",
     "DottedNotation",
-    "dump",
     "Environment",
     "Field",
-    "get_deserializer",
-    "get_serializer",
+    "FieldModelizable",
     "IncludeFile",
-    "JSON",
+    "Instruction",
     "Lazy",
     "LazyProxy",
     "ListModelizable",
-    "load",
-    "model",
     "Model",
-    "FieldModelizable",
     "Modelizable",
     "NumberModelizable",
-    "Instruction",
-    "parse_cli",
     "Partial",
     "Patch",
     "Patcher",
@@ -195,19 +185,29 @@ __all__ = [
     "Referenced",
     "ReferencedClass",
     "Registered",
-    "schema",
     "Schema",
-    "serialize",
-    "serieux",
     "Serieux",
     "SerieuxError",
+    "SerieuxExceptionGroup",
     "Sources",
     "StringModelizable",
     "Tagged",
-    "TaggedUnion",
     "TaggedSubclass",
+    "TaggedUnion",
     "Trail",
     "ValidationError",
-    "SerieuxExceptionGroup",
     "WorkingDirectory",
+    "__version__",
+    "auto_singleton",
+    "deserialize",
+    "display_context_information",
+    "dump",
+    "get_deserializer",
+    "get_serializer",
+    "load",
+    "model",
+    "parse_cli",
+    "schema",
+    "serialize",
+    "serieux",
 ]

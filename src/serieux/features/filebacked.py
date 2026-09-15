@@ -1,7 +1,8 @@
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Generic, TypeVar, get_args, get_origin
+from typing import Any, Generic, TypeVar, get_args, get_origin
 
 from ovld import Medley, ovld
 
@@ -29,7 +30,7 @@ class FileBacked(Generic[T]):
     context: Context
     timestamp: float = None
     refresh: bool = False
-    default_factory: Callable = None
+    default_factory: Callable | None = None
     value: T = None
 
     def __init__(
@@ -39,7 +40,7 @@ class FileBacked(Generic[T]):
         serieux: object,
         context: Context,
         refresh: bool = False,
-        default_factory: Callable = None,
+        default_factory: Callable | None = None,
     ):
         self.path = path
         value_type = Partial.strip(value_type)
@@ -95,13 +96,15 @@ class FileProxy(FileBackedOptions):
 
 
 class FileBackedProxy(ProxyBase):
-    __special_attributes__ = {
-        *ProxyBase.__special_attributes__,
-        "_wrapper",
-        "_path",
-        "load",
-        "save",
-    }
+    __special_attributes__ = frozenset(
+        {
+            *ProxyBase.__special_attributes__,
+            "_wrapper",
+            "_path",
+            "load",
+            "save",
+        }
+    )
 
     def __init__(self, path, value_type, *args, **kwargs):
         self._wrapper = FileBacked(path, value_type, *args, **kwargs)

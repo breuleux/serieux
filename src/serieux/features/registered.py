@@ -122,7 +122,7 @@ class RegisteredHandler(Medley):
 
 
 @model.register
-def _(t: type[Any @ BaseRegistry]):  # noqa: F821
+def _(t: type[Any @ BaseRegistry]):
     rg = BaseRegistry.extract(t)
     return Model(
         original_type=t,
@@ -132,7 +132,7 @@ def _(t: type[Any @ BaseRegistry]):  # noqa: F821
 
 
 @model.register
-def _(t: type[AutoRegistered]):  # noqa: F821
+def _(t: type[AutoRegistered]):
     if not hasattr(t, "_registry"):
         return None
     return recurse(t @ t._registry)

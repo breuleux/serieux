@@ -1,8 +1,10 @@
 import copy
 import math
 
+import pytest
+
 from serieux.features.comment import CommentProxy
-from serieux.proxy import LazyProxy
+from serieux.proxy import DeadlockError, LazyProxy
 
 from .definitions import Point
 
@@ -286,7 +288,5 @@ def test_lazy_proxy_deadlock():
         return proxy._obj
 
     proxy = LazyProxy(recurse)
-    try:
-        _ = proxy._obj
-    except Exception as e:
-        assert "Deadlock" in str(e)
+    with pytest.raises(DeadlockError):
+        proxy._obj

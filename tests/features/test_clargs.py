@@ -154,7 +154,7 @@ class Act:
     """Do stuff!"""
 
     # What to do
-    command: TaggedUnion[Eat, Sleep]  # noqa: F821
+    command: TaggedUnion[Eat, Sleep]
 
     # Do we do it fast?
     fast: bool = field(default=False, metadata={"alias": "-f"})

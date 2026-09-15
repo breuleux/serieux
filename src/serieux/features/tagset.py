@@ -1,9 +1,10 @@
 import importlib
 import importlib.metadata
 from collections import deque
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import TYPE_CHECKING, Annotated, Any, Callable, Iterable, TypeAlias, Union
+from typing import TYPE_CHECKING, Annotated, Any, TypeAlias, Union
 
 from ovld import Medley, call_next, ovld, recurse
 

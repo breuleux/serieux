@@ -3,11 +3,12 @@ import shutil
 from dataclasses import dataclass
 
 import pytest
+from cryptography.fernet import InvalidToken
 
 from serieux import Serieux
 from serieux.ctx import Patcher
 from serieux.exc import ValidationError
-from serieux.features.encrypt import Encrypt, EncryptionKey, Secret, crypt_prefix
+from serieux.features.encrypt import Encrypt, EncryptError, EncryptionKey, Secret, crypt_prefix
 
 featured = (Serieux + Encrypt)()
 serialize = featured.serialize
@@ -92,7 +93,7 @@ def test_wrong_password_decryption(ekey, bad_ekey):
     serialized = serialize(User, user, ekey)
 
     # Try to deserialize with wrong password - should fail
-    with pytest.raises(Exception):
+    with pytest.raises(InvalidToken):
         deserialize(User, serialized, bad_ekey)
 
 
@@ -111,7 +112,7 @@ def test_no_password_decryption(ekey, no_ekey):
 
     serialized = serialize(User, user, ekey)
 
-    with pytest.raises(Exception):
+    with pytest.raises(EncryptError):
         deserialize(User, serialized, no_ekey)
 
 
@@ -145,7 +146,7 @@ def test_missing_encryption_context():
 def test_invalid_encrypted_data(ekey):
     """Test deserialization with invalid encrypted data."""
     invalid_data = {"name": "eve", "password": f"{crypt_prefix}invalid_encrypted_data"}
-    with pytest.raises(Exception):
+    with pytest.raises(InvalidToken):
         deserialize(User, invalid_data, ekey)
 
 

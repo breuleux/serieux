@@ -56,7 +56,7 @@ def decode_string(t: type[UnionAlias], value: str):
     for opt in get_args(t):
         try:
             return decode_string(opt, value)
-        except Exception as exc:
+        except Exception as exc:  # noqa
             err = exc
     raise err
 

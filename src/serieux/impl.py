@@ -36,6 +36,7 @@ from .model import (
     DictModelizable,
     FieldModelizable,
     ListModelizable,
+    ModelDefinitionError,
     Modelizable,
     NumberModelizable,
     StringModelizable,
@@ -53,6 +54,8 @@ from .utils import (
     basic_type,
     clsstring,
 )
+
+_CTX = Code("$ctx")
 
 
 def _noop(*args, **kwargs):  # pragma: no cover
@@ -111,9 +114,7 @@ class BaseImplementation(Medley):
     ##################
 
     @classmethod
-    def subcode(
-        cls, method_name, t, accessor, ctx_t, ctx_expr=Code("$ctx"), after=None, validate=None
-    ):
+    def subcode(cls, method_name, t, accessor, ctx_t, ctx_expr=_CTX, after=None, validate=None):
         if isinstance(accessor, str):
             acc1 = acc2 = Code(accessor)
         else:
@@ -566,7 +567,7 @@ class BaseImplementation(Medley):
         m = model(t)
         if m.regexp:
             if isinstance(m.from_string, Def):  # pragma: no cover
-                raise Exception("In model definitions, use Lambda with regexp, not Def")
+                raise ModelDefinitionError("In model definitions, use Lambda with regexp, not Def")
             elif isinstance(m.from_string, Lambda):
                 expr = m.from_string.create_expression(["t", "obj", "ctx"])
             else:

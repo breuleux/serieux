@@ -22,7 +22,7 @@ def validation_errors(msgs):
                 (exc.info.trail_string == pth and msg in str(exc)) for exc in veg.exceptions
             ):
                 traceback.print_exception(veg)
-                raise Exception(f"No exception was raised at {pth} for '{msg}'")
+                raise Exception(f"No exception was raised at {pth} for '{msg}'")  # noqa
 
 
 class AssertTransformer(NodeTransformer):
@@ -30,7 +30,7 @@ class AssertTransformer(NodeTransformer):
         newfns = []
         for i, stmt in enumerate(node.body):
             if not isinstance(stmt, ast.Assert):
-                raise Exception("@one_test_per_assert requires all statements to be asserts")
+                raise Exception("@one_test_per_assert requires all statements to be asserts")  # noqa
             else:
                 newfns.append(
                     ast.FunctionDef(
@@ -60,7 +60,6 @@ def one_test_per_assert(fn):
     new_fn = compile(new_tree, filename, "exec")
     glb = fn.__globals__
     exec(new_fn, glb, glb)
-    return None
 
 
 has_312_features = pytest.mark.skipif(

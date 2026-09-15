@@ -19,7 +19,7 @@ class MeldedCall:
             (
                 func,
                 (params := list(inspect.signature(func).parameters.values())[min(i, 1) :]),
-                set(p.name for p in params),
+                {p.name for p in params},
             )
             for i, func in enumerate(funcs)
         ]

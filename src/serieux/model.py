@@ -1,4 +1,5 @@
 import re
+from collections.abc import Callable
 from dataclasses import MISSING, dataclass, field, fields, is_dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from functools import cached_property
@@ -6,7 +7,6 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Callable,
     Optional,
     TypeAlias,
     get_args,
@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 from ovld import Code, Dataclass, Lambda, call_next, class_check, ovld, recurse, subclasscheck
 
 from .docstrings import VariableDoc, get_attribute_docstrings
-from .exc import ValidationError
+from .exc import BaseSerieuxError, ValidationError
 from .instructions import Instruction, T, inherit, pushdown, strip
 from .utils import UnionAlias, clsstring, evaluate_hint
 
@@ -28,6 +28,10 @@ if TYPE_CHECKING:
     AllowExtras: TypeAlias = Annotated[T, None]
 else:
     AllowExtras = Instruction("AllowExtras", annotation_priority=1, inherit=True)
+
+
+class ModelDefinitionError(BaseSerieuxError, TypeError):
+    pass
 
 
 @class_check
@@ -144,11 +148,11 @@ class Model:
         if isinstance(self.constructor, type):
             return self.constructor
         elif self.constructor is None:  # pragma: no cover
-            raise TypeError(f"No constructor defined for {self}.")
+            raise ModelDefinitionError(f"No constructor defined for {self}.")
         else:
             return_type = getattr(self.constructor, "__annotations__", {}).get("return", None)
             if return_type is None:
-                raise TypeError(
+                raise ModelDefinitionError(
                     f"Constructor for {self} does not have a return type annotation defined."
                 )
             return return_type

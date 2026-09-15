@@ -1,10 +1,16 @@
 import json
+from collections import Counter
 from enum import Enum
-from typing import Any, Counter
+from typing import Any
 
 from ovld import Medley, call_next, recurse
 
+from .exc import BaseSerieuxError
 from .features.partial import merge
+
+
+class SchemaCompilationError(BaseSerieuxError):
+    pass
 
 
 class Schema:
@@ -94,7 +100,7 @@ class SchemaCompiler(Medley):
             return call_next(x.data, pth)
         elif x in self.refs:
             if x not in self.done and self.ref_policy == RefPolicy.NEVER:
-                raise Exception("Recursive schema cannot be compiled without $ref")
+                raise SchemaCompilationError("Recursive schema cannot be compiled without $ref")
             elif x not in self.done or self.ref_policy not in (RefPolicy.NEVER, RefPolicy.MINIMAL):
                 return {"$ref": "/".join(self.refs[x])}
             else:

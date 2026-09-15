@@ -14,7 +14,7 @@ from serieux import Context, Serieux, Sources, deserialize
 class Dotted(Medley):
     @ovld(priority=10)
     def deserialize(self, t: type[object], obj: dict, ctx: Context):
-        if any("." in k for k in obj.keys()):
+        if any("." in k for k in obj):
             parts = []
             for k, v in obj.items():
                 levels = k.split(".")

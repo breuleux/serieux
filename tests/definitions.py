@@ -169,7 +169,7 @@ class File:
     fd: object = None
 
     def __post_init__(self):
-        self.fd = open(self.path, "r")
+        self.fd = open(self.path, "r")  # noqa
 
 
 @dataclass

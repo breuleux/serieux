@@ -144,7 +144,7 @@ class PartialBuilding(Medley):
             return value
         except BaseSerieuxError as exc:
             return exc
-        except Exception as exc:
+        except Exception as exc:  # noqa
             return ValidationError(exc=exc)
 
     @ovld(priority=HI4.next())
@@ -364,7 +364,7 @@ def instantiate(p: PartialBase):
         return args
     try:
         return dc(**args)
-    except Exception as exc:
+    except Exception as exc:  # noqa
         return ValidationError(exc=exc, ctx=p._serieux_ctx)
 
 

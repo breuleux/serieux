@@ -1,8 +1,16 @@
 from functools import cached_property
 
+from .exc import BaseSerieuxError
+
+
+class DeadlockError(BaseSerieuxError):
+    pass
+
 
 class ProxyBase:
-    __special_attributes__ = {"_obj", "_computing", "_evaluate", "_type", "__dict__", "_"}
+    __special_attributes__ = frozenset(
+        {"_obj", "_computing", "_evaluate", "_type", "__dict__", "_"}
+    )
 
     def __getattribute__(self, name):
         if name in type(self).__special_attributes__:
@@ -227,7 +235,7 @@ class LazyProxy(ProxyBase):
     @cached_property
     def _obj(self):
         if self._computing:
-            raise Exception("Deadlock: asked for a value during its computation.")
+            raise DeadlockError("Deadlock: asked for a value during its computation.")
         self._computing = True
         try:
             rval = self._evaluate()

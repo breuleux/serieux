@@ -1,14 +1,15 @@
 import base64
 import json
+from collections.abc import Callable
 from functools import cache
 from hashlib import sha256
-from typing import TYPE_CHECKING, Annotated, Any, Callable, TypeAlias
+from typing import TYPE_CHECKING, Annotated, Any, TypeAlias
 
 from ovld import Medley, call_next, ovld, recurse
 from ovld.dependent import Regexp
 
 from ..ctx import Context, Patch, Patcher
-from ..exc import ValidationError
+from ..exc import BaseSerieuxError, ValidationError
 from ..instructions import Instruction, T
 from ..priority import STD
 
@@ -19,6 +20,10 @@ except ImportError:  # pragma: no cover
         "The 'cryptography' package is required for encryption features. "
         "Please install it with 'pip install cryptography'."
     )
+
+
+class EncryptError(BaseSerieuxError):
+    pass
 
 
 #############
@@ -54,7 +59,7 @@ class EncryptionKey(Context):
             if callable(pw):
                 pw = self.password()
             elif pw is None:
-                raise Exception("No encryption password or key was provided")
+                raise EncryptError("No encryption password or key was provided")
             encoded = base64.b64encode(sha256(pw.encode()).digest())
             self.fernet_key = Fernet(encoded)
 
