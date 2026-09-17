@@ -709,11 +709,11 @@ wheels = [
 
 [[package]]
 name = "ovld"
-version = "0.5.14"
+version = "0.5.18"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/da/2d/ef4b1de457fb0a5e96fc6cdeaf7cd185186ac4bde6b1d922381fe89c439d/ovld-0.5.14.tar.gz", hash = "sha256:34bb7c1a3a3ee2656a8e8d7b840fdb9e4828efa27ea91e50d8e93b3f35122179", size = 105191, upload-time = "2026-01-15T23:09:50.254Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ae/85/e79d7b90b01149915b0222b1f8e9235546e0a71c5629d709e79c1979c3a8/ovld-0.5.18.tar.gz", hash = "sha256:60a92b85f2b961cafe2987adc53e64bd13bd5a82c0a4b0689e3efe173d399cd9", size = 106662, upload-time = "2026-09-19T05:05:19.976Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/17/45/032d3c8008080861085e5bea4d0635fcaf75a362dcf2668780c1bd610f82/ovld-0.5.14-py3-none-any.whl", hash = "sha256:964474b85a1ecd8d1a163db4d02c1be67ddd87c3e64ee115a46cf7c666828152", size = 39941, upload-time = "2026-01-15T23:09:48.981Z" },
+    { url = "https://files.pythonhosted.org/packages/00/62/8579fd932d6654c07368592f7f7845b031048113ca4eb8a37e8a8f94d1e1/ovld-0.5.18-py3-none-any.whl", hash = "sha256:2ceeb9a88898f64004b11c8686bc92fd0db3611411d17a881c985016460d47e6", size = 40811, upload-time = "2026-09-19T05:05:18.684Z" },
 ]
 
 [[package]]
@@ -1248,7 +1248,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "ovld", specifier = "~=0.5.13" }]
+requires-dist = [{ name = "ovld", specifier = "~=0.5.18" }]
 
 [package.metadata.requires-dev]
 benchmark = [

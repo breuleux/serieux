@@ -63,7 +63,7 @@ def _noop(*args, **kwargs):  # pragma: no cover
     return None
 
 
-class BaseImplementation(Medley):
+class BaseImplementation(Medley, numtower=True):
     validate_serialize: CodegenParameter[bool] = True
     validate_deserialize: CodegenParameter[bool] = True
 
