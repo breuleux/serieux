@@ -2,6 +2,7 @@ import importlib
 import inspect
 import sys
 import typing
+from numbers import Real
 from types import GenericAlias, NoneType, UnionType
 from typing import (
     Annotated,
@@ -159,7 +160,7 @@ def IsLiteral(t):
 
 
 @dependent_check
-def JSON(obj: dict | list | str | int | float | None):
+def JSON(obj: dict | list | str | Real | None):
     if isinstance(obj, dict):
         return all(isinstance(k, str) and isinstance(v, JSON) for k, v in obj.items())
     elif isinstance(obj, list):

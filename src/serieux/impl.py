@@ -5,6 +5,7 @@ from datetime import date, datetime
 from enum import Enum
 from functools import partial
 from itertools import pairwise
+from numbers import Integral, Real
 from pathlib import Path
 from types import NoneType, UnionType, WrapperDescriptorType
 from typing import Annotated, Any, get_args, get_origin
@@ -292,39 +293,29 @@ class BaseImplementation(Medley):
     # int
 
     @code_generator(priority=STD)
-    def serialize(cls, t: type[int], obj: int, ctx: Context, /):
+    def serialize(cls, t: type[Integral], obj: Integral, ctx: Context, /):
         return Lambda(Code("$obj"))
 
     @code_generator(priority=STD)
-    def deserialize(cls, t: type[int], obj: int, ctx: Context, /):
+    def deserialize(cls, t: type[Integral], obj: Integral, ctx: Context, /):
         return Lambda(Code("$obj"))
 
     @ovld(priority=STD)
-    def schema(self, t: type[int], ctx: Context, /):
+    def schema(self, t: type[Integral], ctx: Context, /):
         return {"type": "integer"}
 
     # float
 
     @code_generator(priority=STD)
-    def serialize(cls, t: type[float], obj: float, ctx: Context, /):
+    def serialize(cls, t: type[Real], obj: Real, ctx: Context, /):
         return Lambda(Code("$obj"))
 
     @code_generator(priority=STD)
-    def deserialize(cls, t: type[float], obj: float, ctx: Context, /):
+    def deserialize(cls, t: type[Real], obj: Real, ctx: Context, /):
         return Lambda(Code("$obj"))
-
-    # float
-
-    @code_generator(priority=STD)
-    def serialize(cls, t: type[float], obj: int, ctx: Context, /):
-        return Lambda(Code("$obj"))
-
-    @code_generator(priority=STD)
-    def deserialize(cls, t: type[float], obj: int, ctx: Context, /):
-        return Lambda(Code("float($obj)"))
 
     @ovld(priority=STD)
-    def schema(self, t: type[float], ctx: Context, /):
+    def schema(self, t: type[Real], ctx: Context, /):
         return {"type": "number"}
 
     # None
@@ -611,7 +602,7 @@ class BaseImplementation(Medley):
             return Lambda("$to_number($obj)", to_number=m.to_number)
 
     @code_generator(priority=STD2)
-    def deserialize(self, t: type[NumberModelizable], obj: int | float, ctx: Context, /):
+    def deserialize(self, t: type[NumberModelizable], obj: Real, ctx: Context, /):
         (t,) = get_args(t)
         m = model(t)
         if isinstance(m.from_number, Function):
